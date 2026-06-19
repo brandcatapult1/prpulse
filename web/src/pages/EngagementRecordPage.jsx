@@ -3,11 +3,10 @@ import { Link, useParams } from 'react-router-dom';
 import {
   Card,
   EmptyState,
-  ExpandableSection,
   Modal,
   Toast,
 } from '../components/ui/Primitives.jsx';
-import { RatingStars, StatusButton } from '../components/ui/DataKit.jsx';
+import { ExpandableSection, RatingStars, StatusButton } from '../components/ui/DataKit.jsx';
 import {
   Pill,
   formatDate,

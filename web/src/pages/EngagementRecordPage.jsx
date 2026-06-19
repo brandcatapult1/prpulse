@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Card, Drawer } from '../components/ui/Primitives.jsx';
 import { StatusButton, QuickAction } from '../components/ui/DataKit.jsx';
-import { Pill, formatDate, formatFee, formatStatus } from '../lib/format.js';
+import { Pill, formatDate, formatFee, formatStatus } from '../lib/format.jsx';
 import { MOCK_ENGAGEMENT, MOCK_DELIVERABLES } from '../data/mock.js';
 
 const statusOptions = [

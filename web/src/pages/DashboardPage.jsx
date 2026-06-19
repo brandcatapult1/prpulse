@@ -1,5 +1,5 @@
 import { Card } from '../components/ui/Primitives.jsx';
-import { Pill, healthTone, formatDate } from '../lib/format.js';
+import { Pill, healthTone, formatDate } from '../lib/format.jsx';
 import { MOCK_DASHBOARD } from '../data/mock.js';
 
 export function DashboardPage() {

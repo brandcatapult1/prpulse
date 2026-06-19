@@ -17,7 +17,7 @@ import { attachUser, requireAuth } from './middleware/auth.mjs';
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const rootDir = path.resolve(__dirname, '../../..');
+const rootDir = path.resolve(__dirname, '../..');
 const port = Number(process.env.PORT ?? 8080);
 
 async function runMigrations() {
@@ -25,7 +25,11 @@ async function runMigrations() {
     console.warn('DATABASE_URL not set — skipping migrations');
     return;
   }
-  execSync('node scripts/migrate.mjs up', { cwd: rootDir, stdio: 'inherit' });
+  try {
+    execSync('node scripts/migrate.mjs up', { cwd: rootDir, stdio: 'inherit' });
+  } catch (err) {
+    console.error('Migration failed — app will still start:', err.message ?? err);
+  }
 }
 
 const app = express();

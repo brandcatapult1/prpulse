@@ -8,6 +8,7 @@ import {
 } from '../components/ui/Primitives.jsx';
 import { RatingStars, StatusButton } from '../components/ui/DataKit.jsx';
 import { DeliverableRow } from '../components/deliverables/DeliverableProofSection.jsx';
+import { FeedbackModal } from '../components/feedback/FeedbackModal.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import {
   Pill,
@@ -22,7 +23,9 @@ import { engagementsApi } from '../lib/api.js';
 import {
   getDemoDeliverables,
   getDemoEngagement,
+  getDemoFeedback,
   getDemoTimeline,
+  isContactBlacklisted,
   pickList,
   pickRecord,
   saveDeliverablesOverride,
@@ -74,6 +77,7 @@ export function EngagementRecordPage() {
   const [engagement, setEngagement] = useState(() => getDemoEngagement(id));
   const [deliverables, setDeliverables] = useState(() => getDemoDeliverables(id));
   const [timeline, setTimeline] = useState(() => getDemoTimeline(id));
+  const [feedbackRecord, setFeedbackRecord] = useState(() => getDemoFeedback(id));
   const [saving, setSaving] = useState(false);
 
   const persistEngagement = async (patch, { silent = false } = {}) => {
@@ -143,6 +147,7 @@ export function EngagementRecordPage() {
         usingDemo ? getDemoDeliverables(id) : pickList(dels, getDemoDeliverables(id)),
       );
       setTimeline(getDemoTimeline(id));
+      setFeedbackRecord(getDemoFeedback(id));
     });
   }, [id]);
 
@@ -221,6 +226,9 @@ export function EngagementRecordPage() {
       is_overdue: false,
       content_link: null,
       screenshots: [],
+      brief_compliance: null,
+      brand_tag_verified: null,
+      internal_rating: null,
     };
     persistDeliverables([...deliverables, newItem]);
     setModal(null);
@@ -228,6 +236,7 @@ export function EngagementRecordPage() {
   };
 
   const postedCount = deliverables.filter((d) => d.status === 'posted').length;
+  const blacklisted = engagement.contact_id && isContactBlacklisted(engagement.contact_id);
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -252,6 +261,11 @@ export function EngagementRecordPage() {
       </div>
 
       <DemoBanner show={demo} />
+      {blacklisted && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-2xs text-red-900">
+          <span className="font-semibold">Blacklisted creator.</span> This contact is excluded from new campaign population.
+        </div>
+      )}
       {closedBanner && (
         <TerminalStateBanner {...closedBanner} />
       )}
@@ -262,7 +276,15 @@ export function EngagementRecordPage() {
       <div className="grid gap-3 sm:grid-cols-3">
         <ActionCard
           title="Feedback"
-          subtitle={feedback.available ? 'Rate this collaboration' : feedback.lockedReason}
+          subtitle={
+            feedbackRecord
+              ? 'Feedback saved — tap to edit'
+              : feedback.available
+                ? 'Rate this collaboration'
+                : feedback.lockedReason
+          }
+          badge={feedbackRecord ? 'Saved' : undefined}
+          badgeTone="success"
           disabled={!feedback.available}
           onClick={() => feedback.available && setModal('feedback')}
         />
@@ -495,6 +517,14 @@ export function EngagementRecordPage() {
         open={modal === 'feedback'}
         onClose={() => setModal(null)}
         contactName={engagement.contact_name}
+        engagementId={id}
+        contactId={engagement.contact_id}
+        initial={feedbackRecord}
+        onSaved={(record) => {
+          setFeedbackRecord(record);
+          setModal(null);
+          setToast('Feedback saved');
+        }}
       />
 
       <VisitModal
@@ -774,71 +804,6 @@ function AddDeliverableModal({ open, initialType, onClose, contactName, onAdd })
         </div>
       </div>
     </Modal>
-  );
-}
-
-function FeedbackModal({ open, onClose, contactName }) {
-  return (
-    <Modal
-      open={open}
-      title={`Feedback · ${contactName}`}
-      onClose={onClose}
-      footer={
-        <div className="flex justify-end gap-2">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="button" className="btn-primary" onClick={onClose}>Save feedback</button>
-        </div>
-      }
-    >
-      <div className="space-y-4">
-        {[
-          ['Content quality', 4],
-          ['Professionalism', 5],
-          ['Timeliness', 4],
-        ].map(([label, stars]) => (
-          <div key={label} className="flex items-center justify-between rounded-lg border border-line bg-canvas px-4 py-3">
-            <span className="text-sm text-ink">{label}</span>
-            <RatingStars value={stars} />
-          </div>
-        ))}
-        <div className="grid gap-3 sm:grid-cols-2">
-          <ToggleCard label="Adherence to terms" />
-          <ToggleCard label="Would work again" defaultYes />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-2xs font-medium text-ink-secondary">Internal notes</label>
-          <textarea
-            className="input-field min-h-[80px] py-2"
-            placeholder="Optional notes for the team…"
-          />
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-function ToggleCard({ label, defaultYes = false }) {
-  const [yes, setYes] = useState(defaultYes);
-  return (
-    <div className="rounded-lg border border-line bg-canvas p-3">
-      <div className="text-2xs font-medium text-ink-secondary">{label}</div>
-      <div className="mt-2 flex gap-2">
-        {['Yes', 'No'].map((opt) => (
-          <button
-            key={opt}
-            type="button"
-            onClick={() => setYes(opt === 'Yes')}
-            className={`flex-1 rounded-md border py-2 text-2xs font-medium transition-colors ${
-              (opt === 'Yes') === yes
-                ? 'border-brand bg-brand-soft text-brand'
-                : 'border-line bg-white text-ink-secondary'
-            }`}
-          >
-            {opt}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }
 

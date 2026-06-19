@@ -5,17 +5,27 @@ import {
   MOCK_DELIVERABLES_BY_ENGAGEMENT,
   MOCK_ENGAGEMENTS_BY_CAMPAIGN,
   MOCK_ENGAGEMENTS_BY_ID,
+  MOCK_FEEDBACK_BY_ENGAGEMENT,
   MOCK_TIMELINE_BY_ENGAGEMENT,
 } from '../data/mock.js';
 import {
   getDeliverablesOverride,
+  getFeedbackOverride,
+  getBlacklistOverride,
   mergeEngagementRecord,
   mergeEngagementRow,
   saveDeliverablesOverride,
   saveEngagementOverride,
+  saveFeedbackOverride,
+  saveBlacklistOverride,
 } from './demoStore.js';
 
-export { saveEngagementOverride, saveDeliverablesOverride };
+export {
+  saveEngagementOverride,
+  saveDeliverablesOverride,
+  saveFeedbackOverride,
+  saveBlacklistOverride,
+};
 
 /** Use mock rows when the API returns an empty list (or the call failed). */
 export function pickList(apiRows, mockRows) {
@@ -50,6 +60,17 @@ export function getDemoDeliverables(engagementId) {
 
 export function getDemoTimeline(engagementId) {
   return MOCK_TIMELINE_BY_ENGAGEMENT[engagementId] ?? [];
+}
+
+export function getDemoFeedback(engagementId) {
+  return getFeedbackOverride(engagementId) ?? MOCK_FEEDBACK_BY_ENGAGEMENT[engagementId] ?? null;
+}
+
+export function isContactBlacklisted(contactId) {
+  const override = getBlacklistOverride(contactId);
+  if (override) return true;
+  const contact = MOCK_CONTACTS.find((c) => c.id === contactId);
+  return Boolean(contact?.is_blacklisted);
 }
 
 /** Merge dashboard API payload with sample widgets that would otherwise be empty. */

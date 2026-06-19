@@ -1,3 +1,8 @@
+/** Today as YYYY-MM-DD (local calendar). */
+export function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 /** Today + N days as YYYY-MM-DD (local calendar). */
 export function addDaysIso(days) {
   const d = new Date();

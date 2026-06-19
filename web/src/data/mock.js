@@ -182,6 +182,7 @@ export const MOCK_ENGAGEMENTS_BY_ID = {
   e1: {
     id: 'e1',
     campaign_id: 'c1',
+    contact_id: '1',
     contact_name: 'Aisha K.',
     campaign_name: 'Summer F&B Push',
     brand_name: 'BrandX',
@@ -197,6 +198,7 @@ export const MOCK_ENGAGEMENTS_BY_ID = {
   e2: {
     id: 'e2',
     campaign_id: 'c1',
+    contact_id: '2',
     contact_name: 'Rohan T.',
     campaign_name: 'Summer F&B Push',
     brand_name: 'BrandX',
@@ -228,6 +230,7 @@ export const MOCK_ENGAGEMENTS_BY_ID = {
   e4: {
     id: 'e4',
     campaign_id: 'c1',
+    contact_id: '4',
     contact_name: 'Kabir M.',
     campaign_name: 'Summer F&B Push',
     brand_name: 'BrandX',
@@ -339,6 +342,9 @@ export const MOCK_DELIVERABLES_BY_ENGAGEMENT = {
       is_overdue: true,
       content_link: null,
       screenshots: [],
+      brief_compliance: null,
+      brand_tag_verified: null,
+      internal_rating: null,
     },
     {
       id: 'd6',
@@ -352,6 +358,9 @@ export const MOCK_DELIVERABLES_BY_ENGAGEMENT = {
         { id: 's1', label: 'story-frame-1.png' },
         { id: 's2', label: 'story-frame-2.png' },
       ],
+      brief_compliance: true,
+      brand_tag_verified: true,
+      internal_rating: 4,
     },
   ],
   e7: [
@@ -376,6 +385,18 @@ export const MOCK_TIMELINE_BY_ENGAGEMENT = {
   ],
 };
 
+export const MOCK_FEEDBACK_BY_ENGAGEMENT = {
+  e2: {
+    content_quality: 5,
+    professionalism: 5,
+    timeliness: 4,
+    adherence_to_terms: true,
+    would_work_again: true,
+    internal_notes: 'Smooth collab — would repeat for festive menu.',
+    saved_at: '2026-06-10',
+  },
+};
+
 export const MOCK_DASHBOARD = {
   follow_ups_due: [
     { id: 'e1', full_name: 'Aisha K.', campaign_name: 'Summer F&B Push', next_follow_up_date: '2026-06-24', conversation_status: 'in_conversation' },
@@ -384,12 +405,12 @@ export const MOCK_DASHBOARD = {
     { id: 'e3', full_name: 'Simran P.', campaign_name: 'Summer F&B Push', next_follow_up_date: '2026-06-22', conversation_status: 'scheduled' },
   ],
   overdue_deliverables: [
-    { id: 'd2', deliverable_type: 'story', full_name: 'Aisha K.', campaign_name: 'Summer F&B Push' },
-    { id: 'd5', deliverable_type: 'reel', full_name: 'Kabir M.', campaign_name: 'Summer F&B Push' },
+    { id: 'd2', engagement_id: 'e1', deliverable_type: 'story', full_name: 'Aisha K.', campaign_name: 'Summer F&B Push' },
+    { id: 'd5', engagement_id: 'e4', deliverable_type: 'reel', full_name: 'Kabir M.', campaign_name: 'Summer F&B Push' },
   ],
   deliverables_due: [
-    { id: 'd1', deliverable_type: 'reel', full_name: 'Aisha K.', campaign_name: 'Summer F&B Push', due_date: '2026-06-20' },
-    { id: 'd6', deliverable_type: 'story', full_name: 'Kabir M.', campaign_name: 'Summer F&B Push', due_date: '2026-06-14' },
+    { id: 'd1', engagement_id: 'e1', deliverable_type: 'reel', full_name: 'Aisha K.', campaign_name: 'Summer F&B Push', due_date: '2026-06-20' },
+    { id: 'd6', engagement_id: 'e4', deliverable_type: 'story', full_name: 'Kabir M.', campaign_name: 'Summer F&B Push', due_date: '2026-06-14' },
   ],
   upcoming_visits: [
     { id: 'e3', full_name: 'Simran P.', campaign_name: 'Summer F&B Push', visit_date: '2026-06-22', visit_outlet: 'Connaught Place' },

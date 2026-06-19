@@ -17,14 +17,16 @@ const PERSISTED_ENGAGEMENT_FIELDS = [
 function loadStore() {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return { engagements: {}, deliverables: {} };
+    if (!raw) return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {} };
     const parsed = JSON.parse(raw);
     return {
       engagements: parsed.engagements ?? {},
       deliverables: parsed.deliverables ?? {},
+      feedback: parsed.feedback ?? {},
+      blacklist: parsed.blacklist ?? {},
     };
   } catch {
-    return { engagements: {}, deliverables: {} };
+    return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {} };
   }
 }
 
@@ -86,4 +88,24 @@ export function mergeEngagementRecord(base) {
   const override = getEngagementOverride(base.id);
   const merged = override ? { ...base, ...override } : { ...base };
   return normalizeTerminalFields(merged);
+}
+
+export function getFeedbackOverride(engagementId) {
+  return loadStore().feedback[engagementId] ?? null;
+}
+
+export function saveFeedbackOverride(engagementId, record) {
+  const store = loadStore();
+  store.feedback[engagementId] = record;
+  saveStore(store);
+}
+
+export function getBlacklistOverride(contactId) {
+  return loadStore().blacklist[contactId] ?? null;
+}
+
+export function saveBlacklistOverride(contactId, record) {
+  const store = loadStore();
+  store.blacklist[contactId] = record;
+  saveStore(store);
 }

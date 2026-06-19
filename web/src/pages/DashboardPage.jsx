@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Card } from '../components/ui/Primitives.jsx';
+import { Card, Toast } from '../components/ui/Primitives.jsx';
 import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { Pill, healthTone, formatDate } from '../lib/format.jsx';
@@ -8,11 +8,14 @@ import { MODULES, DASHBOARD_WIDGETS } from '../lib/modules.js';
 import { dashboardApi } from '../lib/api.js';
 import { MOCK_DASHBOARD } from '../data/mock.js';
 import { mergeDashboard } from '../lib/demo.js';
+import { addDaysIso, todayIso } from '../lib/dates.js';
+import { saveEngagementOverride } from '../lib/demoStore.js';
 
 export function DashboardPage() {
   const [data, setData] = useState(MOCK_DASHBOARD);
   const [demo, setDemo] = useState(true);
   const [activeWidget, setActiveWidget] = useState('followUps');
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     dashboardApi
@@ -31,6 +34,32 @@ export function DashboardPage() {
         setData({ ...MOCK_DASHBOARD, _demo: true });
         setDemo(true);
       });
+  }, []);
+
+  const logContact = useCallback((engagementId) => {
+    saveEngagementOverride(engagementId, { last_contact_date: todayIso() });
+    setData((prev) => ({
+      ...prev,
+      follow_ups_due: prev.follow_ups_due.map((item) =>
+        item.id === engagementId ? { ...item, last_contact_date: todayIso() } : item,
+      ),
+    }));
+    setToast('Contact logged for today');
+  }, []);
+
+  const snoozeFollowUp = useCallback((engagementId, currentDate) => {
+    const base = currentDate || todayIso();
+    const next = addDaysIsoFrom(base, 3);
+    saveEngagementOverride(engagementId, { next_follow_up_date: next });
+    setData((prev) => ({
+      ...prev,
+      follow_ups_due: prev.follow_ups_due
+        .map((item) =>
+          item.id === engagementId ? { ...item, next_follow_up_date: next } : item,
+        )
+        .filter((item) => item.next_follow_up_date <= todayIso() || item.id !== engagementId),
+    }));
+    setToast(`Follow-up snoozed to ${formatDate(next)}`);
   }, []);
 
   const {
@@ -78,19 +107,64 @@ export function DashboardPage() {
         <h2 className="text-sm font-medium text-ink">Action list</h2>
         <ul className="mt-3 divide-y divide-line">
           {activeWidget === 'followUps' && follow_ups_due.map((item) => (
-            <ActionRow key={item.id} name={item.full_name} meta={item.campaign_name} badge={formatDate(item.next_follow_up_date)} tone="warning" href={`/engagements/${item.id}`} />
+            <ActionRow
+              key={item.id}
+              name={item.full_name}
+              meta={`${item.campaign_name} · ${formatStatusLabel(item.conversation_status)} · due ${formatDate(item.next_follow_up_date)}`}
+              badge={formatDate(item.next_follow_up_date)}
+              tone="warning"
+              href={`/engagements/${item.id}`}
+              actions={
+                <>
+                  <button type="button" className="btn-ghost !px-2 !py-1 text-2xs" onClick={() => logContact(item.id)}>
+                    Log contact
+                  </button>
+                  <button type="button" className="btn-ghost !px-2 !py-1 text-2xs" onClick={() => snoozeFollowUp(item.id, item.next_follow_up_date)}>
+                    Snooze +3d
+                  </button>
+                </>
+              }
+            />
           ))}
           {activeWidget === 'overdue' && overdue_deliverables.map((item) => (
-            <ActionRow key={item.id} name={item.full_name} meta={`${item.deliverable_type} · ${item.campaign_name}`} badge="Overdue" tone="danger" />
+            <ActionRow
+              key={item.id}
+              name={item.full_name}
+              meta={`${item.deliverable_type} · ${item.campaign_name}`}
+              badge="Overdue"
+              tone="danger"
+              href={`/engagements/${item.engagement_id}`}
+            />
           ))}
           {activeWidget === 'due' && deliverables_due.map((item) => (
-            <ActionRow key={item.id} name={item.full_name} meta={`${item.deliverable_type} · ${item.campaign_name}`} badge={formatDate(item.due_date)} tone="info" />
+            <ActionRow
+              key={item.id}
+              name={item.full_name}
+              meta={`${item.deliverable_type} · ${item.campaign_name}`}
+              badge={formatDate(item.due_date)}
+              tone="info"
+              href={`/engagements/${item.engagement_id}`}
+            />
           ))}
           {activeWidget === 'visits' && upcoming_visits.map((item) => (
-            <ActionRow key={item.id} name={item.full_name} meta={`${item.visit_outlet ?? 'Visit'} · ${item.campaign_name}`} badge={formatDate(item.visit_date)} tone="info" href={`/engagements/${item.id}`} />
+            <ActionRow
+              key={item.id}
+              name={item.full_name}
+              meta={`${item.visit_outlet ?? 'Visit'} · ${item.campaign_name}`}
+              badge={formatDate(item.visit_date)}
+              tone="info"
+              href={`/engagements/${item.id}`}
+            />
           ))}
           {activeWidget === 'stalled' && stalled_engagements.map((item) => (
-            <ActionRow key={item.id} name={item.full_name} meta={`${item.campaign_name} · ${item.days_stalled}d no change`} badge="Stalled" tone="warning" href={`/engagements/${item.id}`} />
+            <ActionRow
+              key={item.id}
+              name={item.full_name}
+              meta={`${item.campaign_name} · ${item.days_stalled}d no change`}
+              badge="Stalled"
+              tone="warning"
+              href={`/engagements/${item.id}`}
+            />
           ))}
           {widgets.find((w) => w.id === activeWidget)?.count === 0 && (
             <li className="py-6 text-center text-2xs text-ink-tertiary">No items in this widget</li>
@@ -116,30 +190,45 @@ export function DashboardPage() {
           ))}
         </ul>
       </Card>
+
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </div>
   );
 }
 
-function ActionRow({ name, meta, badge, tone, href }) {
-  const inner = (
+function ActionRow({ name, meta, badge, tone, href, actions }) {
+  const content = (
     <>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium text-ink">{name}</div>
         <div className="truncate text-2xs text-ink-tertiary">{meta}</div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {actions}
         <Pill tone={tone}>{badge}</Pill>
-        {href && <span className="text-2xs font-medium text-brand">Open</span>}
+        {href && (
+          <Link to={href} className="text-2xs font-medium text-brand hover:underline">
+            Open
+          </Link>
+        )}
       </div>
     </>
   );
+
   return (
     <li className="py-2.5">
-      {href ? (
-        <Link to={href} className="flex items-center justify-between gap-3 hover:opacity-80">{inner}</Link>
-      ) : (
-        <div className="flex items-center justify-between gap-3">{inner}</div>
-      )}
+      <div className="flex flex-wrap items-center justify-between gap-3">{content}</div>
     </li>
   );
+}
+
+function formatStatusLabel(status) {
+  if (!status) return '—';
+  return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function addDaysIsoFrom(isoDate, days) {
+  const d = new Date(isoDate);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
 }

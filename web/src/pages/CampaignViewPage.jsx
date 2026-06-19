@@ -2,23 +2,43 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FilterBar, DataTable, MetricStrip } from '../components/ui/DataKit.jsx';
 import { Drawer } from '../components/ui/Primitives.jsx';
+import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { Pill, healthTone, formatStatus, formatDate, formatFee, statusTone } from '../lib/format.jsx';
+import { MODULES } from '../lib/modules.js';
 import { campaignsApi, engagementsApi } from '../lib/api.js';
-import { MOCK_CAMPAIGN, MOCK_ENGAGEMENTS, MOCK_CONTACTS } from '../data/mock.js';
+import { MOCK_CONTACTS } from '../data/mock.js';
+import {
+  getDemoCampaign,
+  getDemoEngagementsForCampaign,
+  pickList,
+  pickRecord,
+} from '../lib/demo.js';
+import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 
 export function CampaignViewPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [campaign, setCampaign] = useState(MOCK_CAMPAIGN);
-  const [engagements, setEngagements] = useState(MOCK_ENGAGEMENTS);
+  const [campaign, setCampaign] = useState(() => getDemoCampaign(id));
+  const [engagements, setEngagements] = useState(() => getDemoEngagementsForCampaign(id));
+  const [demo, setDemo] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    campaignsApi.get(id).then(setCampaign).catch(() => {});
-    engagementsApi.byCampaign(id).then((rows) => {
-      if (rows.length) setEngagements(rows);
-    }).catch(() => {});
+    setCampaign(getDemoCampaign(id));
+    setEngagements(getDemoEngagementsForCampaign(id));
+    setDemo(true);
+
+    Promise.all([
+      campaignsApi.get(id).catch(() => null),
+      engagementsApi.byCampaign(id).catch(() => []),
+    ]).then(([camp, engs]) => {
+      const campEmpty = !camp?.campaign_name;
+      const engsEmpty = !Array.isArray(engs) || engs.length === 0;
+      setCampaign(pickRecord(camp, getDemoCampaign(id)));
+      setEngagements(pickList(engs, getDemoEngagementsForCampaign(id)));
+      setDemo(campEmpty || engsEmpty);
+    });
   }, [id]);
 
   const columns = [
@@ -39,34 +59,34 @@ export function CampaignViewPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <div className="panel p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold tracking-tight text-ink">{campaign.campaign_name}</h1>
-              <Pill tone="success">{campaign.status}</Pill>
-            </div>
-            <p className="text-2xs text-ink-secondary">{campaign.brand_name}</p>
-            <MetricStrip
-              items={[
-                { label: 'Target', value: campaign.target_collaborations ?? '—' },
-                { label: 'Completed', value: campaign.completed_collaborations, tone: 'accent' },
-                { label: 'Remaining', value: campaign.remaining_collaborations ?? '—' },
-                {
-                  label: 'Health',
-                  value: campaign.campaign_health === 'not_set' ? 'Not set' : `${campaign.achievement_pct ?? 0}% ${campaign.campaign_health}`,
-                  tone: 'accent',
-                },
-              ]}
-            />
-          </div>
-          <button type="button" className="btn-primary" onClick={() => setAddOpen(true)}>Add creators</button>
+      <PageHeader
+        title={campaign.campaign_name}
+        subtitle={`${MODULES.campaignView.pageTitle} · ${campaign.brand_name}`}
+        actions={<button type="button" className="btn-primary" onClick={() => setAddOpen(true)}>Add Creators</button>}
+      />
+
+      <DemoBanner show={demo} />
+
+      <div className="panel p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <MetricStrip
+            items={[
+              { label: 'Target', value: campaign.target_collaborations ?? '—' },
+              { label: 'Completed', value: campaign.completed_collaborations, tone: 'accent' },
+              { label: 'Remaining', value: campaign.remaining_collaborations ?? '—' },
+              {
+                label: 'Health',
+                value: campaign.campaign_health === 'not_set'
+                  ? 'No target set'
+                  : `${campaign.achievement_pct ?? 0}%`,
+                tone: 'accent',
+              },
+            ]}
+          />
+          <Pill tone={healthTone(campaign.campaign_health)}>
+            {campaign.campaign_health === 'not_set' ? 'Not set' : campaign.campaign_health}
+          </Pill>
         </div>
-        {campaign.campaign_health && campaign.campaign_health !== 'not_set' && (
-          <div className="mt-4">
-            <Pill tone={healthTone(campaign.campaign_health)}>{campaign.campaign_health}</Pill>
-          </div>
-        )}
       </div>
 
       <FilterBar filters={['Status', 'Owner', 'Interest', 'Follow-up due']} />

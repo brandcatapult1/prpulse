@@ -1,19 +1,32 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { DataTable } from '../components/ui/DataKit.jsx';
+import { DemoBanner } from '../components/ui/DemoBanner.jsx';
+import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { Pill, healthTone } from '../lib/format.jsx';
+import { MODULES } from '../lib/modules.js';
 import { campaignsApi } from '../lib/api.js';
+import { MOCK_CAMPAIGNS } from '../data/mock.js';
+import { pickList } from '../lib/demo.js';
 
 export function CampaignsPage() {
   const navigate = useNavigate();
-  const [rows, setRows] = useState([]);
+  const [rows, setRows] = useState(MOCK_CAMPAIGNS);
+  const [demo, setDemo] = useState(true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     campaignsApi
       .list()
-      .then(setRows)
-      .catch(() => setRows([]))
+      .then((data) => {
+        const resolved = pickList(data, MOCK_CAMPAIGNS);
+        setRows(resolved);
+        setDemo(!data?.length);
+      })
+      .catch(() => {
+        setRows(MOCK_CAMPAIGNS);
+        setDemo(true);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -47,7 +60,7 @@ export function CampaignsPage() {
       label: 'Health',
       render: (r) => (
         <Pill tone={healthTone(r.campaign_health)}>
-          {r.campaign_health === 'not_set' ? 'Not set' : r.campaign_health}
+          {r.campaign_health === 'not_set' ? 'No target set' : r.campaign_health}
         </Pill>
       ),
     },
@@ -55,10 +68,14 @@ export function CampaignsPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <header>
-        <h1 className="page-title">Campaigns</h1>
-        <p className="page-sub mt-0.5">Run outreach and track progress</p>
-      </header>
+      <PageHeader
+        title={MODULES.campaigns.pageTitle}
+        subtitle={MODULES.campaigns.subtitle}
+        actions={<button type="button" className="btn-primary">+ Campaign</button>}
+      />
+
+      <DemoBanner show={demo} />
+
       {loading ? (
         <div className="panel px-4 py-10 text-center text-2xs text-ink-tertiary">Loading…</div>
       ) : (

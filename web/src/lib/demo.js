@@ -7,6 +7,15 @@ import {
   MOCK_ENGAGEMENTS_BY_ID,
   MOCK_TIMELINE_BY_ENGAGEMENT,
 } from '../data/mock.js';
+import {
+  getDeliverablesOverride,
+  mergeEngagementRecord,
+  mergeEngagementRow,
+  saveDeliverablesOverride,
+  saveEngagementOverride,
+} from './demoStore.js';
+
+export { saveEngagementOverride, saveDeliverablesOverride };
 
 /** Use mock rows when the API returns an empty list (or the call failed). */
 export function pickList(apiRows, mockRows) {
@@ -24,15 +33,19 @@ export function getDemoCampaign(id) {
 }
 
 export function getDemoEngagementsForCampaign(campaignId) {
-  return MOCK_ENGAGEMENTS_BY_CAMPAIGN[campaignId] ?? MOCK_ENGAGEMENTS_BY_CAMPAIGN.c1;
+  const base = MOCK_ENGAGEMENTS_BY_CAMPAIGN[campaignId] ?? MOCK_ENGAGEMENTS_BY_CAMPAIGN.c1;
+  return base.map(mergeEngagementRow);
 }
 
 export function getDemoEngagement(id) {
-  return MOCK_ENGAGEMENTS_BY_ID[id] ?? Object.values(MOCK_ENGAGEMENTS_BY_ID)[0];
+  const base = MOCK_ENGAGEMENTS_BY_ID[id] ?? Object.values(MOCK_ENGAGEMENTS_BY_ID)[0];
+  return mergeEngagementRecord({ ...base });
 }
 
 export function getDemoDeliverables(engagementId) {
-  return MOCK_DELIVERABLES_BY_ENGAGEMENT[engagementId] ?? [];
+  return getDeliverablesOverride(engagementId)
+    ?? MOCK_DELIVERABLES_BY_ENGAGEMENT[engagementId]
+    ?? [];
 }
 
 export function getDemoTimeline(engagementId) {

@@ -24,6 +24,8 @@ import {
   getDemoTimeline,
   pickList,
   pickRecord,
+  saveDeliverablesOverride,
+  saveEngagementOverride,
 } from '../lib/demo.js';
 import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 
@@ -71,6 +73,45 @@ export function EngagementRecordPage() {
   const [engagement, setEngagement] = useState(() => getDemoEngagement(id));
   const [deliverables, setDeliverables] = useState(() => getDemoDeliverables(id));
   const [timeline, setTimeline] = useState(() => getDemoTimeline(id));
+  const [saving, setSaving] = useState(false);
+
+  const persistEngagement = async (patch, { silent = false } = {}) => {
+    let next;
+    setEngagement((prev) => {
+      next = { ...prev, ...patch };
+      return next;
+    });
+
+    if (demo) {
+      saveEngagementOverride(id, next);
+      if (!silent) setToast('Saved');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const saved = await engagementsApi.update(id, patch);
+      setEngagement((prev) => ({
+        ...prev,
+        ...saved,
+        contact_name: prev.contact_name,
+        campaign_name: prev.campaign_name,
+        brand_name: prev.brand_name,
+        owner_name: prev.owner_name,
+        campaign_id: prev.campaign_id,
+      }));
+      if (!silent) setToast('Saved');
+    } catch {
+      setToast('Could not save — please try again');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const persistDeliverables = (list) => {
+    setDeliverables(list);
+    if (demo) saveDeliverablesOverride(id, list);
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -86,12 +127,22 @@ export function EngagementRecordPage() {
     ]).then(([eng, dels]) => {
       const engEmpty = !eng?.contact_name;
       const delsEmpty = !Array.isArray(dels) || dels.length === 0;
-      setEngagement(pickRecord(eng, getDemoEngagement(id)));
-      setDeliverables(pickList(dels, getDemoDeliverables(id)));
+      const usingDemo = engEmpty || delsEmpty;
+      setDemo(usingDemo);
+      setEngagement(
+        usingDemo ? getDemoEngagement(id) : mergeEngagementFromApi(eng, id),
+      );
+      setDeliverables(
+        usingDemo ? getDemoDeliverables(id) : pickList(dels, getDemoDeliverables(id)),
+      );
       setTimeline(getDemoTimeline(id));
-      setDemo(engEmpty || delsEmpty);
     });
   }, [id]);
+
+  function mergeEngagementFromApi(apiRow, engagementId) {
+    const base = pickRecord(apiRow, getDemoEngagement(engagementId));
+    return { ...base, ...apiRow, contact_name: apiRow.contact_name ?? base.contact_name };
+  }
 
   const canComplete =
     deliverables.length > 0 && deliverables.every((d) => d.status === 'posted');
@@ -106,8 +157,7 @@ export function EngagementRecordPage() {
       return;
     }
 
-    setEngagement((e) => ({ ...e, conversation_status: next }));
-
+    const patch = { conversation_status: next };
     const rule = FOLLOW_UP_SUGGESTIONS[next];
     if (rule) {
       setFollowUpSuggestion({
@@ -116,20 +166,23 @@ export function EngagementRecordPage() {
       });
     } else if (next === 'collaboration_complete' || next.startsWith('dropped_')) {
       setFollowUpSuggestion(null);
-      setEngagement((e) => ({ ...e, next_follow_up_date: null }));
+      patch.next_follow_up_date = null;
     }
+
+    persistEngagement(patch);
   };
 
   const handleFollowUpChange = (date) => {
-    setEngagement((e) => ({ ...e, next_follow_up_date: date || null }));
     if (date === followUpSuggestion?.date) setFollowUpSuggestion(null);
+    persistEngagement({ next_follow_up_date: date || null });
   };
 
   const acceptFollowUpSuggestion = () => {
     if (!followUpSuggestion) return;
-    setEngagement((e) => ({ ...e, next_follow_up_date: followUpSuggestion.date }));
+    const { date } = followUpSuggestion;
     setFollowUpSuggestion(null);
-    setToast(`Follow-up set to ${formatDate(followUpSuggestion.date)}`);
+    persistEngagement({ next_follow_up_date: date }, { silent: true });
+    setToast(`Follow-up set to ${formatDate(date)}`);
   };
 
   const openAddDeliverable = (type = 'reel') => {
@@ -146,7 +199,7 @@ export function EngagementRecordPage() {
       status: 'pending',
       is_overdue: false,
     };
-    setDeliverables((prev) => [...prev, newItem]);
+    persistDeliverables([...deliverables, newItem]);
     setModal(null);
     setToast(`Added ${type} ×${newItem.quantity}`);
   };
@@ -177,6 +230,9 @@ export function EngagementRecordPage() {
       </div>
 
       <DemoBanner show={demo} />
+      {saving && (
+        <p className="text-2xs text-ink-tertiary">Saving…</p>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <ActionCard title="Feedback" subtitle="Rate this collaboration" onClick={() => setModal('feedback')} />
@@ -220,7 +276,7 @@ export function EngagementRecordPage() {
                 <ChipGroup
                   options={interestOptions}
                   value={engagement.interest_level}
-                  onChange={(v) => setEngagement((e) => ({ ...e, interest_level: v }))}
+                  onChange={(v) => persistEngagement({ interest_level: v })}
                 />
               </div>
             </div>
@@ -355,8 +411,8 @@ export function EngagementRecordPage() {
         deliverables={deliverables}
         onAdd={() => openAddDeliverable('reel')}
         onStatusChange={(delId, status) => {
-          setDeliverables((prev) =>
-            prev.map((d) => (d.id === delId ? { ...d, status } : d)),
+          persistDeliverables(
+            deliverables.map((d) => (d.id === delId ? { ...d, status } : d)),
           );
         }}
       />
@@ -380,12 +436,11 @@ export function EngagementRecordPage() {
         onClose={() => setModal(null)}
         contactName={engagement.contact_name}
         onSave={(visitDate) => {
-          setEngagement((e) => ({
-            ...e,
+          persistEngagement({
             conversation_status: 'scheduled',
             visit_date: visitDate,
             next_follow_up_date: visitDate,
-          }));
+          });
           setFollowUpSuggestion(null);
           setModal(null);
           setToast('Visit saved — follow-up set to visit date');

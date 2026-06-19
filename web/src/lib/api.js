@@ -37,5 +37,6 @@ export const campaignsApi = {
 export const engagementsApi = {
   byCampaign: (campaignId) => api(`/engagements/campaign/${campaignId}`),
   get: (id) => api(`/engagements/${id}`),
+  update: (id, body) => api(`/engagements/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deliverables: (id) => api(`/engagements/${id}/deliverables`),
 };

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { FilterBar, DataTable, MetricStrip } from '../components/ui/DataKit.jsx';
 import { Drawer } from '../components/ui/Primitives.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
@@ -17,6 +17,7 @@ import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 
 export function CampaignViewPage() {
   const { id } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const [campaign, setCampaign] = useState(() => getDemoCampaign(id));
   const [engagements, setEngagements] = useState(() => getDemoEngagementsForCampaign(id));
@@ -39,7 +40,7 @@ export function CampaignViewPage() {
       setEngagements(pickList(engs, getDemoEngagementsForCampaign(id)));
       setDemo(campEmpty || engsEmpty);
     });
-  }, [id]);
+  }, [id, location.key]);
 
   const columns = [
     {

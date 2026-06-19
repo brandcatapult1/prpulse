@@ -72,6 +72,10 @@ export function getDemoContacts() {
   return [...MOCK_CONTACTS, ...getContactAdds()];
 }
 
+export function getDemoContact(id) {
+  return getDemoContacts().find((c) => c.id === id) ?? null;
+}
+
 export function getDemoCampaigns() {
   return [...MOCK_CAMPAIGNS, ...getCampaignAdds()];
 }

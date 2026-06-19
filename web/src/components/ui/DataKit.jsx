@@ -50,7 +50,7 @@ export function DataTable({ columns, rows, onRowClick, selectable = false, selec
   );
 }
 
-export function FilterBar({ filters, active = [], onClear }) {
+export function FilterBar({ filters, active = [], onToggle, onClear }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {filters.map((f) => {
@@ -59,6 +59,7 @@ export function FilterBar({ filters, active = [], onClear }) {
           <button
             key={f}
             type="button"
+            onClick={() => onToggle?.(f)}
             className={`rounded-md border px-2.5 py-1 text-2xs transition-colors ${
               isActive
                 ? 'border-brand/30 bg-brand-soft text-brand'

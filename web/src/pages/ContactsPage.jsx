@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FilterBar, DataTable } from '../components/ui/DataKit.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { QuickAddModal } from '../components/contacts/QuickAddModal.jsx';
 import { Pill, statusTone } from '../lib/format.jsx';
-import { MODULES, CONTACT_PROFILE_TABS } from '../lib/modules.js';
+import { MODULES } from '../lib/modules.js';
 import { contactsApi } from '../lib/api.js';
 import { getDemoContacts, mergeContacts } from '../lib/demo.js';
+import { getContactProfileExtras } from '../lib/contactProfile.js';
 import { canBulkImport } from '../lib/csvImport.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { DemoBanner } from '../components/ui/DemoBanner.jsx';
@@ -18,6 +19,8 @@ export function ContactsPage() {
   const [rows, setRows] = useState(() => getDemoContacts());
   const [demo, setDemo] = useState(true);
   const [quickOpen, setQuickOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [activeFilters, setActiveFilters] = useState([]);
 
   useEffect(() => {
     loadContacts();
@@ -36,6 +39,39 @@ export function ContactsPage() {
         setDemo(true);
       });
   }
+
+  function toggleFilter(name) {
+    setActiveFilters((prev) =>
+      prev.includes(name) ? prev.filter((f) => f !== name) : [...prev, name],
+    );
+  }
+
+  const filteredRows = useMemo(() => {
+    let result = rows;
+    const q = query.trim().toLowerCase();
+    if (q) {
+      result = result.filter(
+        (r) =>
+          r.full_name?.toLowerCase().includes(q)
+          || r.mobile_number?.includes(q)
+          || r.city?.toLowerCase().includes(q)
+          || r.tags?.some((t) => t.toLowerCase().includes(q)),
+      );
+    }
+    if (activeFilters.includes('Status')) {
+      result = result.filter((r) => r.status === 'active');
+    }
+    if (activeFilters.includes('Classification')) {
+      result = result.filter((r) => r.classification);
+    }
+    if (activeFilters.includes('Open to Paid')) {
+      result = result.filter((r) => getContactProfileExtras(r.id).open_to_paid);
+    }
+    if (activeFilters.includes('Open to Barter')) {
+      result = result.filter((r) => getContactProfileExtras(r.id).open_to_barter);
+    }
+    return result;
+  }, [rows, query, activeFilters]);
 
   const columns = [
     { key: 'full_name', label: 'Name', render: (r) => <span className="font-medium">{r.full_name}</span> },
@@ -64,60 +100,41 @@ export function ContactsPage() {
               <Link to="/import" className="btn-secondary">Bulk Import</Link>
             )}
             <button type="button" className="btn-secondary" onClick={() => setQuickOpen(true)}>Quick Add</button>
-            <button type="button" className="btn-primary">+ Contact</button>
+            <button type="button" className="btn-primary" onClick={() => setQuickOpen(true)}>+ Contact</button>
           </>
         }
       />
 
       <DemoBanner show={demo} />
 
-      <FilterBar filters={['Name', 'Mobile', 'City', 'Category', 'Tags', 'Open to Paid', 'Open to Barter', 'Classification', 'Status']} />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <input
+          className="input-field max-w-xs"
+          placeholder="Search name, mobile, city, tags…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <FilterBar
+          filters={['Name', 'Mobile', 'City', 'Category', 'Tags', 'Open to Paid', 'Open to Barter', 'Classification', 'Status']}
+          active={activeFilters}
+          onToggle={toggleFilter}
+          onClear={() => setActiveFilters([])}
+        />
+      </div>
 
-      <DataTable columns={columns} rows={rows} onRowClick={(row) => navigate(`/contacts/${row.id}`)} />
+      {filteredRows.length === 0 ? (
+        <div className="panel px-4 py-10 text-center text-2xs text-ink-secondary">
+          No contacts match these filters.
+        </div>
+      ) : (
+        <DataTable columns={columns} rows={filteredRows} onRowClick={(row) => navigate(`/contacts/${row.id}`)} />
+      )}
 
       <QuickAddModal
         open={quickOpen}
         onClose={() => setQuickOpen(false)}
         onSaved={() => loadContacts()}
       />
-    </div>
-  );
-}
-
-export function ContactProfilePage() {
-  return (
-    <div className="mx-auto max-w-4xl space-y-4">
-      <PageHeader
-        title={MODULES.contactProfile.pageTitle}
-        subtitle={MODULES.contactProfile.subtitle}
-        actions={<button type="button" className="btn-secondary">Edit</button>}
-      />
-
-      <div className="panel p-5">
-        <h2 className="text-lg font-semibold tracking-tight text-ink">Aisha K.</h2>
-        <p className="text-2xs text-ink-secondary">Micro · Delhi · Luxury · UGC</p>
-        <p className="mt-2 text-2xs text-ink-tertiary">
-          Total: 6 collabs · Last: Apr 2026 · ★4.3 · Would work again 83%
-        </p>
-      </div>
-
-      <div className="flex gap-1 overflow-x-auto border-b border-line">
-        {CONTACT_PROFILE_TABS.map((tab, i) => (
-          <button
-            key={tab}
-            type="button"
-            className={`shrink-0 border-b-2 px-3 py-2 text-2xs font-medium ${
-              i === 0 ? 'border-brand text-brand' : 'border-transparent text-ink-secondary hover:text-ink'
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
-      <div className="panel p-5 text-2xs text-ink-secondary">
-        Read-first profile with stored metrics. Engagement editing stays campaign-scoped.
-      </div>
     </div>
   );
 }

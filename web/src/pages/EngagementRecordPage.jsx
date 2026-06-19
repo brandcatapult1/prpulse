@@ -26,6 +26,7 @@ import {
   getDemoFeedback,
   getDemoTimeline,
   isContactBlacklisted,
+  getDemoContact,
   pickList,
   pickRecord,
   saveDeliverablesOverride,
@@ -46,6 +47,7 @@ import {
   terminalBanner,
   visitRules,
 } from '../lib/engagementRules.js';
+import { getContactProfileExtras, getEngagementsForContact } from '../lib/contactProfile.js';
 
 const interestOptions = [
   { value: 'high', label: 'High' },
@@ -79,6 +81,8 @@ export function EngagementRecordPage() {
   const [timeline, setTimeline] = useState(() => getDemoTimeline(id));
   const [feedbackRecord, setFeedbackRecord] = useState(() => getDemoFeedback(id));
   const [saving, setSaving] = useState(false);
+  const [notesEditing, setNotesEditing] = useState(false);
+  const [notesDraft, setNotesDraft] = useState('');
 
   const persistEngagement = async (patch, { silent = false } = {}) => {
     let next;
@@ -237,6 +241,11 @@ export function EngagementRecordPage() {
 
   const postedCount = deliverables.filter((d) => d.status === 'posted').length;
   const blacklisted = engagement.contact_id && isContactBlacklisted(engagement.contact_id);
+  const contactRecord = engagement.contact_id ? getDemoContact(engagement.contact_id) : null;
+  const contactExtras = engagement.contact_id ? getContactProfileExtras(engagement.contact_id) : {};
+  const previousBrands = contactRecord
+    ? [...new Set(getEngagementsForContact(contactRecord).map((e) => e.brand_name).filter(Boolean))].join(', ')
+    : '—';
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -244,12 +253,19 @@ export function EngagementRecordPage() {
         title={engagement.contact_name}
         subtitle={`${MODULES.engagementRecord.pageTitle} · ${engagement.campaign_name} · ${engagement.brand_name}`}
         actions={
-          <Link
-            to={`/campaigns/${engagement.campaign_id ?? 'c1'}`}
-            className="btn-secondary"
-          >
-            ← Campaign
-          </Link>
+          <>
+            {engagement.contact_id && (
+              <Link to={`/contacts/${engagement.contact_id}`} className="btn-secondary">
+                View profile
+              </Link>
+            )}
+            <Link
+              to={`/campaigns/${engagement.campaign_id ?? 'c1'}`}
+              className="btn-secondary"
+            >
+              ← Campaign
+            </Link>
+          </>
         }
       />
 
@@ -454,40 +470,89 @@ export function EngagementRecordPage() {
           <Card elevated className="!p-5">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-ink">Notes</h2>
-              {notesRule.editable && (
-                <button type="button" className="btn-ghost text-2xs">Edit</button>
+              {notesRule.editable && !notesEditing && (
+                <button
+                  type="button"
+                  className="btn-ghost text-2xs"
+                  onClick={() => {
+                    setNotesDraft(engagement.notes ?? '');
+                    setNotesEditing(true);
+                  }}
+                >
+                  Edit
+                </button>
               )}
             </div>
-            <p className="mt-3 rounded-lg bg-canvas px-3 py-3 text-sm leading-relaxed text-ink-secondary">
-              {engagement.notes || (notesRule.editable
-                ? 'No notes yet — tap Edit to add context for the team.'
-                : '—')}
-            </p>
+            {notesEditing ? (
+              <div className="mt-3 space-y-2">
+                <textarea
+                  className="input-field min-h-[100px] w-full text-sm"
+                  value={notesDraft}
+                  onChange={(e) => setNotesDraft(e.target.value)}
+                  placeholder="Context for the team…"
+                />
+                <div className="flex justify-end gap-2">
+                  <button type="button" className="btn-secondary text-2xs" onClick={() => setNotesEditing(false)}>
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary text-2xs"
+                    onClick={() => {
+                      persistEngagement({ notes: notesDraft.trim() || null });
+                      setNotesEditing(false);
+                      setToast('Notes saved');
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 rounded-lg bg-canvas px-3 py-3 text-sm leading-relaxed text-ink-secondary">
+                {engagement.notes || (notesRule.editable
+                  ? 'No notes yet — tap Edit to add context for the team.'
+                  : '—')}
+              </p>
+            )}
           </Card>
         </div>
 
         <Card elevated className="h-fit !p-5">
           <h2 className="text-sm font-semibold text-ink">Relationship</h2>
           <p className="mt-0.5 text-2xs text-ink-secondary">From contact history</p>
+          {engagement.contact_id && (
+            <Link to={`/contacts/${engagement.contact_id}`} className="mt-2 inline-block text-2xs font-medium text-brand hover:underline">
+              Open full profile →
+            </Link>
+          )}
           <dl className="mt-4 space-y-4">
             <div>
               <dt className="text-2xs text-ink-tertiary">Previous brands</dt>
-              <dd className="mt-1 text-sm font-medium text-ink">BrandY, BrandZ</dd>
+              <dd className="mt-1 text-sm font-medium text-ink">{previousBrands || '—'}</dd>
             </div>
             <div>
               <dt className="text-2xs text-ink-tertiary">Avg rating</dt>
               <dd className="mt-1 flex items-center gap-2">
-                <RatingStars value={4.3} />
-                <span className="text-sm font-medium text-ink">4.3</span>
+                {contactExtras.avg_rating != null ? (
+                  <>
+                    <RatingStars value={contactExtras.avg_rating} />
+                    <span className="text-sm font-medium text-ink">{contactExtras.avg_rating.toFixed(1)}</span>
+                  </>
+                ) : (
+                  <span className="text-sm text-ink-secondary">—</span>
+                )}
               </dd>
             </div>
             <div>
               <dt className="text-2xs text-ink-tertiary">Would work again</dt>
-              <dd className="mt-1 text-sm font-medium text-ink">83%</dd>
+              <dd className="mt-1 text-sm font-medium text-ink">
+                {contactExtras.would_work_again_pct != null ? `${contactExtras.would_work_again_pct}%` : '—'}
+              </dd>
             </div>
           </dl>
           <div className="mt-4 border-t border-line pt-4">
-            <Pill tone="success">Not blacklisted</Pill>
+            <Pill tone={blacklisted ? 'danger' : 'success'}>{blacklisted ? 'Blacklisted' : 'Not blacklisted'}</Pill>
           </div>
         </Card>
       </div>

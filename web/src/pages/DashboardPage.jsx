@@ -197,27 +197,30 @@ export function DashboardPage() {
 }
 
 function ActionRow({ name, meta, badge, tone, href, actions }) {
-  const content = (
-    <>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-ink">{name}</div>
-        <div className="truncate text-2xs text-ink-tertiary">{meta}</div>
-      </div>
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {actions}
-        <Pill tone={tone}>{badge}</Pill>
-        {href && (
-          <Link to={href} className="text-2xs font-medium text-brand hover:underline">
-            Open
-          </Link>
-        )}
-      </div>
-    </>
-  );
-
   return (
     <li className="py-2.5">
-      <div className="flex flex-wrap items-center justify-between gap-3">{content}</div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {href ? (
+          <Link to={href} className="min-w-0 flex-1 hover:text-brand">
+            <div className="truncate text-sm font-medium text-ink">{name}</div>
+            <div className="truncate text-2xs text-ink-tertiary">{meta}</div>
+          </Link>
+        ) : (
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-medium text-ink">{name}</div>
+            <div className="truncate text-2xs text-ink-tertiary">{meta}</div>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {actions}
+          <Pill tone={tone}>{badge}</Pill>
+          {href && (
+            <Link to={href} className="text-2xs font-medium text-brand hover:underline">
+              Open
+            </Link>
+          )}
+        </div>
+      </div>
     </li>
   );
 }

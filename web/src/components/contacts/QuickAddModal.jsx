@@ -13,7 +13,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 
 const EMPTY = { full_name: '', mobile_number: '', instagram_url: '', city: '' };
 
-export function QuickAddModal({ open, onClose, onSaved }) {
+export function QuickAddModal({ open, onClose, onSaved, defaultCampaignId = '' }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [form, setForm] = useState(EMPTY);
@@ -29,14 +29,14 @@ export function QuickAddModal({ open, onClose, onSaved }) {
     setForm(EMPTY);
     setDuplicate(null);
     setContinueAnyway(false);
-    setCampaignId('');
+    setCampaignId(defaultCampaignId || '');
     campaignsApi
       .list()
       .then((data) => {
         setCampaigns(Array.isArray(data) && data.length > 0 ? data : getDemoCampaigns());
       })
       .catch(() => setCampaigns(getDemoCampaigns()));
-  }, [open]);
+  }, [open, defaultCampaignId]);
 
   function updateField(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));

@@ -1,19 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { FilterBar, DataTable, MetricStrip } from '../components/ui/DataKit.jsx';
-import { Drawer } from '../components/ui/Primitives.jsx';
+import { Drawer, Toast } from '../components/ui/Primitives.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
+import { QuickAddModal } from '../components/contacts/QuickAddModal.jsx';
 import { Pill, healthTone, formatStatus, formatDate, formatFee, statusTone } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
 import { campaignsApi, engagementsApi } from '../lib/api.js';
-import { MOCK_CONTACTS } from '../data/mock.js';
 import {
+  addEngagementImport,
   getDemoCampaign,
+  getDemoContacts,
   getDemoEngagementsForCampaign,
   pickList,
   pickRecord,
 } from '../lib/demo.js';
 import { DemoBanner } from '../components/ui/DemoBanner.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 export function CampaignViewPage() {
   const { id } = useParams();
@@ -23,11 +26,16 @@ export function CampaignViewPage() {
   const [engagements, setEngagements] = useState(() => getDemoEngagementsForCampaign(id));
   const [demo, setDemo] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
+  const [activeFilters, setActiveFilters] = useState([]);
+
+  function reloadEngagements() {
+    setEngagements(getDemoEngagementsForCampaign(id));
+  }
 
   useEffect(() => {
     if (!id) return;
     setCampaign(getDemoCampaign(id));
-    setEngagements(getDemoEngagementsForCampaign(id));
+    reloadEngagements();
     setDemo(true);
 
     Promise.all([
@@ -41,6 +49,17 @@ export function CampaignViewPage() {
       setDemo(campEmpty || engsEmpty);
     });
   }, [id, location.key]);
+
+  const filteredEngagements = useMemo(() => {
+    let rows = engagements;
+    if (activeFilters.includes('Follow-up due')) {
+      rows = rows.filter((r) => r.next_follow_up_date);
+    }
+    if (activeFilters.includes('Status')) {
+      rows = rows.filter((r) => r.conversation_status && r.conversation_status !== 'collaboration_complete');
+    }
+    return rows;
+  }, [engagements, activeFilters]);
 
   const columns = [
     {
@@ -101,40 +120,103 @@ export function CampaignViewPage() {
         Click any creator row to open their <span className="font-medium text-ink-secondary">Engagement Record</span>
       </p>
 
-      <FilterBar filters={['Status', 'Owner', 'Interest', 'Follow-up due']} />
+      <FilterBar
+        filters={['Status', 'Owner', 'Interest', 'Follow-up due']}
+        active={activeFilters}
+        onToggle={(f) =>
+          setActiveFilters((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]))
+        }
+        onClear={() => setActiveFilters([])}
+      />
 
       <DataTable
         columns={columns}
-        rows={engagements}
+        rows={filteredEngagements}
         onRowClick={(row) => navigate(`/engagements/${row.id}`)}
       />
 
-      <AddCreatorsDrawer open={addOpen} onClose={() => setAddOpen(false)} />
+      <AddCreatorsDrawer
+        open={addOpen}
+        campaignId={id}
+        campaignName={campaign.campaign_name}
+        onClose={() => setAddOpen(false)}
+        onAdded={reloadEngagements}
+      />
     </div>
   );
 }
 
-function AddCreatorsDrawer({ open, onClose }) {
+function AddCreatorsDrawer({ open, onClose, campaignId, campaignName, onAdded }) {
+  const { user } = useAuth();
   const [selected, setSelected] = useState([]);
-  const toggle = (rowId) => setSelected((s) => (s.includes(rowId) ? s.filter((x) => x !== rowId) : [...s, rowId]));
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [adding, setAdding] = useState(false);
+  const contacts = getDemoContacts().filter((c) => !c.is_blacklisted && c.status !== 'archived');
+
+  const toggle = (rowId) =>
+    setSelected((s) => (s.includes(rowId) ? s.filter((x) => x !== rowId) : [...s, rowId]));
+
+  useEffect(() => {
+    if (!open) {
+      setSelected([]);
+    }
+  }, [open]);
+
+  async function handleAddToCampaign() {
+    if (selected.length === 0) {
+      setToast('Select at least one creator');
+      return;
+    }
+    setAdding(true);
+    const picked = contacts.filter((c) => selected.includes(c.id));
+    try {
+      await campaignsApi.populate(campaignId, { contact_ids: selected });
+    } catch {
+      for (const c of picked) {
+        addEngagementImport({
+          contactId: c.id,
+          contactName: c.full_name,
+          campaignId,
+          campaignName,
+          ownerName: user?.full_name,
+        });
+      }
+    }
+    setAdding(false);
+    setToast(`Added ${picked.length} creator${picked.length === 1 ? '' : 's'} to campaign`);
+    onAdded?.();
+    setSelected([]);
+    onClose();
+  }
 
   return (
-    <Drawer
-      open={open}
-      title="Add creators"
-      onClose={onClose}
-      footer={
-        <div className="flex items-center justify-between">
-          <span className="text-2xs text-ink-tertiary">{selected.length} selected · blacklisted hidden</span>
-          <div className="flex gap-2">
-            <button type="button" className="btn-secondary">Quick Add</button>
-            <button type="button" className="btn-primary">Add to campaign</button>
+    <>
+      <Drawer
+        open={open}
+        title="Add creators"
+        onClose={onClose}
+        footer={
+          <div className="flex items-center justify-between">
+            <span className="text-2xs text-ink-tertiary">{selected.length} selected · blacklisted hidden</span>
+            <div className="flex gap-2">
+              <button type="button" className="btn-secondary" onClick={() => setQuickOpen(true)}>
+                Quick Add
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={adding || selected.length === 0}
+                onClick={handleAddToCampaign}
+              >
+                {adding ? 'Adding…' : 'Add to campaign'}
+              </button>
+            </div>
           </div>
-        </div>
-      }
-    >
-      <FilterBar filters={['Category', 'City', 'Classification', 'Tags', 'Saved list']} />
-      <div className="mt-4">
+        }
+      >
+        <FilterBar filters={['Category', 'City', 'Classification', 'Tags', 'Saved list']} />
+        <div className="mt-4">
         <DataTable
           selectable
           selected={selected}
@@ -142,11 +224,24 @@ function AddCreatorsDrawer({ open, onClose }) {
           columns={[
             { key: 'full_name', label: 'Name' },
             { key: 'city', label: 'City' },
-            { key: 'classification', label: 'Class' },
+            { key: 'classification', label: 'Class', render: (r) => r.classification?.replace('_', ' ') ?? '—' },
           ]}
-          rows={MOCK_CONTACTS.filter((c) => !c.is_blacklisted)}
+          rows={contacts}
         />
-      </div>
-    </Drawer>
+        </div>
+      </Drawer>
+
+      <QuickAddModal
+        open={quickOpen}
+        defaultCampaignId={campaignId}
+        onClose={() => setQuickOpen(false)}
+        onSaved={() => {
+          onAdded?.();
+          setToast('Contact saved — select them above to add to campaign');
+        }}
+      />
+
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+    </>
   );
 }

@@ -26,6 +26,7 @@ export const dashboardApi = {
 
 export const contactsApi = {
   list: () => api('/contacts'),
+  get: (id) => api(`/contacts/${id}`),
   quickAdd: (body) => api('/contacts/quick-add', { method: 'POST', body: JSON.stringify(body) }),
   lookupMobile: (mobile) =>
     api(`/contacts/lookup/mobile/${encodeURIComponent(mobile)}`),

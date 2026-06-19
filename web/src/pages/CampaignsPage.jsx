@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { DataTable } from '../components/ui/DataKit.jsx';
+import { Toast } from '../components/ui/Primitives.jsx';
 import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { Pill, healthTone } from '../lib/format.jsx';
@@ -17,6 +18,7 @@ export function CampaignsPage() {
   const [rows, setRows] = useState(() => getDemoCampaigns());
   const [demo, setDemo] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     campaignsApi
@@ -79,7 +81,16 @@ export function CampaignsPage() {
             {canImport && (
               <Link to="/import" className="btn-secondary">Bulk Import</Link>
             )}
-            <button type="button" className="btn-primary">+ Campaign</button>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => {
+                if (canImport) navigate('/import');
+                else setToast('Campaign setup is available via Bulk Import — ask your admin');
+              }}
+            >
+              + Campaign
+            </button>
           </>
         }
       />
@@ -91,6 +102,8 @@ export function CampaignsPage() {
       ) : (
         <DataTable columns={columns} rows={rows} onRowClick={(r) => navigate(`/campaigns/${r.id}`)} />
       )}
+
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </div>
   );
 }

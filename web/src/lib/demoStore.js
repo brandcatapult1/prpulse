@@ -17,7 +17,7 @@ const PERSISTED_ENGAGEMENT_FIELDS = [
 function loadStore() {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [], brands: {}, contactAdds: [], campaignAdds: [], engagementAdds: [], users: {} };
+    if (!raw) return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [], brands: {}, contactAdds: [], campaignAdds: [], engagementAdds: [], contactProfiles: {}, users: {} };
     const parsed = JSON.parse(raw);
     return {
       engagements: parsed.engagements ?? {},
@@ -30,10 +30,11 @@ function loadStore() {
       contactAdds: parsed.contactAdds ?? [],
       campaignAdds: parsed.campaignAdds ?? [],
       engagementAdds: parsed.engagementAdds ?? [],
+      contactProfiles: parsed.contactProfiles ?? {},
       users: parsed.users ?? {},
     };
   } catch {
-    return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [], brands: {}, contactAdds: [], campaignAdds: [], engagementAdds: [], users: {} };
+    return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [], brands: {}, contactAdds: [], campaignAdds: [], engagementAdds: [], contactProfiles: {}, users: {} };
   }
 }
 
@@ -188,6 +189,19 @@ export function addEngagementImport({ contactId, contactName, campaignId, campai
   store.engagementAdds = [...(store.engagementAdds ?? []), row];
   saveStore(store);
   return row;
+}
+
+export function getContactProfileOverride(id) {
+  return loadStore().contactProfiles?.[id] ?? null;
+}
+
+export function saveContactProfileOverride(id, patch) {
+  const store = loadStore();
+  store.contactProfiles = {
+    ...(store.contactProfiles ?? {}),
+    [id]: { ...(store.contactProfiles?.[id] ?? {}), ...patch },
+  };
+  saveStore(store);
 }
 
 export function getUserOverride(id) {

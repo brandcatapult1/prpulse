@@ -177,6 +177,70 @@ export const MOCK_CONTACTS = [
   { id: '8', full_name: 'Vikram S.', city: 'Chennai', classification: 'macro', status: 'active', tags: ['Auto'] },
 ];
 
+/** Stored profile metrics + extended fields (UX §1.3 — not computed on load). */
+export const MOCK_CONTACT_PROFILE = {
+  '1': {
+    instagram_url: 'https://instagram.com/aisha.k',
+    open_to_paid: true,
+    open_to_barter: true,
+    reel_rate: 35000,
+    story_rate: 8000,
+    total_collaborations: 6,
+    last_collaboration_date: '2026-04-15',
+    avg_rating: 4.3,
+    would_work_again_pct: 83,
+    notes: 'Strong UGC quality. Prefers luxury and F&B briefs. Responsive on WhatsApp.',
+  },
+  '2': {
+    instagram_url: 'https://instagram.com/rohan.eats',
+    open_to_paid: true,
+    open_to_barter: false,
+    reel_rate: 45000,
+    story_rate: 12000,
+    total_collaborations: 4,
+    last_collaboration_date: '2026-06-10',
+    avg_rating: 4.8,
+    would_work_again_pct: 100,
+    notes: 'Reliable for paid F&B collabs. Fast turnaround on reels.',
+  },
+  '4': {
+    instagram_url: 'https://instagram.com/kabir_travel',
+    open_to_paid: true,
+    open_to_barter: true,
+    reel_rate: 85000,
+    story_rate: 20000,
+    total_collaborations: 3,
+    last_collaboration_date: '2026-05-01',
+    avg_rating: 4.1,
+    would_work_again_pct: 67,
+    notes: 'Macro travel creator — strong reach, needs tighter brief compliance.',
+  },
+  '5': {
+    instagram_url: 'https://instagram.com/simran.lifestyle',
+    open_to_paid: true,
+    open_to_barter: true,
+    reel_rate: 28000,
+    story_rate: 7000,
+    total_collaborations: 2,
+    last_collaboration_date: '2026-03-20',
+    avg_rating: 4.0,
+    would_work_again_pct: 50,
+    notes: 'Outlet visits work well — prefers Chandigarh/Delhi shoots.',
+  },
+  '7': {
+    instagram_url: 'https://instagram.com/meera.beauty',
+    open_to_paid: true,
+    open_to_barter: true,
+    reel_rate: 15000,
+    story_rate: 4000,
+    total_collaborations: 1,
+    last_collaboration_date: '2026-02-10',
+    avg_rating: 3.5,
+    would_work_again_pct: 0,
+    notes: 'Nano beauty creator — good for volume campaigns.',
+  },
+};
+
 export const MOCK_CAMPAIGNS = [
   {
     id: 'c1',
@@ -379,6 +443,7 @@ export const MOCK_ENGAGEMENTS_BY_ID = {
   e3: {
     id: 'e3',
     campaign_id: 'c1',
+    contact_id: '5',
     contact_name: 'Simran P.',
     campaign_name: 'Summer F&B Push',
     brand_name: 'BrandX',
@@ -411,6 +476,7 @@ export const MOCK_ENGAGEMENTS_BY_ID = {
   e5: {
     id: 'e5',
     campaign_id: 'c1',
+    contact_id: '7',
     contact_name: 'Meera D.',
     campaign_name: 'Summer F&B Push',
     brand_name: 'BrandX',
@@ -426,6 +492,7 @@ export const MOCK_ENGAGEMENTS_BY_ID = {
   e6: {
     id: 'e6',
     campaign_id: 'c1',
+    contact_id: '6',
     contact_name: 'Arjun V.',
     campaign_name: 'Summer F&B Push',
     brand_name: 'BrandX',
@@ -441,6 +508,7 @@ export const MOCK_ENGAGEMENTS_BY_ID = {
   e7: {
     id: 'e7',
     campaign_id: 'c2',
+    contact_id: '1',
     contact_name: 'Aisha K.',
     campaign_name: 'Luxury Launch',
     brand_name: 'Maison Éclat',
@@ -456,6 +524,7 @@ export const MOCK_ENGAGEMENTS_BY_ID = {
   e8: {
     id: 'e8',
     campaign_id: 'c2',
+    contact_id: '8',
     contact_name: 'Vikram S.',
     campaign_name: 'Luxury Launch',
     brand_name: 'Maison Éclat',
@@ -471,6 +540,7 @@ export const MOCK_ENGAGEMENTS_BY_ID = {
   e10: {
     id: 'e10',
     campaign_id: 'c3',
+    contact_id: '7',
     contact_name: 'Meera D.',
     campaign_name: 'Monsoon Beauty Drive',
     brand_name: 'GlowCo',

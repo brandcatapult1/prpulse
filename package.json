@@ -1,0 +1,27 @@
+{
+  "name": "pr-pulse",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "PR Pulse — Relationship Operations Platform for Brand Catapult",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "db:migrate": "node scripts/migrate.mjs up",
+    "db:migrate:down": "node scripts/migrate.mjs down",
+    "db:migrate:status": "node scripts/migrate.mjs status",
+    "db:test": "node db/tests/integrity.test.mjs",
+    "build": "npm run build --workspace=web",
+    "start": "node server/src/index.mjs",
+    "dev": "npm run dev --workspace=web"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "pg": "^8.13.1"
+  }
+}

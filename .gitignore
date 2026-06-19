@@ -10,6 +10,8 @@ node_modules/
 dist/
 build/
 .next/
+web/dist/
+package-lock.json
 
 # OS / editor noise
 .DS_Store

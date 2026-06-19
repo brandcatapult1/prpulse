@@ -1,6 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext.jsx';
-import { Skeleton } from '../components/ui/Primitives.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { Skeleton } from '../ui/Primitives.jsx';
 
 export function RequireAuth() {
   const { user, loading, devMode } = useAuth();

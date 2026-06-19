@@ -13,6 +13,7 @@ import { ReportsPage } from './pages/ReportsPage.jsx';
 import { RegistrationsPage } from './pages/RegistrationsPage.jsx';
 import { BrandsPage } from './pages/BrandsPage.jsx';
 import { BulkImportPage } from './pages/BulkImportPage.jsx';
+import { AdminPage } from './pages/AdminPage.jsx';
 import { PublicRegistrationPage } from './pages/PublicRegistrationPage.jsx';
 import { Modal } from './components/ui/Primitives.jsx';
 
@@ -36,6 +37,7 @@ export default function App() {
             <Route path="registrations" element={<RegistrationsPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="import" element={<BulkImportPage />} />
+            <Route path="admin" element={<AdminPage />} />
           </Route>
         </Route>
       </Routes>

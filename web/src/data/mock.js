@@ -11,6 +11,110 @@ export const MOCK_TEAM = [
   { id: '3', full_name: 'Rhea Kapoor' },
 ];
 
+export const MOCK_USERS = [
+  {
+    id: '1',
+    full_name: 'Priya Sharma',
+    email: 'priya@brandcatapult.com',
+    role: 'campaign_manager',
+    is_active: true,
+  },
+  {
+    id: '2',
+    full_name: 'Ankit Rao',
+    email: 'ankit@brandcatapult.com',
+    role: 'campaign_manager',
+    is_active: true,
+  },
+  {
+    id: '3',
+    full_name: 'Rhea Kapoor',
+    email: 'rhea@brandcatapult.com',
+    role: 'senior_manager',
+    is_active: true,
+  },
+  {
+    id: '4',
+    full_name: 'Dev User',
+    email: 'dev@brandcatapult.local',
+    role: 'admin',
+    is_active: true,
+  },
+];
+
+export const MOCK_AUDIT_LOG = [
+  {
+    id: 'al1',
+    occurred_at: '2026-06-19T09:15:00',
+    user_name: 'Priya Sharma',
+    entity_type: 'engagement',
+    entity_id: 'e4',
+    action_type: 'status_change',
+    previous_value: { conversation_status: 'scheduled' },
+    new_value: { conversation_status: 'awaiting_final_deliverables' },
+  },
+  {
+    id: 'al2',
+    occurred_at: '2026-06-18T14:30:00',
+    user_name: 'Priya Sharma',
+    entity_type: 'engagement',
+    entity_id: 'e1',
+    action_type: 'status_change',
+    previous_value: { conversation_status: 'not_contacted' },
+    new_value: { conversation_status: 'in_conversation' },
+  },
+  {
+    id: 'al3',
+    occurred_at: '2026-06-17T11:00:00',
+    user_name: 'Ankit Rao',
+    entity_type: 'deliverable',
+    entity_id: 'd6',
+    action_type: 'update',
+    previous_value: { status: 'received' },
+    new_value: { status: 'posted' },
+  },
+  {
+    id: 'al4',
+    occurred_at: '2026-06-16T16:45:00',
+    user_name: 'Priya Sharma',
+    entity_type: 'feedback',
+    entity_id: 'e2',
+    action_type: 'create',
+    previous_value: null,
+    new_value: { content_quality: 5, would_work_again: true },
+  },
+  {
+    id: 'al5',
+    occurred_at: '2026-06-15T10:20:00',
+    user_name: 'Rhea Kapoor',
+    entity_type: 'contact',
+    entity_id: '3',
+    action_type: 'blacklist',
+    previous_value: { is_blacklisted: false },
+    new_value: { is_blacklisted: true, reason: 'Repeated no-shows' },
+  },
+  {
+    id: 'al6',
+    occurred_at: '2026-06-14T08:00:00',
+    user_name: 'Priya Sharma',
+    entity_type: 'campaign',
+    entity_id: 'c1',
+    action_type: 'update',
+    previous_value: { target_collaborations: 18 },
+    new_value: { target_collaborations: 20 },
+  },
+  {
+    id: 'al7',
+    occurred_at: '2026-06-12T13:30:00',
+    user_name: 'Ankit Rao',
+    entity_type: 'engagement',
+    entity_id: 'e2',
+    action_type: 'commercial_change',
+    previous_value: { agreed_fee: null },
+    new_value: { agreed_fee: 40000 },
+  },
+];
+
 export const MOCK_BRANDS = [
   {
     id: 'b1',

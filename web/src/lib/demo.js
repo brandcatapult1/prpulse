@@ -4,6 +4,8 @@ import {
   MOCK_DASHBOARD,
   MOCK_BRANDS,
   MOCK_TEAM,
+  MOCK_USERS,
+  MOCK_AUDIT_LOG,
   MOCK_DELIVERABLES_BY_ENGAGEMENT,
   MOCK_ENGAGEMENTS_BY_CAMPAIGN,
   MOCK_ENGAGEMENTS_BY_ID,
@@ -31,6 +33,8 @@ import {
   getCampaignAdds,
   addContactImports,
   addCampaignImports,
+  getUserOverride,
+  saveUserOverride,
 } from './demoStore.js';
 
 export {
@@ -43,6 +47,7 @@ export {
   addRegistrationSubmission,
   addContactImports,
   addCampaignImports,
+  saveUserOverride,
 };
 
 /** Use mock rows when the API returns an empty list (or the call failed). */
@@ -175,10 +180,39 @@ export function isDemoList(apiRows) {
   return !Array.isArray(apiRows) || apiRows.length === 0;
 }
 
-export { MOCK_CAMPAIGNS, MOCK_CONTACTS, MOCK_DASHBOARD, MOCK_BRANDS, MOCK_TEAM };
+export { MOCK_CAMPAIGNS, MOCK_CONTACTS, MOCK_DASHBOARD, MOCK_BRANDS, MOCK_TEAM, MOCK_USERS, MOCK_AUDIT_LOG };
 
 export function mergeContacts(apiRows) {
   const demo = getDemoContacts();
+  if (!Array.isArray(apiRows) || apiRows.length === 0) {
+    return { rows: demo, _demo: true };
+  }
+  return { rows: apiRows, _demo: false };
+}
+
+export function getDemoUsers() {
+  return MOCK_USERS.map((user) => {
+    const override = getUserOverride(user.id);
+    return override ? { ...user, ...override } : { ...user };
+  });
+}
+
+export function mergeUsers(apiRows) {
+  const demo = getDemoUsers();
+  if (!Array.isArray(apiRows) || apiRows.length === 0) {
+    return { rows: demo, _demo: true };
+  }
+  return { rows: apiRows, _demo: false };
+}
+
+export function getDemoAuditLog(entityType = null) {
+  const base = [...MOCK_AUDIT_LOG];
+  if (!entityType || entityType === 'all') return base;
+  return base.filter((e) => e.entity_type === entityType);
+}
+
+export function mergeAuditLog(apiRows, entityType = null) {
+  const demo = getDemoAuditLog(entityType);
   if (!Array.isArray(apiRows) || apiRows.length === 0) {
     return { rows: demo, _demo: true };
   }

@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { roleLabel } from '../../lib/format.jsx';
 import { NAV_ITEMS } from '../../lib/modules.js';
+import { canAccessAdmin } from '../../lib/adminPermissions.js';
 
 export function AppShell({ onQuickAdd }) {
   const { user, logout, devMode } = useAuth();
@@ -15,7 +16,7 @@ export function AppShell({ onQuickAdd }) {
           <div className="text-2xs text-ink-tertiary">Brand Catapult</div>
         </div>
         <nav className="flex-1 space-y-0.5 px-2">
-          {NAV_ITEMS.map((item) => (
+          {NAV_ITEMS.filter((item) => item.to !== '/admin' || canAccessAdmin(user?.role)).map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

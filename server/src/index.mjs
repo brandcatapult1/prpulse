@@ -12,6 +12,7 @@ import { contactsRouter } from './routes/contacts.mjs';
 import { campaignsRouter } from './routes/campaigns.mjs';
 import { engagementsRouter } from './routes/engagements.mjs';
 import { dashboardRouter } from './routes/dashboard.mjs';
+import { registrationsRouter } from './routes/registrations.mjs';
 import { attachUser } from './middleware/auth.mjs';
 import { devAuthMiddleware } from './middleware/devAuth.mjs';
 
@@ -60,6 +61,7 @@ app.use('/api/contacts', contactsRouter);
 app.use('/api/campaigns', campaignsRouter);
 app.use('/api/engagements', engagementsRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/registrations', registrationsRouter);
 
 const webDist = path.join(rootDir, 'web/dist');
 app.use(express.static(webDist));

@@ -40,3 +40,9 @@ export const engagementsApi = {
   update: (id, body) => api(`/engagements/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deliverables: (id) => api(`/engagements/${id}/deliverables`),
 };
+
+export const registrationsApi = {
+  list: () => api('/registrations'),
+  submit: (body) => api('/registrations', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id, body) => api(`/registrations/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+};

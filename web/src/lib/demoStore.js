@@ -17,16 +17,18 @@ const PERSISTED_ENGAGEMENT_FIELDS = [
 function loadStore() {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {} };
+    if (!raw) return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [] };
     const parsed = JSON.parse(raw);
     return {
       engagements: parsed.engagements ?? {},
       deliverables: parsed.deliverables ?? {},
       feedback: parsed.feedback ?? {},
       blacklist: parsed.blacklist ?? {},
+      registrations: parsed.registrations ?? {},
+      registrationAdds: parsed.registrationAdds ?? [],
     };
   } catch {
-    return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {} };
+    return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [] };
   }
 }
 
@@ -107,5 +109,25 @@ export function getBlacklistOverride(contactId) {
 export function saveBlacklistOverride(contactId, record) {
   const store = loadStore();
   store.blacklist[contactId] = record;
+  saveStore(store);
+}
+
+export function getRegistrationOverride(id) {
+  return loadStore().registrations[id] ?? null;
+}
+
+export function saveRegistrationOverride(id, patch) {
+  const store = loadStore();
+  store.registrations[id] = { ...(store.registrations[id] ?? {}), ...patch };
+  saveStore(store);
+}
+
+export function getRegistrationAdds() {
+  return loadStore().registrationAdds ?? [];
+}
+
+export function addRegistrationSubmission(record) {
+  const store = loadStore();
+  store.registrationAdds = [...(store.registrationAdds ?? []), record];
   saveStore(store);
 }

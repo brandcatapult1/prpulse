@@ -6,18 +6,23 @@ import {
   MOCK_ENGAGEMENTS_BY_CAMPAIGN,
   MOCK_ENGAGEMENTS_BY_ID,
   MOCK_FEEDBACK_BY_ENGAGEMENT,
+  MOCK_REGISTRATIONS,
   MOCK_TIMELINE_BY_ENGAGEMENT,
 } from '../data/mock.js';
 import {
   getDeliverablesOverride,
   getFeedbackOverride,
   getBlacklistOverride,
+  getRegistrationAdds,
+  getRegistrationOverride,
+  addRegistrationSubmission,
   mergeEngagementRecord,
   mergeEngagementRow,
   saveDeliverablesOverride,
   saveEngagementOverride,
   saveFeedbackOverride,
   saveBlacklistOverride,
+  saveRegistrationOverride,
 } from './demoStore.js';
 
 export {
@@ -25,6 +30,8 @@ export {
   saveDeliverablesOverride,
   saveFeedbackOverride,
   saveBlacklistOverride,
+  saveRegistrationOverride,
+  addRegistrationSubmission,
 };
 
 /** Use mock rows when the API returns an empty list (or the call failed). */
@@ -71,6 +78,28 @@ export function isContactBlacklisted(contactId) {
   if (override) return true;
   const contact = MOCK_CONTACTS.find((c) => c.id === contactId);
   return Boolean(contact?.is_blacklisted);
+}
+
+export function getDemoRegistrations() {
+  const added = getRegistrationAdds();
+  const base = [...MOCK_REGISTRATIONS, ...added];
+  return base.map((row) => {
+    const override = getRegistrationOverride(row.id);
+    return override ? { ...row, ...override } : row;
+  });
+}
+
+export function mergeRegistrations(apiRows) {
+  const demo = getDemoRegistrations();
+  if (!Array.isArray(apiRows) || apiRows.length === 0) {
+    return { rows: demo, _demo: true };
+  }
+  const byId = new Map(demo.map((r) => [r.id, r]));
+  for (const row of apiRows) {
+    const existing = byId.get(row.id);
+    byId.set(row.id, existing ? { ...existing, ...row } : row);
+  }
+  return { rows: [...byId.values()], _demo: false };
 }
 
 /** Merge dashboard API payload with sample widgets that would otherwise be empty. */

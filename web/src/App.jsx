@@ -10,6 +10,8 @@ import { CampaignsPage } from './pages/CampaignsPage.jsx';
 import { CampaignViewPage } from './pages/CampaignViewPage.jsx';
 import { EngagementRecordPage, PlaceholderPage } from './pages/EngagementRecordPage.jsx';
 import { ReportsPage } from './pages/ReportsPage.jsx';
+import { RegistrationsPage } from './pages/RegistrationsPage.jsx';
+import { PublicRegistrationPage } from './pages/PublicRegistrationPage.jsx';
 import { Modal } from './components/ui/Primitives.jsx';
 
 export default function App() {
@@ -18,6 +20,7 @@ export default function App() {
   return (
     <AuthProvider>
       <Routes>
+        <Route path="/signup" element={<PublicRegistrationPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route element={<RequireAuth />}>
           <Route element={<AppShell onQuickAdd={() => setQuickAddOpen(true)} />}>
@@ -28,7 +31,7 @@ export default function App() {
             <Route path="campaigns/:id" element={<CampaignViewPage />} />
             <Route path="engagements/:id" element={<EngagementRecordPage />} />
             <Route path="brands" element={<PlaceholderPage title="Brands" description="Brand roster — build step 5" />} />
-            <Route path="registrations" element={<PlaceholderPage title="Registrations" description="Approval queue — build step 11" />} />
+            <Route path="registrations" element={<RegistrationsPage />} />
             <Route path="reports" element={<ReportsPage />} />
           </Route>
         </Route>

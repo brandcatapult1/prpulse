@@ -25,6 +25,12 @@
   .panel {
     @apply rounded-lg border border-line bg-white;
   }
+  .card-elevated {
+    @apply rounded-xl border border-line/80 bg-white shadow-sm transition-shadow hover:shadow-md;
+  }
+  .action-card {
+    @apply card-elevated flex cursor-pointer flex-col gap-2 p-4 text-left transition-colors hover:border-brand/30 hover:bg-brand-soft/30;
+  }
   .page-title {
     @apply text-[15px] font-semibold tracking-tight text-ink;
   }

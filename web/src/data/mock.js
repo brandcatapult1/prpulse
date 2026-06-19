@@ -330,8 +330,29 @@ export const MOCK_DELIVERABLES_BY_ENGAGEMENT = {
     { id: 'd4', deliverable_type: 'story', quantity: 2, due_date: '2026-06-06', status: 'posted', is_overdue: false },
   ],
   e4: [
-    { id: 'd5', deliverable_type: 'reel', quantity: 1, due_date: '2026-06-19', status: 'received', is_overdue: true },
-    { id: 'd6', deliverable_type: 'story', quantity: 4, due_date: '2026-06-14', status: 'posted', is_overdue: false },
+    {
+      id: 'd5',
+      deliverable_type: 'reel',
+      quantity: 1,
+      due_date: '2026-06-19',
+      status: 'received',
+      is_overdue: true,
+      content_link: null,
+      screenshots: [],
+    },
+    {
+      id: 'd6',
+      deliverable_type: 'story',
+      quantity: 4,
+      due_date: '2026-06-14',
+      status: 'posted',
+      is_overdue: false,
+      content_link: 'https://instagram.com/stories/kabir_travel/',
+      screenshots: [
+        { id: 's1', label: 'story-frame-1.png' },
+        { id: 's2', label: 'story-frame-2.png' },
+      ],
+    },
   ],
   e7: [
     { id: 'd7', deliverable_type: 'reel', quantity: 1, due_date: '2026-05-20', status: 'posted', is_overdue: false },

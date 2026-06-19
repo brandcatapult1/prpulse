@@ -92,7 +92,11 @@ export function StatusButton({ value, options, onChange, disabled, hint }) {
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
-      {disabled && hint && <p className="mt-1.5 text-2xs text-health-amber">{hint}</p>}
+      {hint && (
+        <p className={`mt-1.5 text-2xs ${disabled ? 'text-health-amber' : 'text-ink-tertiary'}`}>
+          {hint}
+        </p>
+      )}
     </div>
   );
 }

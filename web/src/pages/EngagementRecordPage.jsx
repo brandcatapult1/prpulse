@@ -6,7 +6,8 @@ import {
   Modal,
   Toast,
 } from '../components/ui/Primitives.jsx';
-import { ExpandableSection, RatingStars, StatusButton } from '../components/ui/DataKit.jsx';
+import { RatingStars, StatusButton } from '../components/ui/DataKit.jsx';
+import { DeliverableRow } from '../components/deliverables/DeliverableProofSection.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import {
   Pill,
@@ -113,6 +114,12 @@ export function EngagementRecordPage() {
     if (demo) saveDeliverablesOverride(id, list);
   };
 
+  const updateDeliverable = (delId, patch) => {
+    persistDeliverables(
+      deliverables.map((d) => (d.id === delId ? { ...d, ...patch } : d)),
+    );
+  };
+
   useEffect(() => {
     if (!id) return;
     setEngagement(getDemoEngagement(id));
@@ -212,6 +219,8 @@ export function EngagementRecordPage() {
       due_date: dueDate || addDaysIso(7),
       status: 'pending',
       is_overdue: false,
+      content_link: null,
+      screenshots: [],
     };
     persistDeliverables([...deliverables, newItem]);
     setModal(null);
@@ -402,27 +411,21 @@ export function EngagementRecordPage() {
                 </p>
               </div>
             ) : (
-              <ul className="mt-4 space-y-2">
+              <div className="mt-4 space-y-3">
                 {deliverables.map((d) => (
-                  <li
+                  <DeliverableRow
                     key={d.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-canvas px-3 py-2.5"
-                  >
-                    <div>
-                      <span className="text-sm font-medium capitalize text-ink">
-                        {d.deliverable_type} ×{d.quantity}
-                      </span>
-                      <span className="ml-2 text-2xs text-ink-tertiary">
-                        Due {formatDate(d.due_date)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {d.is_overdue && <Pill tone="danger">Overdue</Pill>}
-                      <Pill tone={d.status === 'posted' ? 'success' : 'default'}>{d.status}</Pill>
-                    </div>
-                  </li>
+                    deliverable={d}
+                    canEditStatus={deliverablesRule.canEditStatus}
+                    canEditProof={deliverablesRule.canEditStatus}
+                    deliverableStatusOptions={deliverableStatusOptions}
+                    onStatusChange={(delId, status) => updateDeliverable(delId, { status })}
+                    onUpdate={updateDeliverable}
+                    onSaved={() => setToast('Proof saved')}
+                    compact
+                  />
                 ))}
-              </ul>
+              </div>
             )}
           </Card>
 
@@ -475,12 +478,9 @@ export function EngagementRecordPage() {
         canAdd={deliverablesRule.canAdd}
         canEditStatus={deliverablesRule.canEditStatus}
         onAdd={() => openAddDeliverable('reel')}
-        onStatusChange={(delId, status) => {
-          if (!deliverablesRule.canEditStatus) return;
-          persistDeliverables(
-            deliverables.map((d) => (d.id === delId ? { ...d, status } : d)),
-          );
-        }}
+        onStatusChange={(delId, status) => updateDeliverable(delId, { status })}
+        onUpdate={updateDeliverable}
+        onSaved={() => setToast('Proof saved')}
       />
 
       <AddDeliverableModal
@@ -657,7 +657,7 @@ function FollowUpField({ value, suggestion, editable, lockedHint, onChange, onAc
   );
 }
 
-function DeliverablesModal({ open, onClose, contactName, deliverables, canAdd, canEditStatus, onAdd, onStatusChange }) {
+function DeliverablesModal({ open, onClose, contactName, deliverables, canAdd, canEditStatus, onAdd, onStatusChange, onUpdate, onSaved }) {
   return (
     <Modal
       open={open}
@@ -693,42 +693,16 @@ function DeliverablesModal({ open, onClose, contactName, deliverables, canAdd, c
       ) : (
         <div className="space-y-3">
           {deliverables.map((d) => (
-            <Card key={d.id} elevated className="!p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold capitalize text-ink">
-                    {d.deliverable_type} ×{d.quantity}
-                  </div>
-                  <div className="mt-0.5 text-2xs text-ink-tertiary">
-                    Due {formatDate(d.due_date)}
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {d.is_overdue && <Pill tone="danger">Overdue</Pill>}
-                  {canEditStatus ? (
-                    <StatusButton
-                      value={d.status}
-                      options={deliverableStatusOptions}
-                      onChange={(status) => onStatusChange?.(d.id, status)}
-                    />
-                  ) : (
-                    <Pill tone={d.status === 'posted' ? 'success' : 'default'}>{d.status}</Pill>
-                  )}
-                </div>
-              </div>
-              <div className="mt-3">
-                <ExpandableSection title="Proof & details">
-                  <div className="space-y-2">
-                    <button type="button" className="btn-secondary w-full justify-center">
-                      Upload screenshots
-                    </button>
-                    <button type="button" className="btn-secondary w-full justify-center">
-                      Add content link
-                    </button>
-                  </div>
-                </ExpandableSection>
-              </div>
-            </Card>
+            <DeliverableRow
+              key={d.id}
+              deliverable={d}
+              canEditStatus={canEditStatus}
+              canEditProof={canEditStatus}
+              deliverableStatusOptions={deliverableStatusOptions}
+              onStatusChange={onStatusChange}
+              onUpdate={onUpdate}
+              onSaved={onSaved}
+            />
           ))}
         </div>
       )}

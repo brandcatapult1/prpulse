@@ -9,6 +9,7 @@ import { registrationsApi } from '../lib/api.js';
 import { MOCK_CONTACTS } from '../data/mock.js';
 import { getDemoRegistrations, mergeRegistrations, saveRegistrationOverride } from '../lib/demo.js';
 import { findContactByMobile } from '../lib/phone.js';
+import { formatCategories } from '../lib/creatorCategories.js';
 import { todayIso } from '../lib/dates.js';
 
 const PENDING_STATUSES = new Set(['new', 'pending_review']);
@@ -67,7 +68,7 @@ export function RegistrationsPage() {
       ),
     },
     { key: 'city', label: 'City', render: (r) => r.city ?? '—' },
-    { key: 'category', label: 'Category', render: (r) => r.category ?? '—' },
+    { key: 'category', label: 'Categories', render: (r) => formatCategories(r.categories ?? r.category) },
     {
       key: 'status',
       label: 'Status',
@@ -287,7 +288,7 @@ function ReviewDrawer({ registration, onClose, onApprove, onReject, onMarkDuplic
         <Detail label="City" value={registration.city ?? '—'} />
         <Detail label="Instagram" value={registration.instagram_link ?? '—'} link />
         <Detail label="YouTube" value={registration.youtube_link ?? '—'} link />
-        <Detail label="Category" value={registration.category ?? '—'} />
+        <Detail label="Categories" value={formatCategories(registration.categories ?? registration.category)} />
         <Detail
           label="Preferences"
           value={[

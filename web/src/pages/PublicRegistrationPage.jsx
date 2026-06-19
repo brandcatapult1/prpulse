@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { registrationsApi } from '../lib/api.js';
 import { addRegistrationSubmission } from '../lib/demoStore.js';
+import { CREATOR_CATEGORIES } from '../lib/creatorCategories.js';
 
 const EMPTY = {
   full_name: '',
@@ -10,12 +11,11 @@ const EMPTY = {
   city: '',
   instagram_link: '',
   youtube_link: '',
-  category: '',
+  categories: [],
   paid_preference: false,
   barter_preference: false,
   reel_rate: '',
   story_rate: '',
-  portfolio_links: '',
   notes: '',
 };
 
@@ -27,13 +27,33 @@ export function PublicRegistrationPage() {
 
   const set = (field) => (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-    setForm((f) => ({ ...f, [field]: value }));
+    setForm((f) => {
+      const next = { ...f, [field]: value };
+      if (field === 'paid_preference' && !value) {
+        next.reel_rate = '';
+        next.story_rate = '';
+      }
+      return next;
+    });
+  };
+
+  const toggleCategory = (name) => {
+    setForm((f) => ({
+      ...f,
+      categories: f.categories.includes(name)
+        ? f.categories.filter((c) => c !== name)
+        : [...f.categories, name],
+    }));
   };
 
   const submit = async (e) => {
     e.preventDefault();
     if (!form.full_name.trim() || !form.mobile_number.trim()) {
       setError('Full name and mobile number are required.');
+      return;
+    }
+    if (form.categories.length === 0) {
+      setError('Pick at least one category.');
       return;
     }
 
@@ -47,14 +67,13 @@ export function PublicRegistrationPage() {
       city: form.city.trim() || null,
       instagram_link: form.instagram_link.trim() || null,
       youtube_link: form.youtube_link.trim() || null,
-      category: form.category.trim() || null,
+      category: form.categories.join(', '),
+      categories: form.categories,
       paid_preference: form.paid_preference,
       barter_preference: form.barter_preference,
-      reel_rate: form.reel_rate ? Number(form.reel_rate) : null,
-      story_rate: form.story_rate ? Number(form.story_rate) : null,
-      portfolio_links: form.portfolio_links
-        ? form.portfolio_links.split('\n').map((s) => s.trim()).filter(Boolean)
-        : [],
+      reel_rate: form.paid_preference && form.reel_rate ? Number(form.reel_rate) : null,
+      story_rate: form.paid_preference && form.story_rate ? Number(form.story_rate) : null,
+      portfolio_links: [],
       notes: form.notes.trim() || null,
     };
 
@@ -123,33 +142,63 @@ export function PublicRegistrationPage() {
           <Field label="YouTube link">
             <input className="input-field" type="url" value={form.youtube_link} onChange={set('youtube_link')} placeholder="https://youtube.com/…" />
           </Field>
-          <Field label="Category">
-            <input className="input-field" value={form.category} onChange={set('category')} placeholder="Food, Beauty, Travel…" />
+
+          <Field label="Categories *">
+            <p className="mb-2 text-2xs text-ink-tertiary">Select all that apply</p>
+            <div className="flex flex-wrap gap-2">
+              {CREATOR_CATEGORIES.map((name) => {
+                const selected = form.categories.includes(name);
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => toggleCategory(name)}
+                    className={`rounded-lg border px-3 py-2 text-2xs font-medium transition-colors ${
+                      selected
+                        ? 'border-brand bg-brand-soft text-brand'
+                        : 'border-line bg-white text-ink-secondary hover:border-zinc-300'
+                    }`}
+                  >
+                    {name}
+                  </button>
+                );
+              })}
+            </div>
           </Field>
 
-          <div className="flex flex-wrap gap-4">
+          <div className="space-y-3 rounded-lg border border-line bg-canvas px-4 py-3">
+            <p className="text-2xs font-medium text-ink-secondary">Collaboration preferences</p>
             <label className="flex items-center gap-2 text-sm text-ink-secondary">
-              <input type="checkbox" checked={form.paid_preference} onChange={set('paid_preference')} className="rounded border-line text-brand" />
-              Open to paid
-            </label>
-            <label className="flex items-center gap-2 text-sm text-ink-secondary">
-              <input type="checkbox" checked={form.barter_preference} onChange={set('barter_preference')} className="rounded border-line text-brand" />
+              <input
+                type="checkbox"
+                checked={form.barter_preference}
+                onChange={set('barter_preference')}
+                className="rounded border-line text-brand"
+              />
               Open to barter
             </label>
+            <label className="flex items-center gap-2 text-sm text-ink-secondary">
+              <input
+                type="checkbox"
+                checked={form.paid_preference}
+                onChange={set('paid_preference')}
+                className="rounded border-line text-brand"
+              />
+              Open to paid
+            </label>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Reel rate (₹)">
-              <input className="input-field" type="number" min={0} value={form.reel_rate} onChange={set('reel_rate')} placeholder="15000" />
-            </Field>
-            <Field label="Story rate (₹)">
-              <input className="input-field" type="number" min={0} value={form.story_rate} onChange={set('story_rate')} placeholder="5000" />
-            </Field>
-          </div>
+          {form.paid_preference && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Reel rate (₹)">
+                <input className="input-field" type="number" min={0} value={form.reel_rate} onChange={set('reel_rate')} placeholder="15000" />
+              </Field>
+              <Field label="Story rate (₹)">
+                <input className="input-field" type="number" min={0} value={form.story_rate} onChange={set('story_rate')} placeholder="5000" />
+              </Field>
+            </div>
+          )}
 
-          <Field label="Portfolio links (one per line)">
-            <textarea className="input-field min-h-[72px] py-2" value={form.portfolio_links} onChange={set('portfolio_links')} placeholder="https://…" />
-          </Field>
           <Field label="Notes">
             <textarea className="input-field min-h-[72px] py-2" value={form.notes} onChange={set('notes')} placeholder="Anything else we should know?" />
           </Field>

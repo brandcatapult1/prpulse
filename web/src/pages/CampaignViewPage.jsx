@@ -3,6 +3,8 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { FilterBar, DataTable, MetricStrip } from '../components/ui/DataKit.jsx';
 import { Drawer, Toast } from '../components/ui/Primitives.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
+import { CampaignKanbanBoard } from '../components/campaign/CampaignKanbanBoard.jsx';
+import { CampaignQuickEditDrawer } from '../components/campaign/CampaignQuickEditDrawer.jsx';
 import { QuickAddModal } from '../components/contacts/QuickAddModal.jsx';
 import { Pill, healthTone, formatStatus, formatDate, formatFee, statusTone } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
@@ -12,6 +14,7 @@ import {
   getDemoCampaign,
   getDemoContacts,
   getDemoEngagementsForCampaign,
+  getDemoEngagement,
   pickList,
   pickRecord,
 } from '../lib/demo.js';
@@ -27,6 +30,8 @@ export function CampaignViewPage() {
   const [demo, setDemo] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
   const [activeFilters, setActiveFilters] = useState([]);
+  const [viewMode, setViewMode] = useState('board');
+  const [quickEditId, setQuickEditId] = useState(null);
 
   function reloadEngagements() {
     setEngagements(getDemoEngagementsForCampaign(id));
@@ -60,6 +65,15 @@ export function CampaignViewPage() {
     }
     return rows;
   }, [engagements, activeFilters]);
+
+  const boardEngagements = useMemo(
+    () =>
+      filteredEngagements.map((row) => ({
+        ...getDemoEngagement(row.id),
+        ...row,
+      })),
+    [filteredEngagements],
+  );
 
   const columns = [
     {
@@ -117,22 +131,59 @@ export function CampaignViewPage() {
       </div>
 
       <p className="text-2xs text-ink-tertiary">
-        Click any creator row to open their <span className="font-medium text-ink-secondary">Engagement Record</span>
+        {viewMode === 'board'
+          ? <>Click a creator card for a quick summary, or switch to <span className="font-medium text-ink-secondary">List</span> for the full table.</>
+          : <>Click any creator row to open their <span className="font-medium text-ink-secondary">Engagement Record</span></>}
       </p>
 
-      <FilterBar
-        filters={['Status', 'Owner', 'Interest', 'Follow-up due']}
-        active={activeFilters}
-        onToggle={(f) =>
-          setActiveFilters((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]))
-        }
-        onClear={() => setActiveFilters([])}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <FilterBar
+          filters={['Status', 'Owner', 'Interest', 'Follow-up due']}
+          active={activeFilters}
+          onToggle={(f) =>
+            setActiveFilters((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]))
+          }
+          onClear={() => setActiveFilters([])}
+        />
+        <div className="flex rounded-md border border-line p-0.5">
+          <button
+            type="button"
+            onClick={() => setViewMode('board')}
+            className={`rounded px-2.5 py-1 text-2xs font-medium transition-colors ${
+              viewMode === 'board' ? 'bg-ink text-white' : 'text-ink-secondary hover:text-ink'
+            }`}
+          >
+            Board
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            className={`rounded px-2.5 py-1 text-2xs font-medium transition-colors ${
+              viewMode === 'list' ? 'bg-ink text-white' : 'text-ink-secondary hover:text-ink'
+            }`}
+          >
+            List
+          </button>
+        </div>
+      </div>
 
-      <DataTable
-        columns={columns}
-        rows={filteredEngagements}
-        onRowClick={(row) => navigate(`/engagements/${row.id}`)}
+      {viewMode === 'board' ? (
+        <CampaignKanbanBoard
+          engagements={boardEngagements}
+          onCardClick={(row) => setQuickEditId(row.id)}
+        />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={filteredEngagements}
+          onRowClick={(row) => navigate(`/engagements/${row.id}`)}
+        />
+      )}
+
+      <CampaignQuickEditDrawer
+        engagementId={quickEditId}
+        open={Boolean(quickEditId)}
+        onClose={() => setQuickEditId(null)}
       />
 
       <AddCreatorsDrawer

@@ -37,4 +37,10 @@
   .page-sub {
     @apply text-2xs text-ink-secondary;
   }
+  .campaign-board {
+    @apply rounded-lg;
+  }
+  .campaign-kanban-card {
+    @apply rounded-lg border border-[#2a2d38] bg-[#1c1f28] p-3 transition-colors hover:border-[#3d4250] hover:bg-[#22252e];
+  }
 }

@@ -1,6 +1,6 @@
-import { Card } from '../ui/Primitives.jsx';
-import { Pill, healthTone, formatDate } from '../../lib/format.js';
-import { MOCK_DASHBOARD } from '../../data/mock.js';
+import { Card } from '../components/ui/Primitives.jsx';
+import { Pill, healthTone, formatDate } from '../lib/format.js';
+import { MOCK_DASHBOARD } from '../data/mock.js';
 
 export function DashboardPage() {
   const { follow_ups_due, overdue_deliverables, active_campaigns } = MOCK_DASHBOARD;

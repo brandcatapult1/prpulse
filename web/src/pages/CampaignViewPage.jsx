@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FilterBar, DataTable } from '../components/ui/DataKit.jsx';
 import { Drawer } from '../components/ui/Primitives.jsx';
-import { Pill, healthTone, formatStatus, formatDate, formatFee, statusTone } from '../../lib/format.js';
+import { Pill, healthTone, formatStatus, formatDate, formatFee, statusTone } from '../lib/format.js';
 import { MOCK_CAMPAIGN, MOCK_ENGAGEMENTS, MOCK_CONTACTS } from '../data/mock.js';
 
 export function CampaignViewPage() {

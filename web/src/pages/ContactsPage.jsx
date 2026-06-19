@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FilterBar, DataTable } from '../components/ui/DataKit.jsx';
 import { Modal } from '../components/ui/Primitives.jsx';
-import { Pill, statusTone } from '../../lib/format.js';
+import { Pill, statusTone } from '../lib/format.js';
 import { MOCK_CONTACTS } from '../data/mock.js';
 
 export function ContactsPage({ onQuickAdd }) {

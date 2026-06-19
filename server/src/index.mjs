@@ -17,7 +17,7 @@ import { attachUser, requireAuth } from './middleware/auth.mjs';
 dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const rootDir = path.resolve(__dirname, '../..');
+const rootDir = path.resolve(__dirname, '../../..');
 const port = Number(process.env.PORT ?? 8080);
 
 async function runMigrations() {

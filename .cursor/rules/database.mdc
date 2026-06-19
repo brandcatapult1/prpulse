@@ -1,0 +1,27 @@
+---
+description: Database, migrations, and data-integrity rules for PR Pulse
+globs: **/*.sql, **/migrations/**, **/prisma/**, **/db/**, **/drizzle/**, **/models/**
+alwaysApply: false
+---
+
+# Database & integrity rules
+
+The verified schema is `@docs/PR_Pulse_Schema.sql`. Treat it as authoritative.
+
+## Migration strategy (critical)
+- Tables/columns may be ORM-managed, **but the function/trigger/view layer MUST be applied as raw SQL migrations** (Prisma: `prisma/migrations/**/*.sql`; or Drizzle / node-pg-migrate). 
+- **Never reimplement integrity logic in TypeScript.** The following must exist in the DB and never be dropped or duplicated in app code: the completion guard (`fn_engagement_before`), `recompute_campaign_metrics`, `recompute_contact_summary`, `fn_refresh_engagement_completion`, blacklist sync, and the audit triggers.
+- Every migration is reversible (up/down). Never alter a column type in place — add, backfill, drop in a later migration.
+- Requires Postgres `pgcrypto` and `citext` extensions.
+
+## Invariant business rules (do not change without changing the schema + PRD)
+- **Collaboration counts** only when `conversation_status = 'collaboration_complete'` AND the engagement has **≥1 deliverable** AND **all deliverables = 'posted'**.
+- Campaign health: `null/0` target → `not_set` (never Red, never divide). Else Green ≥90 / Amber ≥70 / Red below.
+- **Overdue is computed** via `v_deliverables`, never stored; there is no `overdue` status value.
+- `completed_at` is stamped once and **retained** after reopen; campaign counts always recount live (reopening decrements automatically).
+- Agreed fee / collaboration type are **frozen while status is Completed**; reopen to amend.
+- **Mobile dedup is an app-layer warning** (no DB unique on `mobile_number`).
+
+## Per-transaction
+- Set the actor on every write transaction so audit/timeline attribute correctly:
+  `SET LOCAL app.current_user_id = '<uuid>';` (null = system action).

@@ -1,0 +1,28 @@
+---
+description: API, auth, and permission rules for PR Pulse
+globs: **/api/**, **/server/**, **/routes/**, **/trpc/**, **/middleware/**, **/lib/auth/**
+alwaysApply: false
+---
+
+# API & permissions rules
+
+Roles and scoping per `@docs/PR_Pulse_Master_PRD.md` (User Roles section).
+
+## Authentication & roles
+- **Google OAuth only** (no passwords). Three roles: `campaign_manager`, `senior_manager`, `admin`.
+- **Campaign Manager:** assigned campaigns only (can see peers' work within them); can read all contacts; cannot delete contacts, manage users, or view audit logs.
+- **Senior Manager:** all campaigns + team visibility; approves registrations; manages brands; bulk import; blacklist/un-blacklist.
+- **Admin:** full access incl. user management, system config, audit logs.
+
+## Query scoping defaults (enforce centrally, not per-endpoint)
+- **Contacts are globally readable** (relationship memory). **Engagement management is campaign-scoped.**
+- Default list/search scope **excludes `status = 'archived'`** unless explicitly requested.
+- **Campaign population excludes `is_blacklisted = true`** by default; force-add must warn.
+
+## Writes
+- Open a transaction per mutating request and `SET LOCAL app.current_user_id = '<uuid>'` so audit/timeline attribute correctly.
+- Never expose endpoints that bypass the DB completion guard or recompute triggers.
+
+## Reporting
+- Client-facing report exports and **shareable links must strip** `agreed_fee`, `internal_rating`, and `internal_notes` (use the `client_visible` flag).
+- Shareable links carry an **expiry (default 30 days)** and support **revocation**.

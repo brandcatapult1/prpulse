@@ -1,0 +1,28 @@
+---
+description: Frontend / UI rules for PR Pulse (React + Tailwind)
+globs: **/components/**, **/app/**, **/src/**/*.tsx, **/ui/**, **/screens/**
+alwaysApply: false
+---
+
+# UI rules
+
+The screen contracts are in `@docs/PR_Pulse_UX_Spec.md`. Build to them.
+
+## Structure
+- **Build the primitive component kit first**, then compose every screen from it: `AppShell`, `DataTable`, `FilterBar`, `Drawer`, `Modal`, `SidePanel`, `ExpandableSection`, `StatusButton`, `QuickAction`, `Card`, `Pill`/`Tag`, `RatingStars`, `Toast`, `EmptyState`, `Skeleton`, `ConfirmDialog`. Do not invent per-screen form layouts.
+- **Progressive disclosure:** no screen shows all of an entity's fields. Secondary workflows open in `Drawer`/`Modal`/`SidePanel`. **Drawers are one level deep**; on mobile they are full-screen sheets — never stack a second drawer.
+- **Engagement Record stays compact:** main view = Contact, Campaign, Status, Interest, Owner, Last Contact, Next Follow-up, Agreed Fee, Notes. Deliverables / Feedback / Visit / Timeline are **drawers**, never inline sections.
+- Records are **read-first** with an explicit Edit affordance. Buttons over typing.
+
+## Mirror the DB guards in the UI (don't duplicate logic — reflect state)
+- Disable **Collaboration Complete** until ≥1 deliverable exists and all are `Posted`; show the blocking reason.
+- Selecting **Scheduled** opens a **required Visit modal** before the status commits; on save, `next_follow_up_date = visit_date`.
+- Agreed Fee / Collaboration Type render **read-only while Completed** (lock + "Reopen to amend").
+- **Overdue** is a computed badge from `v_deliverables`, never a status choice.
+
+## Conventions
+- Functional components, **named exports**, explicit prop types, Tailwind utility classes.
+- **Optimistic UI** on status changes; reconcile on response; surface guard rejections as `Toast`.
+- Every list, drawer, and widget implements **loading / empty / error** states.
+- Dashboard widgets read **cached rollups + views**, not request-path aggregation.
+- Do not use `localStorage`/`sessionStorage` for source-of-truth data; server is the source of truth.

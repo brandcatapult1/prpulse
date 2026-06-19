@@ -1,0 +1,29 @@
+---
+description: Verification checklist to run before considering any PR Pulse feature complete. Apply when finishing a feature, opening a PR, or asked whether something is done.
+alwaysApply: false
+---
+
+# Acceptance checklist (verify before "done")
+
+Run the relevant items before declaring a feature complete. These mirror the schema's and UX spec's acceptance tests.
+
+## Data integrity
+- [ ] Completing an engagement with **zero deliverables** is blocked.
+- [ ] Completing with any **non-Posted** deliverable is blocked.
+- [ ] A valid completion increments the campaign count and stamps `completed_at`.
+- [ ] **Reopening** a completed engagement **decrements** the campaign count.
+- [ ] `target = 0` campaign shows **Not Set** health, no division error.
+- [ ] **Overdue** appears only as a computed badge (`v_deliverables`), never a stored status.
+- [ ] Agreed fee / collaboration type are read-only while Completed; editable after reopen.
+- [ ] Duplicate mobile warns on Quick Add, Manual Entry, Bulk Import, and Registration approval.
+- [ ] Blacklist record flips `is_blacklisted`; status enum is unchanged.
+- [ ] Audit + timeline rows are written for tracked actions (actor attributed).
+
+## UX
+- [ ] No operator screen is a long scrolling form; secondary workflows are one-level-deep drawers.
+- [ ] Quick Add creates a contact in < 15s.
+- [ ] `Scheduled` forces the Visit modal before committing; follow-up = visit date.
+- [ ] Archived excluded from search/population; blacklisted excluded from population (force-add warns).
+- [ ] Follow-ups appear on the owner's dashboard; peers still see rows in Campaign View.
+- [ ] Report shareable link has expiry + revoke and strips fee / internal ratings / internal notes.
+- [ ] Loading / empty / error states exist; mobile drawers are full-screen, non-stacking.

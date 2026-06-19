@@ -1,0 +1,19 @@
+# Dependencies (added when we build the app)
+node_modules/
+
+# Environment secrets — never commit these
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+.next/
+
+# OS / editor noise
+.DS_Store
+*.log
+
+# Local database data (if Postgres runs locally later)
+postgres-data/

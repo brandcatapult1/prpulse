@@ -1,0 +1,15 @@
+---
+description: PR Pulse project identity and universal non-negotiables
+alwaysApply: true
+---
+
+# PR Pulse — base rules
+
+PR Pulse is an internal **Relationship Operations Platform** for Brand Catapult. It is an **operational workflow tool, NOT a CRM**.
+
+- It must feel like **Linear / Notion / Trello**, never Salesforce / HubSpot / Zoho. **No long scrolling forms.** If a screen becomes a form, it is wrong.
+- **All dates are IST (`Asia/Kolkata`)** — "today", overdue, follow-ups, reporting periods.
+- **Source of truth = `/docs`:** `PR_Pulse_Master_PRD.md`, `PR_Pulse_Schema.sql`, `PR_Pulse_UX_Spec.md`. Follow them; do not invent product behaviour. If a request conflicts with the docs, flag it.
+- **Database integrity lives in SQL** (triggers/functions/views in the schema). **Never reimplement that logic in application code**, and never let an ORM drop it — apply it via **raw SQL migrations**.
+- Prefer dropdowns, status buttons, and quick actions over typed input. Records are **read-first** with an explicit Edit action.
+- Before calling any feature done, self-check against `.cursor/rules/acceptance.mdc`.

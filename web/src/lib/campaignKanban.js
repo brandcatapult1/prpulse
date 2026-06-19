@@ -2,12 +2,17 @@ import { getDemoContact, getDemoDeliverables } from './demo.js';
 import { getContactProfileExtras } from './contactProfile.js';
 import { todayIso } from './dates.js';
 
-/** Board column layout — do not reorder without product sign-off. */
+/** PRD parent stages — one column per pipeline stage. */
 export const CAMPAIGN_KANBAN_COLUMNS = [
   {
+    id: 'not_contacted',
+    label: 'Not contacted',
+    statuses: ['not_contacted'],
+  },
+  {
     id: 'in_conversation',
-    label: 'In Conversation',
-    statuses: ['not_contacted', 'in_conversation'],
+    label: 'In conversation',
+    statuses: ['in_conversation'],
   },
   {
     id: 'scheduled',
@@ -15,18 +20,8 @@ export const CAMPAIGN_KANBAN_COLUMNS = [
     statuses: ['scheduled'],
   },
   {
-    id: 'awaiting_final',
-    label: 'Awaiting Final',
-    statuses: ['awaiting_final_deliverables'],
-  },
-  {
-    id: 'complete',
-    label: 'Complete',
-    statuses: ['collaboration_complete'],
-  },
-  {
-    id: 'dropped',
-    label: 'Dropped / No Response',
+    id: 'rejected',
+    label: 'Rejected',
     statuses: [
       'no_response',
       'dropped_profile_rejected',
@@ -34,11 +29,32 @@ export const CAMPAIGN_KANBAN_COLUMNS = [
       'dropped_terms_disagreement',
     ],
   },
+  {
+    id: 'complete',
+    label: 'Collaboration complete',
+    statuses: ['collaboration_complete'],
+  },
+  {
+    id: 'awaiting_final',
+    label: 'Awaited final deliverables',
+    statuses: ['awaiting_final_deliverables'],
+  },
 ];
+
+const REASON_LABELS = {
+  business: 'Business',
+  vitality: 'Vitality',
+  positioning: 'Positioning',
+};
+
+export function collaborationReasonLabel(reason) {
+  if (!reason) return null;
+  return REASON_LABELS[reason] ?? reason.replace(/_/g, ' ');
+}
 
 export function columnIdForStatus(status) {
   const col = CAMPAIGN_KANBAN_COLUMNS.find((c) => c.statuses.includes(status));
-  return col?.id ?? 'in_conversation';
+  return col?.id ?? 'not_contacted';
 }
 
 export function dropReasonLabel(status) {
@@ -48,7 +64,7 @@ export function dropReasonLabel(status) {
     dropped_not_interested: 'Not interested',
     dropped_terms_disagreement: 'Terms disagreement',
   };
-  return labels[status] ?? 'Dropped';
+  return labels[status] ?? 'Rejected';
 }
 
 export function contactInitials(name) {
@@ -78,7 +94,7 @@ export function contactHandle(engagement) {
 
 export function contentTypeSummary(engagementId) {
   const dels = getDemoDeliverables(engagementId);
-  if (!dels.length) return '—';
+  if (!dels.length) return null;
   const types = [...new Set(dels.map((d) => d.deliverable_type))];
   return types.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join(' + ');
 }
@@ -97,7 +113,7 @@ export function isFollowUpOverdue(date) {
 
 export function regionLabel(engagement) {
   const contact = engagement.contact_id ? getDemoContact(engagement.contact_id) : null;
-  return contact?.city ?? '—';
+  return contact?.city ?? null;
 }
 
 export function groupEngagementsByColumn(engagements) {

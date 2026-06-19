@@ -41,6 +41,6 @@
     @apply rounded-lg;
   }
   .campaign-kanban-card {
-    @apply rounded-lg border border-[#2a2d38] bg-[#1c1f28] p-3 transition-colors hover:border-[#3d4250] hover:bg-[#22252e];
+    @apply rounded-lg border border-line bg-white p-3 shadow-sm transition-colors hover:border-brand/30 hover:shadow-md;
   }
 }

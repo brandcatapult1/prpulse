@@ -184,6 +184,7 @@ export function CampaignViewPage() {
         engagementId={quickEditId}
         open={Boolean(quickEditId)}
         onClose={() => setQuickEditId(null)}
+        onUpdated={reloadEngagements}
       />
 
       <AddCreatorsDrawer

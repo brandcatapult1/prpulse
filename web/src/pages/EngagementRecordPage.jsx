@@ -63,6 +63,11 @@ const FOLLOW_UP_SUGGESTIONS = {
   no_response: { days: 7, label: '7 days from today' },
 };
 
+/** PRD Module 9 — feedback is recorded after collaboration is complete. */
+function canAddFeedback(conversationStatus) {
+  return conversationStatus === 'collaboration_complete';
+}
+
 export function EngagementRecordPage() {
   const { id } = useParams();
   const [modal, setModal] = useState(null);
@@ -206,6 +211,7 @@ export function EngagementRecordPage() {
 
   const postedCount = deliverables.filter((d) => d.status === 'posted').length;
   const overdueCount = deliverables.filter((d) => d.is_overdue).length;
+  const feedbackAvailable = canAddFeedback(engagement.conversation_status);
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -235,7 +241,16 @@ export function EngagementRecordPage() {
       )}
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <ActionCard title="Feedback" subtitle="Rate this collaboration" onClick={() => setModal('feedback')} />
+        <ActionCard
+          title="Feedback"
+          subtitle={
+            feedbackAvailable
+              ? 'Rate this collaboration'
+              : 'Available after Collaboration Complete'
+          }
+          disabled={!feedbackAvailable}
+          onClick={() => feedbackAvailable && setModal('feedback')}
+        />
         <ActionCard
           title="Visit"
           subtitle={engagement.visit_date ? formatDate(engagement.visit_date) : 'Schedule a visit'}
@@ -459,15 +474,23 @@ export function EngagementRecordPage() {
   );
 }
 
-function ActionCard({ title, subtitle, badge, badgeTone = 'default', onClick }) {
+function ActionCard({ title, subtitle, badge, badgeTone = 'default', disabled = false, onClick }) {
   return (
-    <Card elevated interactive onClick={onClick} className="!p-4">
+    <Card
+      elevated
+      interactive={!disabled}
+      onClick={disabled ? undefined : onClick}
+      className={`!p-4 ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+    >
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="text-sm font-semibold text-ink">{title}</div>
-          <div className="mt-0.5 text-2xs text-ink-secondary">{subtitle}</div>
+          <div className={`mt-0.5 text-2xs ${disabled ? 'text-ink-tertiary' : 'text-ink-secondary'}`}>
+            {subtitle}
+          </div>
         </div>
-        <span className="text-lg text-ink-tertiary" aria-hidden>→</span>
+        {!disabled && <span className="text-lg text-ink-tertiary" aria-hidden>→</span>}
+        {disabled && <span className="text-2xs font-medium text-ink-tertiary" aria-hidden>Locked</span>}
       </div>
       {badge && (
         <div className="mt-3">

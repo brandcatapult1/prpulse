@@ -12,6 +12,7 @@ import { EngagementRecordPage, PlaceholderPage } from './pages/EngagementRecordP
 import { ReportsPage } from './pages/ReportsPage.jsx';
 import { RegistrationsPage } from './pages/RegistrationsPage.jsx';
 import { BrandsPage } from './pages/BrandsPage.jsx';
+import { BulkImportPage } from './pages/BulkImportPage.jsx';
 import { PublicRegistrationPage } from './pages/PublicRegistrationPage.jsx';
 import { Modal } from './components/ui/Primitives.jsx';
 
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="brands" element={<BrandsPage />} />
             <Route path="registrations" element={<RegistrationsPage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="import" element={<BulkImportPage />} />
           </Route>
         </Route>
       </Routes>

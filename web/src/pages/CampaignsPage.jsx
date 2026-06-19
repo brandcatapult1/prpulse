@@ -6,12 +6,15 @@ import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { Pill, healthTone } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
 import { campaignsApi } from '../lib/api.js';
-import { MOCK_CAMPAIGNS } from '../data/mock.js';
-import { pickList } from '../lib/demo.js';
+import { getDemoCampaigns, pickList } from '../lib/demo.js';
+import { canBulkImport } from '../lib/csvImport.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 export function CampaignsPage() {
   const navigate = useNavigate();
-  const [rows, setRows] = useState(MOCK_CAMPAIGNS);
+  const { user } = useAuth();
+  const canImport = canBulkImport(user?.role);
+  const [rows, setRows] = useState(() => getDemoCampaigns());
   const [demo, setDemo] = useState(true);
   const [loading, setLoading] = useState(true);
 
@@ -19,12 +22,12 @@ export function CampaignsPage() {
     campaignsApi
       .list()
       .then((data) => {
-        const resolved = pickList(data, MOCK_CAMPAIGNS);
+        const resolved = pickList(data, getDemoCampaigns());
         setRows(resolved);
         setDemo(!data?.length);
       })
       .catch(() => {
-        setRows(MOCK_CAMPAIGNS);
+        setRows(getDemoCampaigns());
         setDemo(true);
       })
       .finally(() => setLoading(false));
@@ -71,7 +74,14 @@ export function CampaignsPage() {
       <PageHeader
         title={MODULES.campaigns.pageTitle}
         subtitle={MODULES.campaigns.subtitle}
-        actions={<button type="button" className="btn-primary">+ Campaign</button>}
+        actions={
+          <>
+            {canImport && (
+              <Link to="/import" className="btn-secondary">Bulk Import</Link>
+            )}
+            <button type="button" className="btn-primary">+ Campaign</button>
+          </>
+        }
       />
 
       <DemoBanner show={demo} />

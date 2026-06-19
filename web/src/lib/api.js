@@ -52,3 +52,8 @@ export const brandsApi = {
   get: (id) => api(`/brands/${id}`),
   update: (id, body) => api(`/brands/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 };
+
+export const importApi = {
+  contacts: (rows) => api('/import/contacts', { method: 'POST', body: JSON.stringify(rows) }),
+  campaigns: (rows) => api('/import/campaigns', { method: 'POST', body: JSON.stringify(rows) }),
+};

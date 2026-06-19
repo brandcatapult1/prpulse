@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FilterBar, DataTable } from '../components/ui/DataKit.jsx';
 import { Modal } from '../components/ui/Primitives.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { Pill, statusTone } from '../lib/format.jsx';
 import { MODULES, CONTACT_PROFILE_TABS } from '../lib/modules.js';
 import { contactsApi } from '../lib/api.js';
-import { MOCK_CONTACTS } from '../data/mock.js';
-import { pickList } from '../lib/demo.js';
+import { getDemoContacts, mergeContacts } from '../lib/demo.js';
+import { canBulkImport } from '../lib/csvImport.js';
+import { useAuth } from '../context/AuthContext.jsx';
 import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 
 export function ContactsPage() {
   const navigate = useNavigate();
-  const [rows, setRows] = useState(MOCK_CONTACTS);
+  const { user } = useAuth();
+  const canImport = canBulkImport(user?.role);
+  const [rows, setRows] = useState(() => getDemoContacts());
   const [demo, setDemo] = useState(true);
   const [quickOpen, setQuickOpen] = useState(false);
 
@@ -20,12 +23,12 @@ export function ContactsPage() {
     contactsApi
       .list()
       .then((data) => {
-        const resolved = pickList(data, MOCK_CONTACTS);
+        const { rows: resolved, _demo } = mergeContacts(data);
         setRows(resolved);
-        setDemo(!data?.length);
+        setDemo(_demo);
       })
       .catch(() => {
-        setRows(MOCK_CONTACTS);
+        setRows(getDemoContacts());
         setDemo(true);
       });
   }, []);
@@ -53,6 +56,9 @@ export function ContactsPage() {
         subtitle={MODULES.contactDatabase.subtitle}
         actions={
           <>
+            {canImport && (
+              <Link to="/import" className="btn-secondary">Bulk Import</Link>
+            )}
             <button type="button" className="btn-secondary" onClick={() => setQuickOpen(true)}>Quick Add</button>
             <button type="button" className="btn-primary">+ Contact</button>
           </>

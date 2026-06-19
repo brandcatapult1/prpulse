@@ -27,6 +27,10 @@ import {
   saveRegistrationOverride,
   saveBrandOverride,
   getBrandOverride,
+  getContactAdds,
+  getCampaignAdds,
+  addContactImports,
+  addCampaignImports,
 } from './demoStore.js';
 
 export {
@@ -37,6 +41,8 @@ export {
   saveRegistrationOverride,
   saveBrandOverride,
   addRegistrationSubmission,
+  addContactImports,
+  addCampaignImports,
 };
 
 /** Use mock rows when the API returns an empty list (or the call failed). */
@@ -51,7 +57,15 @@ export function pickRecord(apiRow, mockRow) {
 }
 
 export function getDemoCampaign(id) {
-  return MOCK_CAMPAIGNS.find((c) => c.id === id) ?? MOCK_CAMPAIGNS[0];
+  return getDemoCampaigns().find((c) => c.id === id) ?? MOCK_CAMPAIGNS[0];
+}
+
+export function getDemoContacts() {
+  return [...MOCK_CONTACTS, ...getContactAdds()];
+}
+
+export function getDemoCampaigns() {
+  return [...MOCK_CAMPAIGNS, ...getCampaignAdds()];
 }
 
 export function getDemoBrands() {
@@ -162,3 +176,11 @@ export function isDemoList(apiRows) {
 }
 
 export { MOCK_CAMPAIGNS, MOCK_CONTACTS, MOCK_DASHBOARD, MOCK_BRANDS, MOCK_TEAM };
+
+export function mergeContacts(apiRows) {
+  const demo = getDemoContacts();
+  if (!Array.isArray(apiRows) || apiRows.length === 0) {
+    return { rows: demo, _demo: true };
+  }
+  return { rows: apiRows, _demo: false };
+}

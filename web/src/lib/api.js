@@ -46,3 +46,9 @@ export const registrationsApi = {
   submit: (body) => api('/registrations', { method: 'POST', body: JSON.stringify(body) }),
   update: (id, body) => api(`/registrations/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 };
+
+export const brandsApi = {
+  list: () => api('/brands'),
+  get: (id) => api(`/brands/${id}`),
+  update: (id, body) => api(`/brands/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+};

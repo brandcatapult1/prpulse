@@ -17,7 +17,7 @@ const PERSISTED_ENGAGEMENT_FIELDS = [
 function loadStore() {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [] };
+    if (!raw) return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [], brands: {} };
     const parsed = JSON.parse(raw);
     return {
       engagements: parsed.engagements ?? {},
@@ -26,9 +26,10 @@ function loadStore() {
       blacklist: parsed.blacklist ?? {},
       registrations: parsed.registrations ?? {},
       registrationAdds: parsed.registrationAdds ?? [],
+      brands: parsed.brands ?? {},
     };
   } catch {
-    return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [] };
+    return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [], brands: {} };
   }
 }
 
@@ -129,5 +130,15 @@ export function getRegistrationAdds() {
 export function addRegistrationSubmission(record) {
   const store = loadStore();
   store.registrationAdds = [...(store.registrationAdds ?? []), record];
+  saveStore(store);
+}
+
+export function getBrandOverride(id) {
+  return loadStore().brands[id] ?? null;
+}
+
+export function saveBrandOverride(id, patch) {
+  const store = loadStore();
+  store.brands[id] = { ...(store.brands[id] ?? {}), ...patch };
   saveStore(store);
 }

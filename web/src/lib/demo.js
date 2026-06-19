@@ -2,6 +2,8 @@ import {
   MOCK_CAMPAIGNS,
   MOCK_CONTACTS,
   MOCK_DASHBOARD,
+  MOCK_BRANDS,
+  MOCK_TEAM,
   MOCK_DELIVERABLES_BY_ENGAGEMENT,
   MOCK_ENGAGEMENTS_BY_CAMPAIGN,
   MOCK_ENGAGEMENTS_BY_ID,
@@ -23,6 +25,8 @@ import {
   saveFeedbackOverride,
   saveBlacklistOverride,
   saveRegistrationOverride,
+  saveBrandOverride,
+  getBrandOverride,
 } from './demoStore.js';
 
 export {
@@ -31,6 +35,7 @@ export {
   saveFeedbackOverride,
   saveBlacklistOverride,
   saveRegistrationOverride,
+  saveBrandOverride,
   addRegistrationSubmission,
 };
 
@@ -47,6 +52,36 @@ export function pickRecord(apiRow, mockRow) {
 
 export function getDemoCampaign(id) {
   return MOCK_CAMPAIGNS.find((c) => c.id === id) ?? MOCK_CAMPAIGNS[0];
+}
+
+export function getDemoBrands() {
+  return MOCK_BRANDS.map((brand) => {
+    const override = getBrandOverride(brand.id);
+    const merged = override ? { ...brand, ...override } : { ...brand };
+    const campaigns = MOCK_CAMPAIGNS.filter((c) => c.brand_id === brand.id);
+    return { ...merged, campaign_count: campaigns.length };
+  });
+}
+
+export function getDemoBrand(id) {
+  return getDemoBrands().find((b) => b.id === id) ?? null;
+}
+
+export function getCampaignsForBrand(brandId) {
+  return MOCK_CAMPAIGNS.filter((c) => c.brand_id === brandId);
+}
+
+export function mergeBrands(apiRows) {
+  const demo = getDemoBrands();
+  if (!Array.isArray(apiRows) || apiRows.length === 0) {
+    return { rows: demo, _demo: true };
+  }
+  const byId = new Map(demo.map((b) => [b.id, b]));
+  for (const row of apiRows) {
+    const existing = byId.get(row.id);
+    byId.set(row.id, existing ? { ...existing, ...row } : row);
+  }
+  return { rows: [...byId.values()], _demo: false };
 }
 
 export function getDemoEngagementsForCampaign(campaignId) {
@@ -126,4 +161,4 @@ export function isDemoList(apiRows) {
   return !Array.isArray(apiRows) || apiRows.length === 0;
 }
 
-export { MOCK_CAMPAIGNS, MOCK_CONTACTS, MOCK_DASHBOARD };
+export { MOCK_CAMPAIGNS, MOCK_CONTACTS, MOCK_DASHBOARD, MOCK_BRANDS, MOCK_TEAM };

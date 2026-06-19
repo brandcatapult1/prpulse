@@ -5,6 +5,63 @@ export const MOCK_USER = {
   email: 'priya@brandcatapult.com',
 };
 
+export const MOCK_TEAM = [
+  { id: '1', full_name: 'Priya Sharma' },
+  { id: '2', full_name: 'Ankit Rao' },
+  { id: '3', full_name: 'Rhea Kapoor' },
+];
+
+export const MOCK_BRANDS = [
+  {
+    id: 'b1',
+    brand_name: 'BrandX',
+    brand_category: 'Food & Beverage',
+    logo_label: null,
+    primary_contact: 'Sarah Mehta',
+    contact_email: 'sarah@brandx.com',
+    account_manager_id: '1',
+    account_manager_name: 'Priya Sharma',
+    is_active: true,
+    campaign_count: 1,
+  },
+  {
+    id: 'b2',
+    brand_name: 'Maison Éclat',
+    brand_category: 'Luxury',
+    logo_label: 'maison-logo.png',
+    primary_contact: 'Claire Dubois',
+    contact_email: 'claire@maison-eclat.com',
+    account_manager_id: '2',
+    account_manager_name: 'Ankit Rao',
+    is_active: true,
+    campaign_count: 1,
+  },
+  {
+    id: 'b3',
+    brand_name: 'GlowCo',
+    brand_category: 'Beauty',
+    logo_label: null,
+    primary_contact: 'Nisha Patel',
+    contact_email: 'nisha@glowco.in',
+    account_manager_id: '1',
+    account_manager_name: 'Priya Sharma',
+    is_active: true,
+    campaign_count: 1,
+  },
+  {
+    id: 'b4',
+    brand_name: 'WanderIndia',
+    brand_category: 'Travel',
+    logo_label: null,
+    primary_contact: 'Rahul Verma',
+    contact_email: 'rahul@wanderindia.com',
+    account_manager_id: '3',
+    account_manager_name: 'Rhea Kapoor',
+    is_active: false,
+    campaign_count: 1,
+  },
+];
+
 export const MOCK_CONTACTS = [
   { id: '1', full_name: 'Aisha K.', mobile_number: '+919811122233', city: 'Delhi', classification: 'micro', status: 'active', tags: ['Luxury', 'UGC'] },
   { id: '2', full_name: 'Rohan T.', mobile_number: '+919876543210', city: 'Mumbai', classification: 'mid', status: 'active', tags: ['F&B'] },
@@ -19,6 +76,7 @@ export const MOCK_CONTACTS = [
 export const MOCK_CAMPAIGNS = [
   {
     id: 'c1',
+    brand_id: 'b1',
     campaign_name: 'Summer F&B Push',
     brand_name: 'BrandX',
     status: 'active',
@@ -30,6 +88,7 @@ export const MOCK_CAMPAIGNS = [
   },
   {
     id: 'c2',
+    brand_id: 'b2',
     campaign_name: 'Luxury Launch',
     brand_name: 'Maison Éclat',
     status: 'active',
@@ -41,6 +100,7 @@ export const MOCK_CAMPAIGNS = [
   },
   {
     id: 'c3',
+    brand_id: 'b3',
     campaign_name: 'Monsoon Beauty Drive',
     brand_name: 'GlowCo',
     status: 'active',
@@ -52,6 +112,7 @@ export const MOCK_CAMPAIGNS = [
   },
   {
     id: 'c4',
+    brand_id: 'b4',
     campaign_name: 'Q3 Travel Series',
     brand_name: 'WanderIndia',
     status: 'planning',

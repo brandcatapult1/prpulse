@@ -11,6 +11,7 @@ import { CampaignViewPage } from './pages/CampaignViewPage.jsx';
 import { EngagementRecordPage, PlaceholderPage } from './pages/EngagementRecordPage.jsx';
 import { ReportsPage } from './pages/ReportsPage.jsx';
 import { RegistrationsPage } from './pages/RegistrationsPage.jsx';
+import { BrandsPage } from './pages/BrandsPage.jsx';
 import { PublicRegistrationPage } from './pages/PublicRegistrationPage.jsx';
 import { Modal } from './components/ui/Primitives.jsx';
 
@@ -30,7 +31,7 @@ export default function App() {
             <Route path="campaigns" element={<CampaignsPage />} />
             <Route path="campaigns/:id" element={<CampaignViewPage />} />
             <Route path="engagements/:id" element={<EngagementRecordPage />} />
-            <Route path="brands" element={<PlaceholderPage title="Brands" description="Brand roster — build step 5" />} />
+            <Route path="brands" element={<BrandsPage />} />
             <Route path="registrations" element={<RegistrationsPage />} />
             <Route path="reports" element={<ReportsPage />} />
           </Route>

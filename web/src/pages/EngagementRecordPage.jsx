@@ -28,15 +28,20 @@ import {
   saveEngagementOverride,
 } from '../lib/demo.js';
 import { DemoBanner } from '../components/ui/DemoBanner.jsx';
-
-const statusOptions = [
-  'not_contacted',
-  'in_conversation',
-  'scheduled',
-  'no_response',
-  'awaiting_final_deliverables',
-  'collaboration_complete',
-].map((v) => ({ value: v, label: formatStatus(v) }));
+import {
+  agreedFeeRules,
+  deliverablesRules,
+  feedbackRules,
+  followUpRules,
+  followUpSuggestionForStatus,
+  getStatusOptions,
+  interestRules,
+  isComplete,
+  notesRules,
+  sideEffectsOnStatusChange,
+  terminalBanner,
+  visitRules,
+} from '../lib/engagementRules.js';
 
 const interestOptions = [
   { value: 'high', label: 'High' },
@@ -57,16 +62,6 @@ const DELIVERABLE_TYPES = [
   { value: 'post', label: 'Post' },
   { value: 'video', label: 'Video' },
 ];
-
-const FOLLOW_UP_SUGGESTIONS = {
-  in_conversation: { days: 3, label: '3 days from today' },
-  no_response: { days: 7, label: '7 days from today' },
-};
-
-/** PRD Module 9 — feedback is recorded after collaboration is complete. */
-function canAddFeedback(conversationStatus) {
-  return conversationStatus === 'collaboration_complete';
-}
 
 export function EngagementRecordPage() {
   const { id } = useParams();
@@ -152,9 +147,21 @@ export function EngagementRecordPage() {
   const canComplete =
     deliverables.length > 0 && deliverables.every((d) => d.status === 'posted');
 
-  const statusChoices = canComplete
-    ? statusOptions
-    : statusOptions.filter((o) => o.value !== 'collaboration_complete');
+  const status = engagement.conversation_status;
+  const followUp = followUpRules(status);
+  const visit = visitRules(status);
+  const deliverablesRule = deliverablesRules(status);
+  const feedback = feedbackRules(status);
+  const feeRule = agreedFeeRules(status);
+  const interestRule = interestRules(status);
+  const notesRule = notesRules(status);
+  const closedBanner = terminalBanner(status);
+
+  const statusChoices = getStatusOptions({
+    current: status,
+    canComplete,
+    formatStatus,
+  });
 
   const handleStatusChange = (next) => {
     if (next === 'scheduled') {
@@ -162,22 +169,23 @@ export function EngagementRecordPage() {
       return;
     }
 
-    const patch = { conversation_status: next };
-    const rule = FOLLOW_UP_SUGGESTIONS[next];
-    if (rule) {
+    const patch = { conversation_status: next, ...sideEffectsOnStatusChange(next) };
+
+    const rule = followUpSuggestionForStatus(next);
+    if (rule && followUpRules(next).editable) {
       setFollowUpSuggestion({
         date: addDaysIso(rule.days),
         label: rule.label,
       });
-    } else if (next === 'collaboration_complete' || next.startsWith('dropped_')) {
+    } else {
       setFollowUpSuggestion(null);
-      patch.next_follow_up_date = null;
     }
 
     persistEngagement(patch);
   };
 
   const handleFollowUpChange = (date) => {
+    if (!followUp.editable) return;
     if (date === followUpSuggestion?.date) setFollowUpSuggestion(null);
     persistEngagement({ next_follow_up_date: date || null });
   };
@@ -191,6 +199,7 @@ export function EngagementRecordPage() {
   };
 
   const openAddDeliverable = (type = 'reel') => {
+    if (!deliverablesRule.canAdd) return;
     setAddDeliverableType(type);
     setModal('add-deliverable');
   };
@@ -210,8 +219,6 @@ export function EngagementRecordPage() {
   };
 
   const postedCount = deliverables.filter((d) => d.status === 'posted').length;
-  const overdueCount = deliverables.filter((d) => d.is_overdue).length;
-  const feedbackAvailable = canAddFeedback(engagement.conversation_status);
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -236,6 +243,9 @@ export function EngagementRecordPage() {
       </div>
 
       <DemoBanner show={demo} />
+      {closedBanner && (
+        <TerminalStateBanner {...closedBanner} />
+      )}
       {saving && (
         <p className="text-2xs text-ink-tertiary">Saving…</p>
       )}
@@ -243,18 +253,19 @@ export function EngagementRecordPage() {
       <div className="grid gap-3 sm:grid-cols-3">
         <ActionCard
           title="Feedback"
-          subtitle={
-            feedbackAvailable
-              ? 'Rate this collaboration'
-              : 'Available after Collaboration Complete'
-          }
-          disabled={!feedbackAvailable}
-          onClick={() => feedbackAvailable && setModal('feedback')}
+          subtitle={feedback.available ? 'Rate this collaboration' : feedback.lockedReason}
+          disabled={!feedback.available}
+          onClick={() => feedback.available && setModal('feedback')}
         />
         <ActionCard
           title="Visit"
-          subtitle={engagement.visit_date ? formatDate(engagement.visit_date) : 'Schedule a visit'}
-          onClick={() => setModal('visit')}
+          subtitle={
+            visit.available && engagement.visit_date
+              ? formatDate(engagement.visit_date)
+              : visit.lockedReason
+          }
+          disabled={!visit.available}
+          onClick={() => visit.available && setModal('visit')}
         />
         <ActionCard
           title="Timeline"
@@ -278,9 +289,11 @@ export function EngagementRecordPage() {
                   options={statusChoices}
                   onChange={handleStatusChange}
                   hint={
-                    !canComplete
-                      ? 'Complete unlocks when all deliverables are Posted'
-                      : undefined
+                    isComplete(status)
+                      ? 'Change status to reopen and edit fee or deliverables'
+                      : !canComplete
+                        ? 'Complete unlocks when all deliverables are Posted'
+                        : undefined
                   }
                 />
               </div>
@@ -291,7 +304,8 @@ export function EngagementRecordPage() {
                 <ChipGroup
                   options={interestOptions}
                   value={engagement.interest_level}
-                  onChange={(v) => persistEngagement({ interest_level: v })}
+                  disabled={!interestRule.editable}
+                  onChange={(v) => interestRule.editable && persistEngagement({ interest_level: v })}
                 />
               </div>
             </div>
@@ -305,11 +319,18 @@ export function EngagementRecordPage() {
               <FollowUpField
                 value={engagement.next_follow_up_date}
                 suggestion={followUpSuggestion}
+                editable={followUp.editable}
+                lockedHint={followUp.hint}
                 onChange={handleFollowUpChange}
                 onAccept={acceptFollowUpSuggestion}
                 onDismiss={() => setFollowUpSuggestion(null)}
               />
-              <DetailItem label="Agreed fee" value={formatFee(engagement.agreed_fee)} />
+              <DetailItem
+                label="Agreed fee"
+                value={formatFee(engagement.agreed_fee)}
+                locked={feeRule.frozen}
+                hint={feeRule.frozenReason}
+              />
               <DetailItem
                 label="Reason"
                 value={engagement.primary_collaboration_reason ?? '—'}
@@ -331,30 +352,53 @@ export function EngagementRecordPage() {
               </Pill>
             </div>
 
-            <div className="mt-4">
-              <p className="mb-2 text-2xs font-medium text-ink-tertiary">Add content type</p>
-              <div className="flex flex-wrap gap-2">
-                {DELIVERABLE_TYPES.map(({ value, label }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => openAddDeliverable(value)}
-                  >
-                    + {label}
-                  </button>
-                ))}
+            {deliverablesRule.lockedReason && (
+              <p className="mt-3 rounded-lg bg-canvas px-3 py-2 text-2xs text-ink-secondary">
+                {deliverablesRule.lockedReason}
+              </p>
+            )}
+            {deliverablesRule.hint && (
+              <p className="mt-3 text-2xs text-ink-tertiary">{deliverablesRule.hint}</p>
+            )}
+
+            {deliverablesRule.canAdd && (
+              <div className="mt-4">
+                <p className="mb-2 text-2xs font-medium text-ink-tertiary">Add content type</p>
+                <div className="flex flex-wrap gap-2">
+                  {DELIVERABLE_TYPES.map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => openAddDeliverable(value)}
+                    >
+                      + {label}
+                    </button>
+                  ))}
+                  {deliverables.length > 0 && (
+                    <button type="button" className="btn-ghost" onClick={() => setModal('deliverables')}>
+                      Manage all
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {!deliverablesRule.canAdd && deliverables.length > 0 && (
+              <div className="mt-4">
                 <button type="button" className="btn-ghost" onClick={() => setModal('deliverables')}>
-                  View all
+                  View deliverables
                 </button>
               </div>
-            </div>
+            )}
 
             {deliverables.length === 0 ? (
               <div className="mt-4 rounded-lg border border-dashed border-line bg-canvas px-4 py-6 text-center">
                 <p className="text-sm text-ink-secondary">No deliverables yet</p>
                 <p className="mt-1 text-2xs text-ink-tertiary">
-                  Tap <strong>+ Reel</strong>, <strong>+ Story</strong>, or <strong>+ Post</strong> above to add what you agreed on.
+                  {deliverablesRule.canAdd
+                    ? 'Tap + Reel, + Story, or + Post above once commercials are agreed.'
+                    : deliverablesRule.lockedReason}
                 </p>
               </div>
             ) : (
@@ -385,10 +429,14 @@ export function EngagementRecordPage() {
           <Card elevated className="!p-5">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-ink">Notes</h2>
-              <button type="button" className="btn-ghost text-2xs">Edit</button>
+              {notesRule.editable && (
+                <button type="button" className="btn-ghost text-2xs">Edit</button>
+              )}
             </div>
             <p className="mt-3 rounded-lg bg-canvas px-3 py-3 text-sm leading-relaxed text-ink-secondary">
-              {engagement.notes || 'No notes yet — tap Edit to add context for the team.'}
+              {engagement.notes || (notesRule.editable
+                ? 'No notes yet — tap Edit to add context for the team.'
+                : '—')}
             </p>
           </Card>
         </div>
@@ -424,8 +472,11 @@ export function EngagementRecordPage() {
         onClose={() => setModal(null)}
         contactName={engagement.contact_name}
         deliverables={deliverables}
+        canAdd={deliverablesRule.canAdd}
+        canEditStatus={deliverablesRule.canEditStatus}
         onAdd={() => openAddDeliverable('reel')}
         onStatusChange={(delId, status) => {
+          if (!deliverablesRule.canEditStatus) return;
           persistDeliverables(
             deliverables.map((d) => (d.id === delId ? { ...d, status } : d)),
           );
@@ -474,6 +525,18 @@ export function EngagementRecordPage() {
   );
 }
 
+function TerminalStateBanner({ tone, title, body }) {
+  const styles =
+    tone === 'success'
+      ? 'border-teal-200 bg-teal-50 text-teal-900'
+      : 'border-line bg-canvas text-ink-secondary';
+  return (
+    <div className={`rounded-lg border px-4 py-3 text-2xs ${styles}`}>
+      <span className="font-semibold text-ink">{title}.</span> {body}
+    </div>
+  );
+}
+
 function ActionCard({ title, subtitle, badge, badgeTone = 'default', disabled = false, onClick }) {
   return (
     <Card
@@ -501,13 +564,14 @@ function ActionCard({ title, subtitle, badge, badgeTone = 'default', disabled = 
   );
 }
 
-function ChipGroup({ options, value, onChange }) {
+function ChipGroup({ options, value, onChange, disabled = false }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className={`flex flex-wrap gap-2 ${disabled ? 'opacity-60' : ''}`}>
       {options.map((opt) => (
         <button
           key={opt.value}
           type="button"
+          disabled={disabled}
           onClick={() => onChange(opt.value)}
           className={`rounded-lg border px-3 py-2 text-2xs font-medium transition-colors ${
             value === opt.value
@@ -522,18 +586,34 @@ function ChipGroup({ options, value, onChange }) {
   );
 }
 
-function DetailItem({ label, value, highlight, className = '' }) {
+function DetailItem({ label, value, highlight, locked, hint, className = '' }) {
   return (
     <div className={className}>
-      <dt className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">{label}</dt>
+      <dt className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">
+        {label}
+        {locked && <span className="ml-1 normal-case text-ink-tertiary">(locked)</span>}
+      </dt>
       <dd className={`mt-1 text-sm font-medium ${highlight ? 'text-brand' : 'text-ink'}`}>
         {value}
       </dd>
+      {hint && <p className="mt-1 text-2xs text-ink-tertiary">{hint}</p>}
     </div>
   );
 }
 
-function FollowUpField({ value, suggestion, onChange, onAccept, onDismiss }) {
+function FollowUpField({ value, suggestion, editable, lockedHint, onChange, onAccept, onDismiss }) {
+  if (!editable) {
+    return (
+      <div className="sm:col-span-2">
+        <dt className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">
+          Next follow-up
+        </dt>
+        <dd className="mt-1 text-sm font-medium text-ink">—</dd>
+        {lockedHint && <p className="mt-1.5 text-2xs text-ink-tertiary">{lockedHint}</p>}
+      </div>
+    );
+  }
+
   const inputValue = toDateInputValue(value);
   const showSuggestion =
     suggestion && toDateInputValue(suggestion.date) !== inputValue;
@@ -552,7 +632,9 @@ function FollowUpField({ value, suggestion, onChange, onAccept, onDismiss }) {
           aria-label="Next follow-up date"
         />
         {!inputValue && !showSuggestion && (
-          <p className="mt-1.5 text-2xs text-ink-tertiary">Pick a date, or use a suggestion after changing status.</p>
+          <p className="mt-1.5 text-2xs text-ink-tertiary">
+            Pick a date, or use a suggestion after changing status.
+          </p>
         )}
       </dd>
       {showSuggestion && (
@@ -575,7 +657,7 @@ function FollowUpField({ value, suggestion, onChange, onAccept, onDismiss }) {
   );
 }
 
-function DeliverablesModal({ open, onClose, contactName, deliverables, onAdd, onStatusChange }) {
+function DeliverablesModal({ open, onClose, contactName, deliverables, canAdd, canEditStatus, onAdd, onStatusChange }) {
   return (
     <Modal
       open={open}
@@ -583,9 +665,13 @@ function DeliverablesModal({ open, onClose, contactName, deliverables, onAdd, on
       onClose={onClose}
       footer={
         <div className="flex justify-between">
-          <button type="button" className="btn-secondary" onClick={onAdd}>
-            + Add deliverable
-          </button>
+          {canAdd ? (
+            <button type="button" className="btn-secondary" onClick={onAdd}>
+              + Add deliverable
+            </button>
+          ) : (
+            <span className="text-2xs text-ink-tertiary">Read-only</span>
+          )}
           <button type="button" className="btn-primary" onClick={onClose}>
             Done
           </button>
@@ -597,9 +683,11 @@ function DeliverablesModal({ open, onClose, contactName, deliverables, onAdd, on
           title="No deliverables yet"
           description="Use + Reel, + Story, or + Post on the engagement page."
           action={
-            <button type="button" className="btn-primary" onClick={onAdd}>
-              Add first deliverable
-            </button>
+            canAdd ? (
+              <button type="button" className="btn-primary" onClick={onAdd}>
+                Add first deliverable
+              </button>
+            ) : null
           }
         />
       ) : (
@@ -617,11 +705,15 @@ function DeliverablesModal({ open, onClose, contactName, deliverables, onAdd, on
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {d.is_overdue && <Pill tone="danger">Overdue</Pill>}
-                  <StatusButton
-                    value={d.status}
-                    options={deliverableStatusOptions}
-                    onChange={(status) => onStatusChange?.(d.id, status)}
-                  />
+                  {canEditStatus ? (
+                    <StatusButton
+                      value={d.status}
+                      options={deliverableStatusOptions}
+                      onChange={(status) => onStatusChange?.(d.id, status)}
+                    />
+                  ) : (
+                    <Pill tone={d.status === 'posted' ? 'success' : 'default'}>{d.status}</Pill>
+                  )}
                 </div>
               </div>
               <div className="mt-3">

@@ -64,14 +64,26 @@ export function saveDeliverablesOverride(engagementId, list) {
   saveStore(store);
 }
 
+function normalizeTerminalFields(record) {
+  if (
+    record.conversation_status === 'collaboration_complete'
+    || record.conversation_status?.startsWith('dropped_')
+  ) {
+    return { ...record, next_follow_up_date: null };
+  }
+  return record;
+}
+
 export function mergeEngagementRow(row) {
   if (!row?.id) return row;
   const override = getEngagementOverride(row.id);
-  return override ? { ...row, ...override } : row;
+  const merged = override ? { ...row, ...override } : row;
+  return normalizeTerminalFields(merged);
 }
 
 export function mergeEngagementRecord(base) {
   if (!base?.id) return base;
   const override = getEngagementOverride(base.id);
-  return override ? { ...base, ...override } : base;
+  const merged = override ? { ...base, ...override } : { ...base };
+  return normalizeTerminalFields(merged);
 }

@@ -13,6 +13,7 @@ import { campaignsRouter } from './routes/campaigns.mjs';
 import { engagementsRouter } from './routes/engagements.mjs';
 import { dashboardRouter } from './routes/dashboard.mjs';
 import { attachUser } from './middleware/auth.mjs';
+import { devAuthMiddleware } from './middleware/devAuth.mjs';
 
 dotenv.config();
 
@@ -51,6 +52,7 @@ app.use(
   }),
 );
 app.use(attachUser);
+app.use('/api', devAuthMiddleware);
 
 app.use('/api/health', healthRouter);
 app.use('/api/auth', authRouter);

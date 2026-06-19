@@ -12,7 +12,7 @@ const nav = [
 ];
 
 export function AppShell({ onQuickAdd }) {
-  const { user, logout } = useAuth();
+  const { user, logout, devMode } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -41,6 +41,11 @@ export function AppShell({ onQuickAdd }) {
           ))}
         </nav>
         <div className="border-t border-line p-3">
+          {devMode && (
+            <div className="mb-2 rounded-md bg-amber-50 px-2 py-1.5 text-2xs font-medium text-amber-800">
+              Dev mode — no Google sign-in
+            </div>
+          )}
           <div className="rounded-md px-2 py-2">
             <div className="truncate text-sm font-medium text-ink">{user?.full_name}</div>
             <div className="text-2xs text-ink-tertiary">{roleLabel(user?.role)}</div>

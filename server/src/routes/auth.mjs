@@ -1,32 +1,21 @@
-import { OAuth2Client } from 'google-auth-library';
 import { Router } from 'express';
 import { pool } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
+import { ensureDevSession } from '../middleware/devAuth.mjs';
+import {
+  getOAuthClient,
+  isDevAuthEnabled,
+  isGoogleConfigured,
+  sessionUser,
+} from '../lib/authConfig.mjs';
 
 export const authRouter = Router();
-
-function getOAuthClient() {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const appUrl = process.env.APP_URL ?? 'http://localhost:8080';
-  if (!clientId || !clientSecret) return null;
-  return new OAuth2Client(clientId, clientSecret, `${appUrl.replace(/\/$/, '')}/api/auth/google/callback`);
-}
-
-function sessionUser(user) {
-  return {
-    id: user.id,
-    email: user.email,
-    full_name: user.full_name,
-    role: user.role,
-  };
-}
 
 authRouter.get('/google', (req, res) => {
   const client = getOAuthClient();
   if (!client) {
     return res.status(503).json({
-      error: 'Google sign-in is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on Render.',
+      error: 'Google sign-in is not configured yet. Dev mode is active — use the app directly.',
     });
   }
   const url = client.generateAuthUrl({
@@ -82,11 +71,17 @@ authRouter.post('/logout', requireAuth, (req, res) => {
   });
 });
 
-authRouter.get('/me', (req, res) => {
+authRouter.get('/me', async (req, res) => {
+  if (!req.session?.user && isDevAuthEnabled()) {
+    await ensureDevSession(req);
+  }
   if (!req.session?.user) return res.status(401).json({ error: 'Sign in required' });
   res.json(req.session.user);
 });
 
 authRouter.get('/status', (_req, res) => {
-  res.json({ google_configured: Boolean(getOAuthClient()) });
+  res.json({
+    google_configured: isGoogleConfigured(),
+    dev_mode: isDevAuthEnabled(),
+  });
 });

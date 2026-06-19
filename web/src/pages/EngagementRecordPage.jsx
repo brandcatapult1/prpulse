@@ -7,6 +7,7 @@ import {
   Toast,
 } from '../components/ui/Primitives.jsx';
 import { ExpandableSection, RatingStars, StatusButton } from '../components/ui/DataKit.jsx';
+import { PageHeader } from '../components/ui/PageHeader.jsx';
 import {
   Pill,
   formatDate,
@@ -14,6 +15,8 @@ import {
   formatStatus,
   statusTone,
 } from '../lib/format.jsx';
+import { MODULES } from '../lib/modules.js';
+import { addDaysIso, toDateInputValue } from '../lib/dates.js';
 import { engagementsApi } from '../lib/api.js';
 import {
   getDemoDeliverables,
@@ -46,11 +49,25 @@ const deliverableStatusOptions = [
   'posted',
 ].map((v) => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) }));
 
+const DELIVERABLE_TYPES = [
+  { value: 'reel', label: 'Reel' },
+  { value: 'story', label: 'Story' },
+  { value: 'post', label: 'Post' },
+  { value: 'video', label: 'Video' },
+];
+
+const FOLLOW_UP_SUGGESTIONS = {
+  in_conversation: { days: 3, label: '3 days from today' },
+  no_response: { days: 7, label: '7 days from today' },
+};
+
 export function EngagementRecordPage() {
   const { id } = useParams();
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState(null);
   const [demo, setDemo] = useState(true);
+  const [followUpSuggestion, setFollowUpSuggestion] = useState(null);
+  const [addDeliverableType, setAddDeliverableType] = useState('reel');
   const [engagement, setEngagement] = useState(() => getDemoEngagement(id));
   const [deliverables, setDeliverables] = useState(() => getDemoDeliverables(id));
   const [timeline, setTimeline] = useState(() => getDemoTimeline(id));
@@ -61,6 +78,7 @@ export function EngagementRecordPage() {
     setDeliverables(getDemoDeliverables(id));
     setTimeline(getDemoTimeline(id));
     setDemo(true);
+    setFollowUpSuggestion(null);
 
     Promise.all([
       engagementsApi.get(id).catch(() => null),
@@ -87,13 +105,50 @@ export function EngagementRecordPage() {
       setModal('visit');
       return;
     }
+
     setEngagement((e) => ({ ...e, conversation_status: next }));
-    if (next === 'in_conversation') {
-      setToast('Follow-up suggested: 3 days from today');
+
+    const rule = FOLLOW_UP_SUGGESTIONS[next];
+    if (rule) {
+      setFollowUpSuggestion({
+        date: addDaysIso(rule.days),
+        label: rule.label,
+      });
+    } else if (next === 'collaboration_complete' || next.startsWith('dropped_')) {
+      setFollowUpSuggestion(null);
+      setEngagement((e) => ({ ...e, next_follow_up_date: null }));
     }
-    if (next === 'no_response') {
-      setToast('Follow-up suggested: 7 days from today');
-    }
+  };
+
+  const handleFollowUpChange = (date) => {
+    setEngagement((e) => ({ ...e, next_follow_up_date: date || null }));
+    if (date === followUpSuggestion?.date) setFollowUpSuggestion(null);
+  };
+
+  const acceptFollowUpSuggestion = () => {
+    if (!followUpSuggestion) return;
+    setEngagement((e) => ({ ...e, next_follow_up_date: followUpSuggestion.date }));
+    setFollowUpSuggestion(null);
+    setToast(`Follow-up set to ${formatDate(followUpSuggestion.date)}`);
+  };
+
+  const openAddDeliverable = (type = 'reel') => {
+    setAddDeliverableType(type);
+    setModal('add-deliverable');
+  };
+
+  const handleAddDeliverable = ({ type, quantity, dueDate }) => {
+    const newItem = {
+      id: `d-${Date.now()}`,
+      deliverable_type: type,
+      quantity: Number(quantity) || 1,
+      due_date: dueDate || addDaysIso(7),
+      status: 'pending',
+      is_overdue: false,
+    };
+    setDeliverables((prev) => [...prev, newItem]);
+    setModal(null);
+    setToast(`Added ${type} ×${newItem.quantity}`);
   };
 
   const postedCount = deliverables.filter((d) => d.status === 'posted').length;
@@ -101,42 +156,30 @@ export function EngagementRecordPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+      <PageHeader
+        title={engagement.contact_name}
+        subtitle={`${MODULES.engagementRecord.pageTitle} · ${engagement.campaign_name} · ${engagement.brand_name}`}
+        actions={
           <Link
             to={`/campaigns/${engagement.campaign_id ?? 'c1'}`}
-            className="text-2xs font-medium text-brand hover:underline"
+            className="btn-secondary"
           >
-            ← Back to campaign
+            ← Campaign
           </Link>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight text-ink">
-            {engagement.contact_name}
-          </h1>
-          <p className="mt-0.5 text-sm text-ink-secondary">
-            {engagement.campaign_name} · {engagement.brand_name}
-          </p>
-        </div>
+        }
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
         <Pill tone={statusTone(engagement.conversation_status)}>
           {formatStatus(engagement.conversation_status)}
         </Pill>
+        <span className="text-2xs text-ink-tertiary">{MODULES.engagementRecord.subtitle}</span>
       </div>
 
       <DemoBanner show={demo} />
 
-      {/* Primary action cards — tap to open modals */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <ActionCard
-          title="Deliverables"
-          subtitle={`${postedCount}/${deliverables.length} posted`}
-          badge={overdueCount > 0 ? `${overdueCount} overdue` : null}
-          badgeTone="danger"
-          onClick={() => setModal('deliverables')}
-        />
-        <ActionCard
-          title="Feedback"
-          subtitle="Rate this collaboration"
-          onClick={() => setModal('feedback')}
-        />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <ActionCard title="Feedback" subtitle="Rate this collaboration" onClick={() => setModal('feedback')} />
         <ActionCard
           title="Visit"
           subtitle={engagement.visit_date ? formatDate(engagement.visit_date) : 'Schedule a visit'}
@@ -151,12 +194,9 @@ export function EngagementRecordPage() {
 
       <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
         <div className="space-y-4">
-          {/* Status & interest — card controls, not a flat form */}
           <Card elevated className="!p-5">
             <h2 className="text-sm font-semibold text-ink">Advance outreach</h2>
-            <p className="mt-0.5 text-2xs text-ink-secondary">
-              Update status and interest with one tap
-            </p>
+            <p className="mt-0.5 text-2xs text-ink-secondary">Update status and interest</p>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-2 block text-2xs font-medium uppercase tracking-wide text-ink-tertiary">
@@ -186,13 +226,18 @@ export function EngagementRecordPage() {
             </div>
           </Card>
 
-          {/* Details grid */}
           <Card elevated className="!p-5">
             <h2 className="text-sm font-semibold text-ink">Details</h2>
             <dl className="mt-4 grid gap-4 sm:grid-cols-2">
               <DetailItem label="Owner" value={engagement.owner_name} />
               <DetailItem label="Last contact" value={formatDate(engagement.last_contact_date)} />
-              <DetailItem label="Next follow-up" value={formatDate(engagement.next_follow_up_date)} highlight />
+              <FollowUpField
+                value={engagement.next_follow_up_date}
+                suggestion={followUpSuggestion}
+                onChange={handleFollowUpChange}
+                onAccept={acceptFollowUpSuggestion}
+                onDismiss={() => setFollowUpSuggestion(null)}
+              />
               <DetailItem label="Agreed fee" value={formatFee(engagement.agreed_fee)} />
               <DetailItem
                 label="Reason"
@@ -202,7 +247,70 @@ export function EngagementRecordPage() {
             </dl>
           </Card>
 
-          {/* Notes */}
+          <Card elevated className="!p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-ink">Deliverables</h2>
+                <p className="mt-0.5 text-2xs text-ink-secondary">
+                  What content did you agree on with this creator?
+                </p>
+              </div>
+              <Pill tone={deliverables.length ? 'info' : 'muted'}>
+                {postedCount}/{deliverables.length} posted
+              </Pill>
+            </div>
+
+            <div className="mt-4">
+              <p className="mb-2 text-2xs font-medium text-ink-tertiary">Add content type</p>
+              <div className="flex flex-wrap gap-2">
+                {DELIVERABLE_TYPES.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => openAddDeliverable(value)}
+                  >
+                    + {label}
+                  </button>
+                ))}
+                <button type="button" className="btn-ghost" onClick={() => setModal('deliverables')}>
+                  View all
+                </button>
+              </div>
+            </div>
+
+            {deliverables.length === 0 ? (
+              <div className="mt-4 rounded-lg border border-dashed border-line bg-canvas px-4 py-6 text-center">
+                <p className="text-sm text-ink-secondary">No deliverables yet</p>
+                <p className="mt-1 text-2xs text-ink-tertiary">
+                  Tap <strong>+ Reel</strong>, <strong>+ Story</strong>, or <strong>+ Post</strong> above to add what you agreed on.
+                </p>
+              </div>
+            ) : (
+              <ul className="mt-4 space-y-2">
+                {deliverables.map((d) => (
+                  <li
+                    key={d.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-canvas px-3 py-2.5"
+                  >
+                    <div>
+                      <span className="text-sm font-medium capitalize text-ink">
+                        {d.deliverable_type} ×{d.quantity}
+                      </span>
+                      <span className="ml-2 text-2xs text-ink-tertiary">
+                        Due {formatDate(d.due_date)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {d.is_overdue && <Pill tone="danger">Overdue</Pill>}
+                      <Pill tone={d.status === 'posted' ? 'success' : 'default'}>{d.status}</Pill>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
           <Card elevated className="!p-5">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-ink">Notes</h2>
@@ -214,7 +322,6 @@ export function EngagementRecordPage() {
           </Card>
         </div>
 
-        {/* Relationship context card */}
         <Card elevated className="h-fit !p-5">
           <h2 className="text-sm font-semibold text-ink">Relationship</h2>
           <p className="mt-0.5 text-2xs text-ink-secondary">From contact history</p>
@@ -234,10 +341,6 @@ export function EngagementRecordPage() {
               <dt className="text-2xs text-ink-tertiary">Would work again</dt>
               <dd className="mt-1 text-sm font-medium text-ink">83%</dd>
             </div>
-            <div>
-              <dt className="text-2xs text-ink-tertiary">Past collabs</dt>
-              <dd className="mt-1 text-sm font-medium text-ink">6 total</dd>
-            </div>
           </dl>
           <div className="mt-4 border-t border-line pt-4">
             <Pill tone="success">Not blacklisted</Pill>
@@ -250,13 +353,20 @@ export function EngagementRecordPage() {
         onClose={() => setModal(null)}
         contactName={engagement.contact_name}
         deliverables={deliverables}
-        onAdd={() => setModal('add-deliverable')}
+        onAdd={() => openAddDeliverable('reel')}
+        onStatusChange={(delId, status) => {
+          setDeliverables((prev) =>
+            prev.map((d) => (d.id === delId ? { ...d, status } : d)),
+          );
+        }}
       />
 
       <AddDeliverableModal
         open={modal === 'add-deliverable'}
-        onClose={() => setModal('deliverables')}
+        initialType={addDeliverableType}
+        onClose={() => setModal(null)}
         contactName={engagement.contact_name}
+        onAdd={handleAddDeliverable}
       />
 
       <FeedbackModal
@@ -269,8 +379,14 @@ export function EngagementRecordPage() {
         open={modal === 'visit'}
         onClose={() => setModal(null)}
         contactName={engagement.contact_name}
-        onSave={() => {
-          setEngagement((e) => ({ ...e, conversation_status: 'scheduled' }));
+        onSave={(visitDate) => {
+          setEngagement((e) => ({
+            ...e,
+            conversation_status: 'scheduled',
+            visit_date: visitDate,
+            next_follow_up_date: visitDate,
+          }));
+          setFollowUpSuggestion(null);
           setModal(null);
           setToast('Visit saved — follow-up set to visit date');
         }}
@@ -283,9 +399,7 @@ export function EngagementRecordPage() {
         entries={timeline}
       />
 
-      {toast && (
-        <Toast message={toast} onClose={() => setToast(null)} />
-      )}
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </div>
   );
 }
@@ -341,11 +455,53 @@ function DetailItem({ label, value, highlight, className = '' }) {
   );
 }
 
-function DeliverablesModal({ open, onClose, contactName, deliverables, onAdd }) {
+function FollowUpField({ value, suggestion, onChange, onAccept, onDismiss }) {
+  const inputValue = toDateInputValue(value);
+  const showSuggestion =
+    suggestion && toDateInputValue(suggestion.date) !== inputValue;
+
+  return (
+    <div className="sm:col-span-2">
+      <dt className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">
+        Next follow-up
+      </dt>
+      <dd className="mt-1.5">
+        <input
+          type="date"
+          className="input-field max-w-[220px]"
+          value={inputValue}
+          onChange={(e) => onChange(e.target.value || null)}
+          aria-label="Next follow-up date"
+        />
+        {!inputValue && !showSuggestion && (
+          <p className="mt-1.5 text-2xs text-ink-tertiary">Pick a date, or use a suggestion after changing status.</p>
+        )}
+      </dd>
+      {showSuggestion && (
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
+          <p className="text-2xs text-amber-900">
+            <span className="font-medium">Suggested:</span>{' '}
+            {formatDate(suggestion.date)} ({suggestion.label}) — you choose whether to use it.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" className="btn-primary" onClick={onAccept}>
+              Use {formatDate(suggestion.date)}
+            </button>
+            <button type="button" className="btn-secondary" onClick={onDismiss}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DeliverablesModal({ open, onClose, contactName, deliverables, onAdd, onStatusChange }) {
   return (
     <Modal
       open={open}
-      title={`Deliverables · ${contactName}`}
+      title={`All deliverables · ${contactName}`}
       onClose={onClose}
       footer={
         <div className="flex justify-between">
@@ -361,7 +517,7 @@ function DeliverablesModal({ open, onClose, contactName, deliverables, onAdd }) 
       {deliverables.length === 0 ? (
         <EmptyState
           title="No deliverables yet"
-          description="Add reels, stories, or posts to track content delivery."
+          description="Use + Reel, + Story, or + Post on the engagement page."
           action={
             <button type="button" className="btn-primary" onClick={onAdd}>
               Add first deliverable
@@ -386,19 +542,20 @@ function DeliverablesModal({ open, onClose, contactName, deliverables, onAdd }) 
                   <StatusButton
                     value={d.status}
                     options={deliverableStatusOptions}
+                    onChange={(status) => onStatusChange?.(d.id, status)}
                   />
                 </div>
               </div>
               <div className="mt-3">
                 <ExpandableSection title="Proof & details">
-                <div className="space-y-2">
-                  <button type="button" className="btn-secondary w-full justify-center">
-                    Upload screenshots
-                  </button>
-                  <button type="button" className="btn-secondary w-full justify-center">
-                    Add content link
-                  </button>
-                </div>
+                  <div className="space-y-2">
+                    <button type="button" className="btn-secondary w-full justify-center">
+                      Upload screenshots
+                    </button>
+                    <button type="button" className="btn-secondary w-full justify-center">
+                      Add content link
+                    </button>
+                  </div>
                 </ExpandableSection>
               </div>
             </Card>
@@ -409,7 +566,23 @@ function DeliverablesModal({ open, onClose, contactName, deliverables, onAdd }) 
   );
 }
 
-function AddDeliverableModal({ open, onClose, contactName }) {
+function AddDeliverableModal({ open, initialType, onClose, contactName, onAdd }) {
+  const [type, setType] = useState(initialType);
+  const [quantity, setQuantity] = useState(1);
+  const [dueDate, setDueDate] = useState(() => addDaysIso(7));
+
+  useEffect(() => {
+    if (open) {
+      setType(initialType);
+      setQuantity(1);
+      setDueDate(addDaysIso(7));
+    }
+  }, [open, initialType]);
+
+  const submit = () => {
+    onAdd({ type, quantity, dueDate });
+  };
+
   return (
     <Modal
       open={open}
@@ -418,27 +591,42 @@ function AddDeliverableModal({ open, onClose, contactName }) {
       footer={
         <div className="flex justify-end gap-2">
           <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="button" className="btn-primary" onClick={onClose}>Add</button>
+          <button type="button" className="btn-primary" onClick={submit}>Add to engagement</button>
         </div>
       }
     >
+      <p className="mb-4 text-2xs text-ink-secondary">
+        Choose the content type you agreed on with this creator.
+      </p>
       <div className="grid gap-3">
         <div>
           <label className="mb-1.5 block text-2xs font-medium text-ink-secondary">Type</label>
-          <select className="input-field">
-            <option>Reel</option>
-            <option>Story</option>
-            <option>Post</option>
-            <option>Video</option>
+          <select className="input-field" value={type} onChange={(e) => setType(e.target.value)}>
+            {DELIVERABLE_TYPES.map(({ value, label }) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+            <option value="carousel">Carousel</option>
+            <option value="live">Live</option>
           </select>
         </div>
         <div>
           <label className="mb-1.5 block text-2xs font-medium text-ink-secondary">Quantity</label>
-          <input type="number" className="input-field" defaultValue={1} min={1} />
+          <input
+            type="number"
+            className="input-field"
+            value={quantity}
+            min={1}
+            onChange={(e) => setQuantity(e.target.value)}
+          />
         </div>
         <div>
           <label className="mb-1.5 block text-2xs font-medium text-ink-secondary">Due date</label>
-          <input type="date" className="input-field" />
+          <input
+            type="date"
+            className="input-field"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+          />
         </div>
       </div>
     </Modal>
@@ -511,6 +699,12 @@ function ToggleCard({ label, defaultYes = false }) {
 }
 
 function VisitModal({ open, onClose, contactName, onSave }) {
+  const [visitDate, setVisitDate] = useState('');
+
+  useEffect(() => {
+    if (open) setVisitDate('');
+  }, [open]);
+
   return (
     <Modal
       open={open}
@@ -519,17 +713,30 @@ function VisitModal({ open, onClose, contactName, onSave }) {
       footer={
         <div className="flex justify-end gap-2">
           <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="button" className="btn-primary" onClick={onSave}>Save visit</button>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={!visitDate}
+            onClick={() => onSave(visitDate)}
+          >
+            Save visit
+          </button>
         </div>
       }
     >
       <p className="mb-4 text-2xs text-ink-secondary">
-        Required when status is Scheduled. Follow-up will be set to the visit date.
+        Required when status is Scheduled. Follow-up will be set to the visit date you pick.
       </p>
       <div className="grid gap-3">
         <div>
           <label className="mb-1.5 block text-2xs font-medium text-ink-secondary">Visit date *</label>
-          <input type="date" className="input-field" required />
+          <input
+            type="date"
+            className="input-field"
+            required
+            value={visitDate}
+            onChange={(e) => setVisitDate(e.target.value)}
+          />
         </div>
         <div>
           <label className="mb-1.5 block text-2xs font-medium text-ink-secondary">Time</label>

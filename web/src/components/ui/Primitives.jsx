@@ -1,6 +1,19 @@
-export function Card({ children, className = '', padding = true }) {
+export function Card({ children, className = '', padding = true, elevated = false, interactive = false, onClick }) {
+  const Tag = onClick ? 'button' : 'div';
   return (
-    <div className={`panel ${padding ? 'p-4' : ''} ${className}`}>{children}</div>
+    <Tag
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      className={[
+        'rounded-xl border bg-white text-left',
+        elevated ? 'border-zinc-200 shadow-sm' : 'border-line',
+        interactive ? 'transition-all hover:border-brand/30 hover:shadow-md' : '',
+        padding ? 'p-4' : '',
+        className,
+      ].join(' ')}
+    >
+      {children}
+    </Tag>
   );
 }
 

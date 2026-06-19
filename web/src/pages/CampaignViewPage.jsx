@@ -45,7 +45,9 @@ export function CampaignViewPage() {
     {
       key: 'contact_name',
       label: 'Creator',
-      render: (r) => <span className="font-medium">{r.contact_name}</span>,
+      render: (r) => (
+        <span className="font-medium text-brand">{r.contact_name}</span>
+      ),
     },
     { key: 'owner_name', label: 'Owner' },
     {
@@ -55,6 +57,11 @@ export function CampaignViewPage() {
     },
     { key: 'next_follow_up_date', label: 'Next FU', render: (r) => formatDate(r.next_follow_up_date) },
     { key: 'agreed_fee', label: 'Fee', render: (r) => formatFee(r.agreed_fee) },
+    {
+      key: 'open',
+      label: '',
+      render: () => <span className="text-2xs font-medium text-brand">Open →</span>,
+    },
   ];
 
   return (
@@ -88,6 +95,10 @@ export function CampaignViewPage() {
           </Pill>
         </div>
       </div>
+
+      <p className="text-2xs text-ink-tertiary">
+        Click any creator row to open their <span className="font-medium text-ink-secondary">Engagement Record</span>
+      </p>
 
       <FilterBar filters={['Status', 'Owner', 'Interest', 'Follow-up due']} />
 

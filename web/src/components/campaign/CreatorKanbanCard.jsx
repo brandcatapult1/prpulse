@@ -6,7 +6,7 @@ import {
   contactInitials,
   contentTypeSummary,
   deliverableProgress,
-  dropReasonLabel,
+  droppedReasonLabel,
   isFollowUpOverdue,
   regionLabel,
 } from '../../lib/campaignKanban.js';
@@ -44,9 +44,25 @@ function StatusLine({ engagement, columnId }) {
   if (columnId === 'in_conversation') {
     const date = engagement.next_follow_up_date;
     const overdue = isFollowUpOverdue(date);
+    if (status === 'no_response') {
+      return (
+        <p className={`text-2xs ${overdue ? 'font-medium text-health-red' : 'text-ink-secondary'}`}>
+          {date ? `No reply — retry ${formatDate(date)}` : 'No reply yet — set retry date'}
+        </p>
+      );
+    }
     return (
       <p className={`text-2xs ${overdue ? 'font-medium text-health-red' : 'text-ink-secondary'}`}>
         {date ? `Follow-up ${formatDate(date)}` : 'Set a follow-up date'}
+      </p>
+    );
+  }
+
+  if (columnId === 'scheduled') {
+    const visitDate = engagement.visit_date ?? engagement.next_follow_up_date;
+    return (
+      <p className="text-2xs text-ink-secondary">
+        Visit {visitDate ? formatDate(visitDate) : '—'}
       </p>
     );
   }
@@ -82,10 +98,10 @@ function StatusLine({ engagement, columnId }) {
     return <p className="text-2xs font-medium text-health-green">Content live</p>;
   }
 
-  if (columnId === 'rejected') {
+  if (columnId === 'dropped') {
     return (
       <span className="inline-flex rounded px-1.5 py-0.5 text-2xs font-medium text-health-red ring-1 ring-red-200">
-        {dropReasonLabel(status)}
+        {droppedReasonLabel(status)}
       </span>
     );
   }

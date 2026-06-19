@@ -2,7 +2,7 @@ import { getDemoContact, getDemoDeliverables } from './demo.js';
 import { getContactProfileExtras } from './contactProfile.js';
 import { todayIso } from './dates.js';
 
-/** PRD parent stages — one column per pipeline stage. */
+/** PRD Module 5 conversation statuses — one Kanban column per parent stage. */
 export const CAMPAIGN_KANBAN_COLUMNS = [
   {
     id: 'not_contacted',
@@ -12,7 +12,7 @@ export const CAMPAIGN_KANBAN_COLUMNS = [
   {
     id: 'in_conversation',
     label: 'In conversation',
-    statuses: ['in_conversation'],
+    statuses: ['in_conversation', 'no_response'],
   },
   {
     id: 'scheduled',
@@ -20,24 +20,23 @@ export const CAMPAIGN_KANBAN_COLUMNS = [
     statuses: ['scheduled'],
   },
   {
-    id: 'rejected',
-    label: 'Rejected',
+    id: 'dropped',
+    label: 'Dropped',
     statuses: [
-      'no_response',
       'dropped_profile_rejected',
       'dropped_not_interested',
       'dropped_terms_disagreement',
     ],
   },
   {
-    id: 'complete',
-    label: 'Collaboration complete',
-    statuses: ['collaboration_complete'],
-  },
-  {
     id: 'awaiting_final',
     label: 'Awaited final deliverables',
     statuses: ['awaiting_final_deliverables'],
+  },
+  {
+    id: 'complete',
+    label: 'Collaboration complete',
+    statuses: ['collaboration_complete'],
   },
 ];
 
@@ -57,14 +56,18 @@ export function columnIdForStatus(status) {
   return col?.id ?? 'not_contacted';
 }
 
-export function dropReasonLabel(status) {
+export function droppedReasonLabel(status) {
   const labels = {
-    no_response: 'No response',
     dropped_profile_rejected: 'Profile rejected',
     dropped_not_interested: 'Not interested',
     dropped_terms_disagreement: 'Terms disagreement',
   };
-  return labels[status] ?? 'Rejected';
+  return labels[status] ?? 'Dropped';
+}
+
+/** @deprecated use droppedReasonLabel */
+export function dropReasonLabel(status) {
+  return droppedReasonLabel(status);
 }
 
 export function contactInitials(name) {

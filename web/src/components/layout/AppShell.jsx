@@ -1,15 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { roleLabel } from '../../lib/format.jsx';
-
-const nav = [
-  { to: '/', label: 'Dashboard', end: true },
-  { to: '/contacts', label: 'Contacts' },
-  { to: '/campaigns', label: 'Campaigns' },
-  { to: '/brands', label: 'Brands' },
-  { to: '/registrations', label: 'Registrations' },
-  { to: '/reports', label: 'Reports' },
-];
+import { NAV_ITEMS } from '../../lib/modules.js';
 
 export function AppShell({ onQuickAdd }) {
   const { user, logout, devMode } = useAuth();
@@ -23,7 +15,7 @@ export function AppShell({ onQuickAdd }) {
           <div className="text-2xs text-ink-tertiary">Brand Catapult</div>
         </div>
         <nav className="flex-1 space-y-0.5 px-2">
-          {nav.map((item) => (
+          {NAV_ITEMS.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

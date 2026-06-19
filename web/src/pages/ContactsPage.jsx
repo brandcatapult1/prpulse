@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FilterBar, DataTable } from '../components/ui/DataKit.jsx';
-import { Modal } from '../components/ui/Primitives.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
+import { QuickAddModal } from '../components/contacts/QuickAddModal.jsx';
 import { Pill, statusTone } from '../lib/format.jsx';
 import { MODULES, CONTACT_PROFILE_TABS } from '../lib/modules.js';
 import { contactsApi } from '../lib/api.js';
@@ -20,6 +20,10 @@ export function ContactsPage() {
   const [quickOpen, setQuickOpen] = useState(false);
 
   useEffect(() => {
+    loadContacts();
+  }, []);
+
+  function loadContacts() {
     contactsApi
       .list()
       .then((data) => {
@@ -31,7 +35,7 @@ export function ContactsPage() {
         setRows(getDemoContacts());
         setDemo(true);
       });
-  }, []);
+  }
 
   const columns = [
     { key: 'full_name', label: 'Name', render: (r) => <span className="font-medium">{r.full_name}</span> },
@@ -71,44 +75,12 @@ export function ContactsPage() {
 
       <DataTable columns={columns} rows={rows} onRowClick={(row) => navigate(`/contacts/${row.id}`)} />
 
-      <QuickAddModal open={quickOpen} onClose={() => setQuickOpen(false)} />
+      <QuickAddModal
+        open={quickOpen}
+        onClose={() => setQuickOpen(false)}
+        onSaved={() => loadContacts()}
+      />
     </div>
-  );
-}
-
-function QuickAddModal({ open, onClose }) {
-  return (
-    <Modal
-      open={open}
-      title="Quick Add"
-      onClose={onClose}
-      footer={
-        <div className="flex justify-end gap-2">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="button" className="btn-secondary">Save & Add to Campaign…</button>
-          <button type="button" className="btn-primary" onClick={onClose}>Save</button>
-        </div>
-      }
-    >
-      <div className="grid gap-3">
-        <label className="block text-2xs text-ink-secondary">
-          Full name
-          <input className="input-field mt-1" placeholder="Creator name" />
-        </label>
-        <label className="block text-2xs text-ink-secondary">
-          Mobile number
-          <input className="input-field mt-1" placeholder="+91…" />
-        </label>
-        <label className="block text-2xs text-ink-secondary">
-          Instagram URL
-          <input className="input-field mt-1" placeholder="https://instagram.com/…" />
-        </label>
-        <label className="block text-2xs text-ink-secondary">
-          City
-          <input className="input-field mt-1" placeholder="Delhi" />
-        </label>
-      </div>
-    </Modal>
   );
 }
 

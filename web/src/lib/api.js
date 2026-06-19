@@ -27,11 +27,15 @@ export const dashboardApi = {
 export const contactsApi = {
   list: () => api('/contacts'),
   quickAdd: (body) => api('/contacts/quick-add', { method: 'POST', body: JSON.stringify(body) }),
+  lookupMobile: (mobile) =>
+    api(`/contacts/lookup/mobile/${encodeURIComponent(mobile)}`),
 };
 
 export const campaignsApi = {
   list: () => api('/campaigns'),
   get: (id) => api(`/campaigns/${id}`),
+  populate: (id, body) =>
+    api(`/campaigns/${id}/populate`, { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export const engagementsApi = {

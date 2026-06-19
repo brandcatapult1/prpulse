@@ -31,8 +31,10 @@ import {
   getBrandOverride,
   getContactAdds,
   getCampaignAdds,
+  getEngagementAdds,
   addContactImports,
   addCampaignImports,
+  addEngagementImport,
   getUserOverride,
   saveUserOverride,
 } from './demoStore.js';
@@ -47,6 +49,7 @@ export {
   addRegistrationSubmission,
   addContactImports,
   addCampaignImports,
+  addEngagementImport,
   saveUserOverride,
 };
 
@@ -104,11 +107,14 @@ export function mergeBrands(apiRows) {
 }
 
 export function getDemoEngagementsForCampaign(campaignId) {
-  const base = MOCK_ENGAGEMENTS_BY_CAMPAIGN[campaignId] ?? MOCK_ENGAGEMENTS_BY_CAMPAIGN.c1;
-  return base.map(mergeEngagementRow);
+  const base = MOCK_ENGAGEMENTS_BY_CAMPAIGN[campaignId] ?? [];
+  const added = getEngagementAdds().filter((e) => e.campaign_id === campaignId);
+  return [...base, ...added].map(mergeEngagementRow);
 }
 
 export function getDemoEngagement(id) {
+  const added = getEngagementAdds().find((e) => e.id === id);
+  if (added) return mergeEngagementRecord({ ...added });
   const base = MOCK_ENGAGEMENTS_BY_ID[id] ?? Object.values(MOCK_ENGAGEMENTS_BY_ID)[0];
   return mergeEngagementRecord({ ...base });
 }

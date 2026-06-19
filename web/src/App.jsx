@@ -15,7 +15,7 @@ import { BrandsPage } from './pages/BrandsPage.jsx';
 import { BulkImportPage } from './pages/BulkImportPage.jsx';
 import { AdminPage } from './pages/AdminPage.jsx';
 import { PublicRegistrationPage } from './pages/PublicRegistrationPage.jsx';
-import { Modal } from './components/ui/Primitives.jsx';
+import { QuickAddModal } from './components/contacts/QuickAddModal.jsx';
 
 export default function App() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -42,25 +42,7 @@ export default function App() {
         </Route>
       </Routes>
 
-      <Modal
-        open={quickAddOpen}
-        title="Quick Add"
-        onClose={() => setQuickAddOpen(false)}
-        footer={
-          <div className="flex justify-end gap-2">
-            <button type="button" className="btn-secondary" onClick={() => setQuickAddOpen(false)}>Cancel</button>
-            <button type="button" className="btn-primary" onClick={() => setQuickAddOpen(false)}>Save</button>
-          </div>
-        }
-      >
-        <p className="mb-4 text-2xs text-ink-secondary">Capture a creator in under 15 seconds.</p>
-        <div className="grid gap-3">
-          <input className="input-field" placeholder="Full name" />
-          <input className="input-field" placeholder="Mobile number" />
-          <input className="input-field" placeholder="Instagram URL" />
-          <input className="input-field" placeholder="City" />
-        </div>
-      </Modal>
+      <QuickAddModal open={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
     </AuthProvider>
   );
 }

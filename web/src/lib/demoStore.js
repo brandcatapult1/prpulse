@@ -17,7 +17,7 @@ const PERSISTED_ENGAGEMENT_FIELDS = [
 function loadStore() {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [], brands: {}, contactAdds: [], campaignAdds: [], users: {} };
+    if (!raw) return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [], brands: {}, contactAdds: [], campaignAdds: [], engagementAdds: [], users: {} };
     const parsed = JSON.parse(raw);
     return {
       engagements: parsed.engagements ?? {},
@@ -29,10 +29,11 @@ function loadStore() {
       brands: parsed.brands ?? {},
       contactAdds: parsed.contactAdds ?? [],
       campaignAdds: parsed.campaignAdds ?? [],
+      engagementAdds: parsed.engagementAdds ?? [],
       users: parsed.users ?? {},
     };
   } catch {
-    return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [], brands: {}, contactAdds: [], campaignAdds: [], users: {} };
+    return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [], brands: {}, contactAdds: [], campaignAdds: [], engagementAdds: [], users: {} };
   }
 }
 
@@ -164,6 +165,29 @@ export function addCampaignImports(campaigns) {
   const store = loadStore();
   store.campaignAdds = [...(store.campaignAdds ?? []), ...campaigns];
   saveStore(store);
+}
+
+export function getEngagementAdds() {
+  return loadStore().engagementAdds ?? [];
+}
+
+export function addEngagementImport({ contactId, contactName, campaignId, campaignName, ownerName }) {
+  const store = loadStore();
+  const row = {
+    id: `eq-${Date.now()}`,
+    campaign_id: campaignId,
+    contact_id: contactId,
+    contact_name: contactName,
+    campaign_name: campaignName,
+    owner_name: ownerName ?? 'You',
+    conversation_status: 'new',
+    interest_level: null,
+    next_follow_up_date: null,
+    agreed_fee: null,
+  };
+  store.engagementAdds = [...(store.engagementAdds ?? []), row];
+  saveStore(store);
+  return row;
 }
 
 export function getUserOverride(id) {

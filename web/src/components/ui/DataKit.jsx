@@ -1,12 +1,22 @@
 export function DataTable({ columns, rows, onRowClick, selectable = false, selected = [], onSelect }) {
+  if (!rows.length) {
+    return (
+      <div className="panel px-4 py-10 text-center text-2xs text-ink-secondary">
+        No rows to show
+      </div>
+    );
+  }
+
   return (
-    <div className="overflow-hidden rounded-lg border border-surface-border bg-white">
+    <div className="panel overflow-hidden">
       <table className="min-w-full text-left text-sm">
-        <thead className="border-b border-surface-border bg-surface-muted text-xs uppercase tracking-wide text-slate-500">
-          <tr>
-            {selectable && <th className="px-4 py-3 w-10" />}
+        <thead>
+          <tr className="border-b border-line bg-canvas/60">
+            {selectable && <th className="w-10 px-4 py-2.5" />}
             {columns.map((col) => (
-              <th key={col.key} className="px-4 py-3 font-medium">{col.label}</th>
+              <th key={col.key} className="px-4 py-2.5 text-2xs font-medium uppercase tracking-wide text-ink-tertiary">
+                {col.label}
+              </th>
             ))}
           </tr>
         </thead>
@@ -14,20 +24,21 @@ export function DataTable({ columns, rows, onRowClick, selectable = false, selec
           {rows.map((row) => (
             <tr
               key={row.id}
-              className="border-b border-surface-border last:border-0 hover:bg-slate-50 cursor-pointer"
+              className="group border-b border-line/80 last:border-0 transition-colors hover:bg-brand-soft/40 cursor-pointer"
               onClick={() => onRowClick?.(row)}
             >
               {selectable && (
-                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
+                    className="rounded border-line text-brand focus:ring-brand/30"
                     checked={selected.includes(row.id)}
                     onChange={() => onSelect?.(row.id)}
                   />
                 </td>
               )}
               {columns.map((col) => (
-                <td key={col.key} className="px-4 py-3 text-slate-700">
+                <td key={col.key} className="px-4 py-2.5 text-sm text-ink">
                   {col.render ? col.render(row) : row[col.key]}
                 </td>
               ))}
@@ -39,26 +50,39 @@ export function DataTable({ columns, rows, onRowClick, selectable = false, selec
   );
 }
 
-export function FilterBar({ filters, onClear }) {
+export function FilterBar({ filters, active = [], onClear }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-surface-border bg-white px-3 py-2">
-      {filters.map((f) => (
-        <button key={f} type="button" className="rounded-full border border-surface-border px-3 py-1 text-xs text-slate-600 hover:bg-slate-50">
-          {f}
+    <div className="flex flex-wrap items-center gap-1.5">
+      {filters.map((f) => {
+        const isActive = active.includes(f);
+        return (
+          <button
+            key={f}
+            type="button"
+            className={`rounded-md border px-2.5 py-1 text-2xs transition-colors ${
+              isActive
+                ? 'border-brand/30 bg-brand-soft text-brand'
+                : 'border-line bg-white text-ink-secondary hover:border-zinc-300 hover:text-ink'
+            }`}
+          >
+            {f}
+          </button>
+        );
+      })}
+      {active.length > 0 && (
+        <button type="button" onClick={onClear} className="ml-1 text-2xs text-ink-tertiary hover:text-ink">
+          Clear
         </button>
-      ))}
-      <button type="button" onClick={onClear} className="ml-auto text-xs text-slate-400 hover:text-slate-600">
-        Clear all
-      </button>
+      )}
     </div>
   );
 }
 
 export function StatusButton({ value, options, onChange, disabled, hint }) {
   return (
-    <div className="relative">
+    <div>
       <select
-        className="input-field pr-8 disabled:opacity-50"
+        className="input-field h-8 max-w-[220px] disabled:cursor-not-allowed disabled:opacity-50"
         value={value}
         disabled={disabled}
         title={hint}
@@ -68,32 +92,54 @@ export function StatusButton({ value, options, onChange, disabled, hint }) {
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
-      {disabled && hint && (
-        <p className="mt-1 text-xs text-amber-700">{hint}</p>
-      )}
+      {disabled && hint && <p className="mt-1.5 text-2xs text-health-amber">{hint}</p>}
     </div>
   );
 }
 
-export function QuickAction({ label, onClick }) {
+export function QuickAction({ label, onClick, active = false }) {
   return (
-    <button type="button" className="btn-ghost text-xs" onClick={onClick}>{label}</button>
+    <button
+      type="button"
+      className={`inline-flex h-8 items-center rounded-md border px-3 text-2xs font-medium transition-colors ${
+        active
+          ? 'border-brand/30 bg-brand-soft text-brand'
+          : 'border-line bg-white text-ink-secondary hover:border-zinc-300 hover:text-ink'
+      }`}
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  );
+}
+
+export function MetricStrip({ items }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-2xs text-ink-secondary">
+      {items.map(({ label, value, tone }) => (
+        <div key={label} className="flex items-center gap-1.5">
+          <span>{label}</span>
+          <span className={`font-medium ${tone === 'accent' ? 'text-brand' : 'text-ink'}`}>{value}</span>
+        </div>
+      ))}
+    </div>
   );
 }
 
 export function RatingStars({ value = 0 }) {
   return (
-    <span className="text-amber-500 text-sm">
-      {'★'.repeat(Math.round(value))}{'☆'.repeat(5 - Math.round(value))}
+    <span className="text-sm text-health-amber">
+      {'★'.repeat(Math.round(value))}
+      <span className="text-line">{'★'.repeat(5 - Math.round(value))}</span>
     </span>
   );
 }
 
 export function ExpandableSection({ title, children, defaultOpen = false }) {
   return (
-    <details className="rounded-md border border-surface-border bg-surface-muted px-3 py-2" open={defaultOpen}>
-      <summary className="cursor-pointer text-sm font-medium text-slate-700">{title}</summary>
-      <div className="mt-2 text-sm text-slate-600">{children}</div>
+    <details className="rounded-md border border-line bg-canvas/50 px-3 py-2" open={defaultOpen}>
+      <summary className="cursor-pointer text-2xs font-medium text-ink">{title}</summary>
+      <div className="mt-2 text-2xs text-ink-secondary">{children}</div>
     </details>
   );
 }

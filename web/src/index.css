@@ -4,18 +4,31 @@
 
 @layer base {
   body {
-    @apply min-h-screen;
+    @apply min-h-screen bg-canvas text-ink antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors;
+    @apply inline-flex h-8 items-center justify-center rounded-md bg-ink px-3 text-2xs font-medium text-white transition-colors hover:bg-zinc-800;
+  }
+  .btn-secondary {
+    @apply inline-flex h-8 items-center justify-center rounded-md border border-line bg-white px-3 text-2xs font-medium text-ink transition-colors hover:bg-zinc-50;
   }
   .btn-ghost {
-    @apply inline-flex items-center justify-center rounded-md border border-surface-border bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors;
+    @apply inline-flex h-8 items-center justify-center rounded-md px-3 text-2xs font-medium text-ink-secondary transition-colors hover:bg-zinc-100 hover:text-ink;
   }
   .input-field {
-    @apply w-full rounded-md border border-surface-border bg-white px-3 py-2 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent;
+    @apply h-8 w-full rounded-md border border-line bg-white px-3 text-sm text-ink outline-none transition-colors placeholder:text-ink-tertiary focus:border-brand focus:ring-2 focus:ring-brand/20;
+  }
+  .panel {
+    @apply rounded-lg border border-line bg-white;
+  }
+  .page-title {
+    @apply text-[15px] font-semibold tracking-tight text-ink;
+  }
+  .page-sub {
+    @apply text-2xs text-ink-secondary;
   }
 }

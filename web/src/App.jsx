@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext.jsx';
+import { RequireAuth } from './components/layout/RequireAuth.jsx';
 import { AppShell } from './components/layout/AppShell.jsx';
+import { LoginPage } from './pages/LoginPage.jsx';
 import { DashboardPage } from './pages/DashboardPage.jsx';
 import { ContactsPage, ContactProfilePage } from './pages/ContactsPage.jsx';
+import { CampaignsPage } from './pages/CampaignsPage.jsx';
 import { CampaignViewPage } from './pages/CampaignViewPage.jsx';
 import { EngagementRecordPage, PlaceholderPage } from './pages/EngagementRecordPage.jsx';
 import { Modal } from './components/ui/Primitives.jsx';
@@ -11,17 +15,21 @@ export default function App() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   return (
-    <>
+    <AuthProvider>
       <Routes>
-        <Route element={<AppShell onQuickAdd={() => setQuickAddOpen(true)} />}>
-          <Route index element={<DashboardPage />} />
-          <Route path="contacts" element={<ContactsPage />} />
-          <Route path="contacts/:id" element={<ContactProfilePage />} />
-          <Route path="campaigns/:id" element={<CampaignViewPage />} />
-          <Route path="engagements/:id" element={<EngagementRecordPage />} />
-          <Route path="brands" element={<PlaceholderPage title="Brands" description="Brand roster — coming in build step 5" />} />
-          <Route path="registrations" element={<PlaceholderPage title="Registrations" description="Approval queue — coming in build step 11" />} />
-          <Route path="reports" element={<PlaceholderPage title="Reports" description="Monthly reporting — coming in build step 10" />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route element={<RequireAuth />}>
+          <Route element={<AppShell onQuickAdd={() => setQuickAddOpen(true)} />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="contacts" element={<ContactsPage />} />
+            <Route path="contacts/:id" element={<ContactProfilePage />} />
+            <Route path="campaigns" element={<CampaignsPage />} />
+            <Route path="campaigns/:id" element={<CampaignViewPage />} />
+            <Route path="engagements/:id" element={<EngagementRecordPage />} />
+            <Route path="brands" element={<PlaceholderPage title="Brands" description="Brand roster — build step 5" />} />
+            <Route path="registrations" element={<PlaceholderPage title="Registrations" description="Approval queue — build step 11" />} />
+            <Route path="reports" element={<PlaceholderPage title="Reports" description="Monthly reporting — build step 10" />} />
+          </Route>
         </Route>
       </Routes>
 
@@ -31,12 +39,12 @@ export default function App() {
         onClose={() => setQuickAddOpen(false)}
         footer={
           <div className="flex justify-end gap-2">
-            <button type="button" className="btn-ghost" onClick={() => setQuickAddOpen(false)}>Cancel</button>
+            <button type="button" className="btn-secondary" onClick={() => setQuickAddOpen(false)}>Cancel</button>
             <button type="button" className="btn-primary" onClick={() => setQuickAddOpen(false)}>Save</button>
           </div>
         }
       >
-        <p className="mb-3 text-sm text-slate-500">Capture a creator in under 15 seconds.</p>
+        <p className="mb-4 text-2xs text-ink-secondary">Capture a creator in under 15 seconds.</p>
         <div className="grid gap-3">
           <input className="input-field" placeholder="Full name" />
           <input className="input-field" placeholder="Mobile number" />
@@ -44,6 +52,6 @@ export default function App() {
           <input className="input-field" placeholder="City" />
         </div>
       </Modal>
-    </>
+    </AuthProvider>
   );
 }

@@ -2,17 +2,17 @@ import express from 'express';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { execSync } from 'node:child_process';
 import { healthRouter } from './routes/health.mjs';
+import { authRouter } from './routes/auth.mjs';
 import { contactsRouter } from './routes/contacts.mjs';
 import { campaignsRouter } from './routes/campaigns.mjs';
 import { engagementsRouter } from './routes/engagements.mjs';
 import { dashboardRouter } from './routes/dashboard.mjs';
-import { attachUser, requireAuth } from './middleware/auth.mjs';
+import { attachUser } from './middleware/auth.mjs';
 
 dotenv.config();
 
@@ -33,8 +33,8 @@ async function runMigrations() {
 }
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(helmet({ contentSecurityPolicy: false }));
-app.use(cors({ origin: process.env.APP_URL ?? true, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 app.use(
@@ -42,25 +42,22 @@ app.use(
     secret: process.env.SESSION_SECRET ?? 'dev-only-change-me',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: process.env.NODE_ENV === 'production', httpOnly: true, maxAge: 7 * 86400000 },
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: 7 * 86400000,
+    },
   }),
 );
 app.use(attachUser);
 
 app.use('/api/health', healthRouter);
+app.use('/api/auth', authRouter);
 app.use('/api/contacts', contactsRouter);
 app.use('/api/campaigns', campaignsRouter);
 app.use('/api/engagements', engagementsRouter);
 app.use('/api/dashboard', dashboardRouter);
-
-app.get('/api/auth/me', requireAuth, (req, res) => res.json(req.user));
-
-app.get('/api/auth/google', (_req, res) => {
-  res.json({
-    message: 'Google OAuth — configure GOOGLE_CLIENT_ID in cloud env vars',
-    configured: Boolean(process.env.GOOGLE_CLIENT_ID),
-  });
-});
 
 const webDist = path.join(rootDir, 'web/dist');
 app.use(express.static(webDist));

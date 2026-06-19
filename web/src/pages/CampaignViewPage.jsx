@@ -1,17 +1,32 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FilterBar, DataTable } from '../components/ui/DataKit.jsx';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { FilterBar, DataTable, MetricStrip } from '../components/ui/DataKit.jsx';
 import { Drawer } from '../components/ui/Primitives.jsx';
 import { Pill, healthTone, formatStatus, formatDate, formatFee, statusTone } from '../lib/format.jsx';
+import { campaignsApi, engagementsApi } from '../lib/api.js';
 import { MOCK_CAMPAIGN, MOCK_ENGAGEMENTS, MOCK_CONTACTS } from '../data/mock.js';
 
 export function CampaignViewPage() {
+  const { id } = useParams();
   const navigate = useNavigate();
+  const [campaign, setCampaign] = useState(MOCK_CAMPAIGN);
+  const [engagements, setEngagements] = useState(MOCK_ENGAGEMENTS);
   const [addOpen, setAddOpen] = useState(false);
-  const c = MOCK_CAMPAIGN;
+
+  useEffect(() => {
+    if (!id) return;
+    campaignsApi.get(id).then(setCampaign).catch(() => {});
+    engagementsApi.byCampaign(id).then((rows) => {
+      if (rows.length) setEngagements(rows);
+    }).catch(() => {});
+  }, [id]);
 
   const columns = [
-    { key: 'contact_name', label: 'Creator' },
+    {
+      key: 'contact_name',
+      label: 'Creator',
+      render: (r) => <span className="font-medium">{r.contact_name}</span>,
+    },
     { key: 'owner_name', label: 'Owner' },
     {
       key: 'conversation_status',
@@ -23,29 +38,42 @@ export function CampaignViewPage() {
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-lg border border-surface-border bg-white p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold">{c.campaign_name}</h1>
-            <p className="text-sm text-slate-500">{c.brand_name} · Active</p>
-            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
-              <span>Target {c.target_collaborations}</span>
-              <span>Completed {c.completed_collaborations}</span>
-              <span>Remaining {c.remaining_collaborations}</span>
-              <span>{c.achievement_pct}%</span>
-              <Pill tone={healthTone(c.campaign_health)}>{c.campaign_health === 'not_set' ? 'No target set' : c.campaign_health}</Pill>
+    <div className="mx-auto max-w-6xl space-y-4">
+      <div className="panel p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-semibold tracking-tight text-ink">{campaign.campaign_name}</h1>
+              <Pill tone="success">{campaign.status}</Pill>
             </div>
+            <p className="text-2xs text-ink-secondary">{campaign.brand_name}</p>
+            <MetricStrip
+              items={[
+                { label: 'Target', value: campaign.target_collaborations ?? '—' },
+                { label: 'Completed', value: campaign.completed_collaborations, tone: 'accent' },
+                { label: 'Remaining', value: campaign.remaining_collaborations ?? '—' },
+                {
+                  label: 'Health',
+                  value: campaign.campaign_health === 'not_set' ? 'Not set' : `${campaign.achievement_pct ?? 0}% ${campaign.campaign_health}`,
+                  tone: 'accent',
+                },
+              ]}
+            />
           </div>
-          <button type="button" className="btn-primary" onClick={() => setAddOpen(true)}>Add Creators</button>
+          <button type="button" className="btn-primary" onClick={() => setAddOpen(true)}>Add creators</button>
         </div>
+        {campaign.campaign_health && campaign.campaign_health !== 'not_set' && (
+          <div className="mt-4">
+            <Pill tone={healthTone(campaign.campaign_health)}>{campaign.campaign_health}</Pill>
+          </div>
+        )}
       </div>
 
       <FilterBar filters={['Status', 'Owner', 'Interest', 'Follow-up due']} />
 
       <DataTable
         columns={columns}
-        rows={MOCK_ENGAGEMENTS}
+        rows={engagements}
         onRowClick={(row) => navigate(`/engagements/${row.id}`)}
       />
 
@@ -56,24 +84,24 @@ export function CampaignViewPage() {
 
 function AddCreatorsDrawer({ open, onClose }) {
   const [selected, setSelected] = useState([]);
-  const toggle = (id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const toggle = (rowId) => setSelected((s) => (s.includes(rowId) ? s.filter((x) => x !== rowId) : [...s, rowId]));
 
   return (
     <Drawer
       open={open}
-      title="Add Creators"
+      title="Add creators"
       onClose={onClose}
       footer={
         <div className="flex items-center justify-between">
-          <span className="text-xs text-slate-500">Blacklisted hidden · {selected.length} selected</span>
+          <span className="text-2xs text-ink-tertiary">{selected.length} selected · blacklisted hidden</span>
           <div className="flex gap-2">
-            <button type="button" className="btn-ghost">Quick Add new</button>
-            <button type="button" className="btn-primary">Add {selected.length} to campaign</button>
+            <button type="button" className="btn-secondary">Quick Add</button>
+            <button type="button" className="btn-primary">Add to campaign</button>
           </div>
         </div>
       }
     >
-      <FilterBar filters={['Category', 'City', 'Platform', 'Classification', 'Paid/Barter', 'Tags', 'Saved List']} />
+      <FilterBar filters={['Category', 'City', 'Classification', 'Tags', 'Saved list']} />
       <div className="mt-4">
         <DataTable
           selectable

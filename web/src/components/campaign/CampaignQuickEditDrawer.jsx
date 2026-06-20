@@ -16,6 +16,7 @@ import {
 } from '../../lib/demo.js';
 import { getEngagementOverride } from '../../lib/demoStore.js';
 import { recordEngagementPatchActivity } from '../../lib/activityLog.js';
+import { STAGE, transitionStage } from '../../lib/engagementTransitions.js';
 import {
   canSetDeliverableStatus,
   deliverableStatusBlockReason,
@@ -131,12 +132,19 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
   }
 
   function handleVisitSave(visitDate) {
+    const result = transitionStage(engagement, STAGE.SCHEDULED, { visitDate });
+    if (!result.ok) {
+      setToast(result.error ?? 'Could not schedule visit');
+      if (result.focusDeliverables) {
+        document.getElementById('campaign-drawer-deliverables')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+      }
+      return;
+    }
     persist(
-      {
-        conversation_status: 'scheduled',
-        visit_date: visitDate,
-        next_follow_up_date: visitDate,
-      },
+      result.patch,
       `Visit set for ${formatDate(visitDate)}`,
     );
     setVisitOpen(false);
@@ -244,7 +252,7 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
             </p>
           )}
 
-          <div>
+          <div id="campaign-drawer-deliverables">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-ink">Deliverables</h3>
               <span className="text-2xs text-ink-tertiary">

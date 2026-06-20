@@ -222,7 +222,11 @@ export function CreatorKanbanCard({
       )}
 
       {showInConversationLogging && onApplyLogging && (
-        <InConversationCardLogging engagement={engagement} onApply={onApplyLogging} />
+        <InConversationCardLogging
+          engagement={engagement}
+          onApply={onApplyLogging}
+          onError={onLoggingError}
+        />
       )}
 
       {showScheduledLogging && onApplyLogging && (

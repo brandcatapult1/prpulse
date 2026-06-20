@@ -10,7 +10,7 @@ import {
 /**
  * Inline logging for In conversation cards only — one disclosure level at a time.
  */
-export function InConversationCardLogging({ engagement, onApply }) {
+export function InConversationCardLogging({ engagement, onApply, onError }) {
   const [step, setStep] = useState('idle');
   const [retryDate, setRetryDate] = useState('');
   const [followUpDate, setFollowUpDate] = useState('');
@@ -59,7 +59,10 @@ export function InConversationCardLogging({ engagement, onApply }) {
   function handleScheduledConfirm() {
     if (!visitDate) return;
     const result = transitionStage(engagement, STAGE.SCHEDULED, { visitDate });
-    if (!result.ok) return;
+    if (!result.ok) {
+      onError?.(result.error ?? 'Could not schedule visit');
+      return;
+    }
     apply(result.patch, `Scheduled — visit ${formatDate(visitDate)}`);
   }
 

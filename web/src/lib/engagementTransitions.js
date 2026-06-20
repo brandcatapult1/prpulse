@@ -35,6 +35,10 @@ export const DIDNT_DELIVER_DROP_REASON = {
   label: "Didn't Deliver",
 };
 
+/** Shown when → Scheduled is blocked because terms/deliverables are not planned yet. */
+export const SCHEDULED_REQUIRES_DELIVERABLES_MESSAGE =
+  'Add at least one deliverable before scheduling';
+
 export { isValidDropReason, resolveDroppedFrom, droppedFromToStatus } from './dropTransitions.js';
 export { NOT_CONTACTED_DROP_REASON } from './dropTransitions.js';
 
@@ -117,6 +121,13 @@ export function transitionStage(engagement, target, payload = {}) {
   if (normalized === STAGE.SCHEDULED || normalized === 'scheduled') {
     if (!payload.visitDate) {
       return { ok: false, needsPrompt: 'visit_date' };
+    }
+    if (getDemoDeliverables(engagement.id).length === 0) {
+      return {
+        ok: false,
+        error: SCHEDULED_REQUIRES_DELIVERABLES_MESSAGE,
+        focusDeliverables: true,
+      };
     }
     return okTransition(engagement, payload, {
       ok: true,

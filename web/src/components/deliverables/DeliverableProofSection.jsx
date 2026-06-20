@@ -261,9 +261,11 @@ export function DeliverableRow({
   deliverable,
   canEditStatus,
   canEditProof,
+  canRemove = false,
   deliverableStatusOptions,
   onStatusChange,
   onUpdate,
+  onRemove,
   onSaved,
   compact = false,
 }) {
@@ -305,6 +307,16 @@ export function DeliverableRow({
             <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-2xs font-medium capitalize text-ink-secondary">
               {deliverable.status}
             </span>
+          )}
+          {canRemove && (
+            <button
+              type="button"
+              className="rounded-md px-1.5 py-1 text-2xs font-medium text-ink-tertiary hover:bg-red-50 hover:text-health-red"
+              aria-label={`Remove ${deliverableTypeLabel(deliverable.deliverable_type)}`}
+              onClick={() => onRemove?.(deliverable.id)}
+            >
+              Remove
+            </button>
           )}
         </div>
       </div>

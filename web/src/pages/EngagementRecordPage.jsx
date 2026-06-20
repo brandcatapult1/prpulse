@@ -40,6 +40,7 @@ import {
   deliverableStatusBlockReason,
   deliverableStatusOptionsForEngagement,
   deliverablesRules,
+  canRemoveDeliverable,
   feedbackRules,
   followUpRules,
   followUpSuggestionForStatus,
@@ -220,6 +221,13 @@ export function EngagementRecordPage() {
     const newItem = buildNewDeliverable({ type, engagementStatus: status });
     persistDeliverables([...deliverables, newItem]);
     setToast(`Added ${deliverableTypeLabel(type)} ×${newItem.quantity}`);
+  };
+
+  const removeDeliverable = (delId) => {
+    const item = deliverables.find((d) => d.id === delId);
+    if (!item || !canRemoveDeliverable(status, item)) return;
+    persistDeliverables(deliverables.filter((d) => d.id !== delId));
+    setToast(`Removed ${deliverableTypeLabel(item.deliverable_type)} ×${item.quantity}`);
   };
 
   const postedCount = deliverables.filter((d) => d.status === 'posted').length;
@@ -428,9 +436,11 @@ export function EngagementRecordPage() {
                     deliverable={d}
                     canEditStatus={deliverablesRule.canEditStatus}
                     canEditProof={deliverablesRule.canEditStatus}
+                    canRemove={canRemoveDeliverable(status, d)}
                     deliverableStatusOptions={deliverableStatusOptions}
                     onStatusChange={(delId, status) => updateDeliverable(delId, { status })}
                     onUpdate={updateDeliverable}
+                    onRemove={removeDeliverable}
                     onSaved={() => setToast('Proof saved')}
                     compact
                   />
@@ -538,6 +548,8 @@ export function EngagementRecordPage() {
         canEditStatus={deliverablesRule.canEditStatus}
         deliverableStatusOptions={deliverableStatusOptions}
         onAddType={addDeliverable}
+        onRemove={removeDeliverable}
+        engagementStatus={status}
         onStatusChange={(delId, nextStatus) => updateDeliverable(delId, { status: nextStatus })}
         onUpdate={updateDeliverable}
         onSaved={() => setToast('Proof saved')}
@@ -726,6 +738,8 @@ function DeliverablesModal({
   canEditStatus,
   deliverableStatusOptions,
   onAddType,
+  onRemove,
+  engagementStatus,
   onStatusChange,
   onUpdate,
   onSaved,
@@ -766,9 +780,11 @@ function DeliverablesModal({
               deliverable={d}
               canEditStatus={canEditStatus}
               canEditProof={canEditStatus}
+              canRemove={canRemoveDeliverable(engagementStatus, d)}
               deliverableStatusOptions={deliverableStatusOptions}
               onStatusChange={onStatusChange}
               onUpdate={onUpdate}
+              onRemove={onRemove}
               onSaved={onSaved}
             />
           ))}

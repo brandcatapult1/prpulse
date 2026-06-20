@@ -98,6 +98,13 @@ export function deliverablesRules(status) {
   };
 }
 
+/** Removable while the engagement allows adds and the item is not yet Posted. */
+export function canRemoveDeliverable(engagementStatus, deliverable) {
+  const rules = deliverablesRules(engagementStatus);
+  if (!rules.canAdd || !deliverable) return false;
+  return deliverable.status !== 'posted';
+}
+
 export const DELIVERABLE_STATUSES = ['pending', 'received', 'approved', 'posted'];
 
 const DELIVERABLE_STATUS_LABELS = {

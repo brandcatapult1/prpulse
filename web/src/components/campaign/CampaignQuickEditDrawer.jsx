@@ -21,6 +21,7 @@ import {
   deliverableStatusBlockReason,
   deliverableStatusOptionsForEngagement,
   deliverablesRules,
+  canRemoveDeliverable,
   followUpSuggestionForStatus,
   getStatusOptions,
   interestRules,
@@ -88,6 +89,15 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
     persistDeliverables(
       [...deliverables, newItem],
       `Added ${deliverableTypeLabel(type)} ×${newItem.quantity}`,
+    );
+  }
+
+  function removeDeliverable(delId) {
+    const item = deliverables.find((d) => d.id === delId);
+    if (!item || !canRemoveDeliverable(status, item)) return;
+    persistDeliverables(
+      deliverables.filter((d) => d.id !== delId),
+      `Removed ${deliverableTypeLabel(item.deliverable_type)} ×${item.quantity}`,
     );
   }
 
@@ -272,9 +282,11 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
                     deliverable={d}
                     canEditStatus={deliverablesRule.canEditStatus}
                     canEditProof={false}
+                    canRemove={canRemoveDeliverable(status, d)}
                     deliverableStatusOptions={deliverableStatusOptions}
                     onStatusChange={(delId, nextStatus) => updateDeliverable(delId, { status: nextStatus })}
                     onUpdate={updateDeliverable}
+                    onRemove={removeDeliverable}
                     compact
                   />
                 ))}

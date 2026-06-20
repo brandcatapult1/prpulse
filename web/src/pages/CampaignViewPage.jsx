@@ -28,8 +28,13 @@ import {
   getEngagementOverride,
   getBlacklistOverride,
   saveBlacklistOverride,
+  saveContactProfileOverride,
   saveEngagementOverride,
+  saveFeedbackOverride,
+  getContactProfileOverride,
+  getFeedbackOverride,
 } from '../lib/demoStore.js';
+import { getContactProfileExtras } from '../lib/contactProfile.js';
 
 export function CampaignViewPage() {
   const { id } = useParams();
@@ -163,6 +168,63 @@ export function CampaignViewPage() {
     });
   }
 
+  function applyReopenLogging(engagementId, { engagementPatch, clearBlacklist, message }) {
+    const base = {
+      ...getDemoEngagement(engagementId),
+      ...getEngagementOverride(engagementId),
+    };
+    const engagementSnapshot = {};
+    for (const key of Object.keys(engagementPatch)) {
+      engagementSnapshot[key] = base[key];
+    }
+    engagementSnapshot.dropped_from = base.dropped_from ?? base.drop_failed_at_stage ?? null;
+
+    const contactId = base.contact_id;
+    const priorBlacklistOverride = contactId ? getBlacklistOverride(contactId) : null;
+    const wasBlacklistedBefore = Boolean(priorBlacklistOverride);
+
+    saveEngagementOverride(engagementId, engagementPatch);
+    if (clearBlacklist && contactId) {
+      clearBlacklistOverride(contactId);
+    }
+    bumpBoard();
+    showActionToast(message, () => {
+      saveEngagementOverride(engagementId, engagementSnapshot);
+      if (clearBlacklist && contactId && wasBlacklistedBefore) {
+        saveBlacklistOverride(contactId, priorBlacklistOverride);
+      }
+      bumpBoard();
+      setToast(null);
+    });
+  }
+
+  function applyContactFeedbackLogging(
+    engagementId,
+    { contactId, contactProfilePatch, engagementFeedback, message },
+  ) {
+    const priorProfile = {
+      ...getContactProfileExtras(contactId),
+      ...getContactProfileOverride(contactId),
+    };
+    const priorFeedback = getFeedbackOverride(engagementId);
+
+    saveContactProfileOverride(contactId, contactProfilePatch);
+    saveFeedbackOverride(engagementId, engagementFeedback);
+    bumpBoard();
+    showActionToast(message, () => {
+      const profileSnapshot = {};
+      for (const key of Object.keys(contactProfilePatch)) {
+        profileSnapshot[key] = priorProfile[key];
+      }
+      saveContactProfileOverride(contactId, profileSnapshot);
+      if (priorFeedback) {
+        saveFeedbackOverride(engagementId, priorFeedback);
+      }
+      bumpBoard();
+      setToast(null);
+    });
+  }
+
   const columns = [
     {
       key: 'contact_name',
@@ -264,6 +326,8 @@ export function CampaignViewPage() {
           onApplyLogging={applyEngagementLogging}
           onApplyDeliverables={applyDeliverablesLogging}
           onApplyDidntDeliver={applyDidntDeliverLogging}
+          onApplyReopen={applyReopenLogging}
+          onApplyContactFeedback={applyContactFeedbackLogging}
           onLoggingError={(message) => {
             setToast({ message, onUndo: null });
             window.setTimeout(() => setToast((t) => (t?.message === message ? null : t)), 5000);

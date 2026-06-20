@@ -1,4 +1,5 @@
 import { getDemoContact, getDemoDeliverables } from './demo.js';
+import { deliverableHasProof } from './deliverableLogging.js';
 import { getContactProfileExtras } from './contactProfile.js';
 import { collaborationReasonLabel } from './collaborationReasons.js';
 import { addDaysToIsoDate, todayIso } from './dates.js';
@@ -136,6 +137,7 @@ export function regionLabel(engagement) {
 }
 
 /** Display-only commercial tag for board cards — not operationally gated. */
+/** Display-only commercial tag for board cards — not operationally gated. */
 export function commercialTypeLabel(engagement) {
   const explicit = engagement.collaboration_type?.toLowerCase();
   if (explicit === 'paid') return 'Paid';
@@ -144,6 +146,18 @@ export function commercialTypeLabel(engagement) {
     return 'Paid';
   }
   return null;
+}
+
+export function deliverableProofSummary(engagementId) {
+  const dels = getDemoDeliverables(engagementId).filter(
+    (d) => d.status === 'posted' && deliverableHasProof(d),
+  );
+  return dels.map((d) => ({
+    id: d.id,
+    label: `${d.deliverable_type} ×${d.quantity}`,
+    content_link: d.content_link,
+    screenshots: d.screenshots ?? [],
+  }));
 }
 
 export function groupEngagementsByColumn(engagements) {

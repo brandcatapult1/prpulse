@@ -16,7 +16,9 @@ const PERSISTED_ENGAGEMENT_FIELDS = [
   'no_reply_count',
   'last_contact_log_type',
   'visit_completed_date',
+  'dropped_from',
   'drop_failed_at_stage',
+  'initial_contact_date',
 ];
 
 function loadStore() {

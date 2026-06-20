@@ -7,6 +7,8 @@ export function CampaignKanbanBoard({
   onApplyLogging,
   onApplyDeliverables,
   onApplyDidntDeliver,
+  onApplyReopen,
+  onApplyContactFeedback,
   onLoggingError,
   userRole,
   boardRevision,
@@ -45,6 +47,10 @@ export function CampaignKanbanBoard({
                     }
                     onApplyDidntDeliver={(payload) =>
                       onApplyDidntDeliver?.(engagement.id, payload)
+                    }
+                    onApplyReopen={(payload) => onApplyReopen?.(engagement.id, payload)}
+                    onApplyContactFeedback={(payload) =>
+                      onApplyContactFeedback?.(engagement.id, payload)
                     }
                     onLoggingError={onLoggingError}
                   />

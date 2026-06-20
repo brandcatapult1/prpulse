@@ -1,6 +1,14 @@
 import { getDemoDeliverables } from './demo.js';
 import { deliverableHasProof } from './deliverableLogging.js';
+import { todayIso } from './dates.js';
+import { canMarkDidntDeliver } from './campaignPermissions.js';
 import { sideEffectsOnStatusChange } from './engagementRules.js';
+import {
+  conversationStatusToDroppedFrom,
+  droppedFromToStatus,
+  isValidDropReason,
+  resolveDroppedFrom,
+} from './dropTransitions.js';
 
 /** Shared stage targets for drag-and-drop and inline card flows. */
 export const STAGE = {
@@ -10,6 +18,7 @@ export const STAGE = {
   COMPLETE: 'CollaborationComplete',
   NO_RESPONSE: 'No Response',
   IN_CONVERSATION: 'In Conversation',
+  REOPEN: 'Reopen',
 };
 
 /** Drop reasons available before Awaiting Final Deliverables. */
@@ -24,12 +33,8 @@ export const DIDNT_DELIVER_DROP_REASON = {
   label: "Didn't Deliver",
 };
 
-export function isValidDropReason(dropReason, fromStatus) {
-  if (dropReason === DIDNT_DELIVER_DROP_REASON.value) {
-    return fromStatus === 'awaiting_final_deliverables';
-  }
-  return DROP_REASON_OPTIONS.some((o) => o.value === dropReason);
-}
+export { isValidDropReason, resolveDroppedFrom, droppedFromToStatus } from './dropTransitions.js';
+export { NOT_CONTACTED_DROP_REASON } from './dropTransitions.js';
 
 export function canCompleteEngagement(engagementId) {
   const dels = getDemoDeliverables(engagementId);
@@ -39,12 +44,49 @@ export function canCompleteEngagement(engagementId) {
   );
 }
 
+function buildDropPatch(engagement, dropReason, payload) {
+  const fromStatus = engagement.conversation_status;
+  const droppedFrom =
+    payload.droppedFrom
+    ?? conversationStatusToDroppedFrom(fromStatus === 'no_response' ? 'no_response' : fromStatus);
+  return {
+    conversation_status: dropReason,
+    dropped_from: droppedFrom,
+    ...sideEffectsOnStatusChange(dropReason),
+  };
+}
+
 /**
  * Single entry point for stage changes (board drag, card logging, drawer).
  * Returns { ok, patch } or { ok: false, needsPrompt, error }.
  */
 export function transitionStage(engagement, target, payload = {}) {
   const normalized = String(target);
+
+  if (normalized === STAGE.REOPEN || normalized === 'Reopen') {
+    if (!engagement.conversation_status?.startsWith('dropped_')) {
+      return { ok: false, error: 'Engagement is not dropped' };
+    }
+    const droppedFrom = resolveDroppedFrom(engagement);
+    if (!droppedFrom) {
+      return { ok: false, error: 'No prior stage recorded' };
+    }
+    if (
+      engagement.conversation_status === DIDNT_DELIVER_DROP_REASON.value
+      && !canMarkDidntDeliver(payload.role)
+    ) {
+      return { ok: false, error: 'Senior Manager or Admin required to reopen' };
+    }
+    const targetStatus = droppedFromToStatus(droppedFrom);
+    return {
+      ok: true,
+      patch: {
+        conversation_status: targetStatus,
+        dropped_from: null,
+      },
+      clearBlacklist: Boolean(payload.clearBlacklist),
+    };
+  }
 
   if (normalized === STAGE.SCHEDULED || normalized === 'scheduled') {
     if (!payload.visitDate) {
@@ -96,14 +138,10 @@ export function transitionStage(engagement, target, payload = {}) {
     if (!isValidDropReason(payload.dropReason, engagement.conversation_status)) {
       return { ok: false, error: 'Invalid drop reason for this stage' };
     }
-    const patch = {
-      conversation_status: payload.dropReason,
-      ...sideEffectsOnStatusChange(payload.dropReason),
+    return {
+      ok: true,
+      patch: buildDropPatch(engagement, payload.dropReason, payload),
     };
-    if (payload.dropReason === DIDNT_DELIVER_DROP_REASON.value) {
-      patch.drop_failed_at_stage = payload.failedAt ?? 'awaiting_final_deliverables';
-    }
-    return { ok: true, patch };
   }
 
   if (normalized === STAGE.NO_RESPONSE || normalized === 'no_response') {
@@ -120,13 +158,18 @@ export function transitionStage(engagement, target, payload = {}) {
     if (!payload.nextFollowUpDate) {
       return { ok: false, needsPrompt: 'follow_up_date' };
     }
-    return {
-      ok: true,
-      patch: {
-        conversation_status: 'in_conversation',
-        next_follow_up_date: payload.nextFollowUpDate,
-      },
+    const patch = {
+      conversation_status: 'in_conversation',
+      next_follow_up_date: payload.nextFollowUpDate,
     };
+    if (payload.logFirstOutreach || engagement.conversation_status === 'not_contacted') {
+      const today = payload.contactDate ?? todayIso();
+      patch.initial_contact_date = today;
+      patch.last_contact_date = today;
+      patch.last_contact_log_type = 'conversation';
+      patch.no_reply_count = 0;
+    }
+    return { ok: true, patch };
   }
 
   if (

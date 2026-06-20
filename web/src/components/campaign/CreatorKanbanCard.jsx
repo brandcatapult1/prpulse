@@ -12,10 +12,15 @@ import {
   isVisitOverdue,
   commercialTypeLabel,
 } from '../../lib/campaignKanban.js';
+import { resolveDroppedFrom } from '../../lib/engagementTransitions.js';
+import { droppedFromLabel } from '../../lib/dropTransitions.js';
 import { isContactBlacklisted } from '../../lib/demo.js';
 import { InConversationCardLogging } from './InConversationCardLogging.jsx';
 import { ScheduledCardLogging } from './ScheduledCardLogging.jsx';
 import { AwaitingDeliverablesCardLogging } from './AwaitingDeliverablesCardLogging.jsx';
+import { NotContactedCardLogging } from './NotContactedCardLogging.jsx';
+import { DroppedCardLogging } from './DroppedCardLogging.jsx';
+import { CompleteCardLogging } from './CompleteCardLogging.jsx';
 
 function InterestDot({ level }) {
   const title = level ? `${level} interest` : 'Interest not set';
@@ -106,18 +111,29 @@ function StatusLine({ engagement, columnId }) {
   }
 
   if (columnId === 'complete') {
-    return <p className="text-2xs font-medium text-health-green">Content live</p>;
+    const { posted, total } = deliverableProgress(engagement.id);
+    return (
+      <p className="text-2xs font-medium text-health-green">
+        Delivered · {posted}/{total}
+      </p>
+    );
   }
 
   if (columnId === 'dropped') {
     const blacklisted =
       engagement.contact_id && isContactBlacklisted(engagement.contact_id);
+    const droppedFrom = resolveDroppedFrom(engagement);
     return (
-      <div className="flex flex-wrap items-center gap-1">
+      <div className="space-y-1">
         <span className="inline-flex rounded px-1.5 py-0.5 text-2xs font-medium text-health-red ring-1 ring-red-200">
           {droppedReasonLabel(status)}
         </span>
-        {status === 'dropped_didnt_deliver' && blacklisted && (
+        {status === 'dropped_didnt_deliver' && droppedFrom && (
+          <p className="text-[11px] text-ink-secondary">
+            Failed at: {droppedFromLabel(droppedFrom)}
+          </p>
+        )}
+        {blacklisted && (
           <span className="inline-flex rounded px-1.5 py-0.5 text-2xs font-medium text-health-red ring-1 ring-red-200">
             Blacklisted
           </span>
@@ -139,17 +155,24 @@ export function CreatorKanbanCard({
   onApplyLogging,
   onApplyDeliverables,
   onApplyDidntDeliver,
+  onApplyReopen,
+  onApplyContactFeedback,
   onLoggingError,
   userRole,
   boardRevision,
 }) {
   const columnId = columnIdForStatus(engagement.conversation_status);
+  const showNotContactedLogging =
+    columnId === 'not_contacted' && engagement.conversation_status === 'not_contacted';
   const showInConversationLogging =
     columnId === 'in_conversation' && engagement.conversation_status === 'in_conversation';
   const showScheduledLogging =
     columnId === 'scheduled' && engagement.conversation_status === 'scheduled';
   const showAwaitingLogging =
     columnId === 'awaiting_final' && engagement.conversation_status === 'awaiting_final_deliverables';
+  const showDroppedLogging = columnId === 'dropped';
+  const showCompleteLogging =
+    columnId === 'complete' && engagement.conversation_status === 'collaboration_complete';
   const owner = engagement.owner_name?.split(' ')[0] ?? '—';
   const contentType = contentTypeSummary(engagement.id);
   const commercial = commercialTypeLabel(engagement);
@@ -190,6 +213,14 @@ export function CreatorKanbanCard({
         </p>
       </button>
 
+      {showNotContactedLogging && onApplyLogging && (
+        <NotContactedCardLogging
+          engagement={engagement}
+          onApply={onApplyLogging}
+          onError={onLoggingError}
+        />
+      )}
+
       {showInConversationLogging && onApplyLogging && (
         <InConversationCardLogging engagement={engagement} onApply={onApplyLogging} />
       )}
@@ -210,6 +241,24 @@ export function CreatorKanbanCard({
           onApplyEngagement={onApplyLogging}
           onApplyDeliverables={onApplyDeliverables}
           onApplyDidntDeliver={onApplyDidntDeliver}
+          onError={onLoggingError}
+        />
+      )}
+
+      {showDroppedLogging && onApplyReopen && (
+        <DroppedCardLogging
+          engagement={engagement}
+          userRole={userRole}
+          onApplyReopen={onApplyReopen}
+          onError={onLoggingError}
+        />
+      )}
+
+      {showCompleteLogging && onApplyContactFeedback && (
+        <CompleteCardLogging
+          engagement={engagement}
+          boardRevision={boardRevision}
+          onApplyContactFeedback={onApplyContactFeedback}
           onError={onLoggingError}
         />
       )}

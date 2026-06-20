@@ -69,7 +69,7 @@ export function AwaitingDeliverablesCardLogging({
   function handleDidntDeliver() {
     const result = transitionStage(engagement, STAGE.DROPPED, {
       dropReason: DIDNT_DELIVER_DROP_REASON.value,
-      failedAt: 'awaiting_final_deliverables',
+      droppedFrom: 'awaiting_final_deliverables',
     });
     if (!result.ok) {
       onError?.(result.error ?? 'Could not mark didn\'t deliver');

@@ -557,6 +557,22 @@ export const MOCK_ENGAGEMENTS_BY_ID = {
     primary_collaboration_reason: 'positioning',
     notes: 'Skincare routine integration.',
   },
+  e11: {
+    id: 'e11',
+    campaign_id: 'c1',
+    contact_id: '3',
+    contact_name: 'Neha S.',
+    campaign_name: 'Summer F&B Push',
+    brand_name: 'BrandX',
+    owner_name: 'Priya Sharma',
+    conversation_status: 'dropped_not_interested',
+    interest_level: 'low',
+    last_contact_date: '2026-06-14',
+    next_follow_up_date: null,
+    agreed_fee: null,
+    dropped_from: 'in_conversation',
+    notes: 'Declined after initial pitch.',
+  },
 };
 
 /** @deprecated use MOCK_ENGAGEMENTS_BY_ID.e1 */

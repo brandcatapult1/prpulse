@@ -39,6 +39,19 @@ function SectionLabel({ children, className = '' }) {
   );
 }
 
+/** Subtle filled block — accent for strategic fields, neutral for grouped commercial content. */
+function SectionBlock({ tone = 'neutral', children, className = '' }) {
+  const toneClass =
+    tone === 'accent'
+      ? 'border-brand/10 bg-brand-soft/30'
+      : 'border-line/80 bg-canvas/70';
+  return (
+    <div className={`rounded-md border px-3 py-2.5 ${toneClass} ${className}`}>
+      {children}
+    </div>
+  );
+}
+
 function FieldLabel({ children }) {
   return (
     <span className="text-2xs text-ink-secondary">{children}</span>
@@ -424,7 +437,7 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
           />
 
           <section className="py-3">
-            <div className="rounded-md border border-brand/10 bg-brand-soft/30 px-3 py-2.5">
+            <SectionBlock tone="accent">
               <SectionLabel className="mb-1 text-brand/70">Collab reason</SectionLabel>
               <select
                 className="input-field h-8"
@@ -443,7 +456,7 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
               {!engagement.primary_collaboration_reason && (
                 <p className="mt-1 text-[10px] text-health-amber">Required before complete</p>
               )}
-            </div>
+            </SectionBlock>
           </section>
 
           <section className="py-3">
@@ -477,74 +490,76 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
           </section>
 
           <section className="py-3">
-            <SectionLabel>The deal</SectionLabel>
+            <SectionBlock tone="neutral">
+              <SectionLabel className="mb-2">The deal</SectionLabel>
 
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-2xs text-ink-secondary">
-                <span>Type</span>
-                <Pill tone={collabType === 'paid' ? 'info' : 'success'}>
-                  {collabType === 'paid' ? 'Paid' : 'Barter'}
-                </Pill>
-              </div>
-              {collabType === 'barter' ? (
-                <button type="button" className="text-2xs text-brand hover:underline" onClick={makePaid}>
-                  Make paid →
-                </button>
-              ) : (
-                <button type="button" className="text-2xs text-ink-tertiary hover:text-ink hover:underline" onClick={makeBarter}>
-                  Switch to barter
-                </button>
-              )}
-            </div>
-
-            {collabType === 'paid' && (
-              <label className="mt-2.5 block">
-                <FieldLabel>Agreed fee (₹)</FieldLabel>
-                <input
-                  type="number"
-                  min={0}
-                  className="input-field mt-1 h-8"
-                  value={engagement.agreed_fee ?? ''}
-                  onChange={(e) => setEngagement((prev) => ({ ...prev, agreed_fee: e.target.value }))}
-                  onBlur={(e) => saveAgreedFee(e.target.value)}
-                  placeholder="40000"
-                />
-              </label>
-            )}
-
-            <div id="campaign-drawer-deliverables" className="mt-3 border-t border-line/80 pt-3">
-              <div className="flex items-baseline justify-between gap-2">
-                <FieldLabel>Deliverables</FieldLabel>
-                {deliverables.length > 0 && (
-                  <span className="text-[10px] text-ink-tertiary">
-                    {postedCount}/{deliverables.length} posted
-                  </span>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-2xs text-ink-secondary">
+                  <span>Type</span>
+                  <Pill tone={collabType === 'paid' ? 'info' : 'success'}>
+                    {collabType === 'paid' ? 'Paid' : 'Barter'}
+                  </Pill>
+                </div>
+                {collabType === 'barter' ? (
+                  <button type="button" className="text-2xs text-brand hover:underline" onClick={makePaid}>
+                    Make paid →
+                  </button>
+                ) : (
+                  <button type="button" className="text-2xs text-ink-tertiary hover:text-ink hover:underline" onClick={makeBarter}>
+                    Switch to barter
+                  </button>
                 )}
               </div>
 
-              {deliverablesNote && (
-                <p className="mt-1 text-[10px] text-ink-tertiary">{deliverablesNote}</p>
+              {collabType === 'paid' && (
+                <label className="mt-2.5 block">
+                  <FieldLabel>Agreed fee (₹)</FieldLabel>
+                  <input
+                    type="number"
+                    min={0}
+                    className="input-field mt-1 h-8"
+                    value={engagement.agreed_fee ?? ''}
+                    onChange={(e) => setEngagement((prev) => ({ ...prev, agreed_fee: e.target.value }))}
+                    onBlur={(e) => saveAgreedFee(e.target.value)}
+                    placeholder="40000"
+                  />
+                </label>
               )}
 
-              {deliverables.length > 0 && (
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {deliverables.map((d) => (
-                    <DeliverableChip
-                      key={d.id}
-                      deliverable={d}
-                      canRemove={canRemoveDeliverable(status, d)}
-                      onRemove={removeDeliverable}
-                    />
-                  ))}
+              <div id="campaign-drawer-deliverables" className="mt-3 border-t border-line/60 pt-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <FieldLabel>Deliverables</FieldLabel>
+                  {deliverables.length > 0 && (
+                    <span className="text-[10px] text-ink-tertiary">
+                      {postedCount}/{deliverables.length} posted
+                    </span>
+                  )}
                 </div>
-              )}
 
-              {deliverablesRule.canAdd && (
-                <div className="mt-2 [&_button]:h-6 [&_button]:border-dashed [&_button]:border-line/80 [&_button]:bg-transparent [&_button]:px-2 [&_button]:text-[10px] [&_button]:font-normal [&_button]:text-ink-secondary [&_button]:hover:border-zinc-300 [&_button]:hover:text-ink">
-                  <DeliverableTypeButtons onAdd={addDeliverable} className="gap-1.5" />
-                </div>
-              )}
-            </div>
+                {deliverablesNote && (
+                  <p className="mt-1 text-[10px] text-ink-tertiary">{deliverablesNote}</p>
+                )}
+
+                {deliverables.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {deliverables.map((d) => (
+                      <DeliverableChip
+                        key={d.id}
+                        deliverable={d}
+                        canRemove={canRemoveDeliverable(status, d)}
+                        onRemove={removeDeliverable}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {deliverablesRule.canAdd && (
+                  <div className="mt-2 [&_button]:h-6 [&_button]:border-dashed [&_button]:border-line/80 [&_button]:bg-white/80 [&_button]:px-2 [&_button]:text-[10px] [&_button]:font-normal [&_button]:text-ink-secondary [&_button]:hover:border-zinc-300 [&_button]:hover:text-ink">
+                    <DeliverableTypeButtons onAdd={addDeliverable} className="gap-1.5" />
+                  </div>
+                )}
+              </div>
+            </SectionBlock>
           </section>
 
           <section className="py-3">

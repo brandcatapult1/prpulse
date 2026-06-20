@@ -25,6 +25,7 @@ The screen contracts are in `@docs/PR_Pulse_UX_Spec.md`. Build to them.
 - **Summaries as chips:** planned items (deliverables, tags) render as compact removable chips — never large bordered cards with nested controls.
 - **Progressive disclosure:** don't surface a control until the stage needs it (e.g. agreed fee only when paid; follow-up hidden when complete/dropped).
 - **Restraint:** subtle 0.5px borders, two font weights (regular + medium), muted uppercase micro-labels (`text-[10px] tracking-wider`) for section headers, brand accent used sparingly, minimal contextual helper text (no verbose always-on hints).
+- **Section rhythm in drawers:** alternate plain sections with subtle filled blocks (`SectionBlock`) — **accent** tint (`bg-brand-soft/30`) for strategic anchors (e.g. collab reason), **neutral** canvas fill (`bg-canvas/70`) for grouped commercial content (e.g. deal + deliverables). Status, notes, and identity stay on white to avoid a wall of color.
 - **Posting status:** deliverable Posted status is set only through the Awaiting Final Deliverables "Log deliverable" flow (requires proof) — never via a status dropdown in quick-edit drawers.
 
 ## Conventions

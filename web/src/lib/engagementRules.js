@@ -10,6 +10,7 @@ export const CONVERSATION_STATUSES = [
   'dropped_profile_rejected',
   'dropped_not_interested',
   'dropped_terms_disagreement',
+  'dropped_didnt_deliver',
   'awaiting_final_deliverables',
   'collaboration_complete',
 ];

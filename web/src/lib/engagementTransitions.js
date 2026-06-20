@@ -1,4 +1,5 @@
 import { getDemoDeliverables } from './demo.js';
+import { deliverableHasProof } from './deliverableLogging.js';
 import { sideEffectsOnStatusChange } from './engagementRules.js';
 
 /** Shared stage targets for drag-and-drop and inline card flows. */
@@ -6,20 +7,36 @@ export const STAGE = {
   SCHEDULED: 'Scheduled',
   AWAITING_FINAL_DELIVERABLES: 'AwaitingFinalDeliverables',
   DROPPED: 'Dropped',
-  COMPLETE: 'Complete',
+  COMPLETE: 'CollaborationComplete',
   NO_RESPONSE: 'No Response',
   IN_CONVERSATION: 'In Conversation',
 };
 
+/** Drop reasons available before Awaiting Final Deliverables. */
 export const DROP_REASON_OPTIONS = [
   { value: 'dropped_profile_rejected', label: 'Profile rejected' },
   { value: 'dropped_not_interested', label: 'Not interested' },
   { value: 'dropped_terms_disagreement', label: 'Terms disagreement' },
 ];
 
+export const DIDNT_DELIVER_DROP_REASON = {
+  value: 'dropped_didnt_deliver',
+  label: "Didn't Deliver",
+};
+
+export function isValidDropReason(dropReason, fromStatus) {
+  if (dropReason === DIDNT_DELIVER_DROP_REASON.value) {
+    return fromStatus === 'awaiting_final_deliverables';
+  }
+  return DROP_REASON_OPTIONS.some((o) => o.value === dropReason);
+}
+
 export function canCompleteEngagement(engagementId) {
   const dels = getDemoDeliverables(engagementId);
-  return dels.length > 0 && dels.every((d) => d.status === 'posted');
+  return (
+    dels.length > 0
+    && dels.every((d) => d.status === 'posted' && deliverableHasProof(d))
+  );
 }
 
 /**
@@ -76,16 +93,17 @@ export function transitionStage(engagement, target, payload = {}) {
     if (!payload.dropReason) {
       return { ok: false, needsPrompt: 'drop_reason' };
     }
-    if (!DROP_REASON_OPTIONS.some((o) => o.value === payload.dropReason)) {
-      return { ok: false, error: 'Pick a drop reason' };
+    if (!isValidDropReason(payload.dropReason, engagement.conversation_status)) {
+      return { ok: false, error: 'Invalid drop reason for this stage' };
     }
-    return {
-      ok: true,
-      patch: {
-        conversation_status: payload.dropReason,
-        ...sideEffectsOnStatusChange(payload.dropReason),
-      },
+    const patch = {
+      conversation_status: payload.dropReason,
+      ...sideEffectsOnStatusChange(payload.dropReason),
     };
+    if (payload.dropReason === DIDNT_DELIVER_DROP_REASON.value) {
+      patch.drop_failed_at_stage = payload.failedAt ?? 'awaiting_final_deliverables';
+    }
+    return { ok: true, patch };
   }
 
   if (normalized === STAGE.NO_RESPONSE || normalized === 'no_response') {
@@ -111,9 +129,13 @@ export function transitionStage(engagement, target, payload = {}) {
     };
   }
 
-  if (normalized === STAGE.COMPLETE || normalized === 'collaboration_complete') {
+  if (
+    normalized === STAGE.COMPLETE
+    || normalized === 'collaboration_complete'
+    || normalized === 'CollaborationComplete'
+  ) {
     if (!canCompleteEngagement(engagement.id)) {
-      return { ok: false, error: 'Complete when all deliverables are Posted' };
+      return { ok: false, error: 'Complete when all deliverables are Posted with proof' };
     }
     return {
       ok: true,

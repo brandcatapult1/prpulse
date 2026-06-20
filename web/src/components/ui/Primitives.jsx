@@ -66,11 +66,17 @@ export function ConfirmDialog({ open, title, body, confirmLabel = 'Confirm', onC
   );
 }
 
-export function Modal({ open, title, children, onClose, footer }) {
+export function Modal({ open, title, children, onClose, footer, mobileSheet = false }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4 backdrop-blur-[1px]">
-      <div className="panel w-full max-w-lg overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4 backdrop-blur-[1px] max-md:items-stretch max-md:p-0">
+      <div
+        className={`panel flex w-full flex-col overflow-hidden ${
+          mobileSheet
+            ? 'max-w-lg max-md:fixed max-md:inset-0 max-md:max-h-none max-md:max-w-none max-md:rounded-none'
+            : 'max-w-lg'
+        }`}
+      >
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <h3 className="text-sm font-semibold text-ink">{title}</h3>
           <button type="button" onClick={onClose} className="text-ink-tertiary hover:text-ink">×</button>

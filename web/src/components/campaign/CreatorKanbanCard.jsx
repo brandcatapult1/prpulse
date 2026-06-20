@@ -7,12 +7,15 @@ import {
   contentTypeSummary,
   deliverableProgress,
   droppedReasonLabel,
+  isDeliverablesAtRisk,
   isFollowUpOverdue,
   isVisitOverdue,
   regionLabel,
 } from '../../lib/campaignKanban.js';
+import { isContactBlacklisted } from '../../lib/demo.js';
 import { InConversationCardLogging } from './InConversationCardLogging.jsx';
 import { ScheduledCardLogging } from './ScheduledCardLogging.jsx';
+import { AwaitingDeliverablesCardLogging } from './AwaitingDeliverablesCardLogging.jsx';
 
 function InterestDot({ level }) {
   const title = level ? `${level} interest` : 'Interest not set';
@@ -80,11 +83,17 @@ function StatusLine({ engagement, columnId }) {
 
   if (columnId === 'awaiting_final') {
     const { posted, total, pct } = deliverableProgress(engagement.id);
+    const atRisk = isDeliverablesAtRisk(engagement);
     if (total === 0) {
       return <p className="text-2xs text-ink-tertiary">Add deliverables to track progress</p>;
     }
     return (
       <div className="space-y-1">
+        {atRisk && (
+          <span className="inline-flex rounded px-1.5 py-0.5 text-2xs font-medium text-health-amber ring-1 ring-amber-200">
+            At risk
+          </span>
+        )}
         <div className="text-2xs text-ink-secondary">{posted} / {total} posted</div>
         <div className="h-1 overflow-hidden rounded-full bg-line">
           <div
@@ -101,10 +110,19 @@ function StatusLine({ engagement, columnId }) {
   }
 
   if (columnId === 'dropped') {
+    const blacklisted =
+      engagement.contact_id && isContactBlacklisted(engagement.contact_id);
     return (
-      <span className="inline-flex rounded px-1.5 py-0.5 text-2xs font-medium text-health-red ring-1 ring-red-200">
-        {droppedReasonLabel(status)}
-      </span>
+      <div className="flex flex-wrap items-center gap-1">
+        <span className="inline-flex rounded px-1.5 py-0.5 text-2xs font-medium text-health-red ring-1 ring-red-200">
+          {droppedReasonLabel(status)}
+        </span>
+        {status === 'dropped_didnt_deliver' && blacklisted && (
+          <span className="inline-flex rounded px-1.5 py-0.5 text-2xs font-medium text-health-red ring-1 ring-red-200">
+            Blacklisted
+          </span>
+        )}
+      </div>
     );
   }
 
@@ -115,12 +133,23 @@ function StatusLine({ engagement, columnId }) {
  * Glanceable creator summary for the campaign Kanban board.
  * Card body opens quick-edit drawer; In conversation cards add inline logging on hover.
  */
-export function CreatorKanbanCard({ engagement, onClick, onApplyLogging, onLoggingError }) {
+export function CreatorKanbanCard({
+  engagement,
+  onClick,
+  onApplyLogging,
+  onApplyDeliverables,
+  onApplyDidntDeliver,
+  onLoggingError,
+  userRole,
+  boardRevision,
+}) {
   const columnId = columnIdForStatus(engagement.conversation_status);
   const showInConversationLogging =
     columnId === 'in_conversation' && engagement.conversation_status === 'in_conversation';
   const showScheduledLogging =
     columnId === 'scheduled' && engagement.conversation_status === 'scheduled';
+  const showAwaitingLogging =
+    columnId === 'awaiting_final' && engagement.conversation_status === 'awaiting_final_deliverables';
   const owner = engagement.owner_name?.split(' ')[0] ?? '—';
   const contentType = contentTypeSummary(engagement.id);
   const region = regionLabel(engagement);
@@ -169,6 +198,18 @@ export function CreatorKanbanCard({ engagement, onClick, onApplyLogging, onLoggi
         <ScheduledCardLogging
           engagement={engagement}
           onApply={onApplyLogging}
+          onError={onLoggingError}
+        />
+      )}
+
+      {showAwaitingLogging && onApplyDeliverables && (
+        <AwaitingDeliverablesCardLogging
+          engagement={engagement}
+          userRole={userRole}
+          boardRevision={boardRevision}
+          onApplyEngagement={onApplyLogging}
+          onApplyDeliverables={onApplyDeliverables}
+          onApplyDidntDeliver={onApplyDidntDeliver}
           onError={onLoggingError}
         />
       )}

@@ -1,7 +1,7 @@
 import { getDemoContact, getDemoDeliverables } from './demo.js';
 import { getContactProfileExtras } from './contactProfile.js';
 import { collaborationReasonLabel } from './collaborationReasons.js';
-import { todayIso } from './dates.js';
+import { addDaysToIsoDate, todayIso } from './dates.js';
 
 /** PRD Module 5 conversation statuses — one Kanban column per parent stage. */
 export const CAMPAIGN_KANBAN_COLUMNS = [
@@ -27,6 +27,7 @@ export const CAMPAIGN_KANBAN_COLUMNS = [
       'dropped_profile_rejected',
       'dropped_not_interested',
       'dropped_terms_disagreement',
+      'dropped_didnt_deliver',
     ],
   },
   {
@@ -53,6 +54,7 @@ export function droppedReasonLabel(status) {
     dropped_profile_rejected: 'Profile rejected',
     dropped_not_interested: 'Not interested',
     dropped_terms_disagreement: 'Terms disagreement',
+    dropped_didnt_deliver: "Didn't Deliver",
   };
   return labels[status] ?? 'Dropped';
 }
@@ -99,6 +101,20 @@ export function deliverableProgress(engagementId) {
   const total = dels.length;
   const posted = dels.filter((d) => d.status === 'posted').length;
   return { posted, total, pct: total ? Math.round((posted / total) * 100) : 0 };
+}
+
+/** Default SLA after visit completion before deliverables are all posted (days). */
+export const DELIVERABLES_AT_RISK_SLA_DAYS = 7;
+
+/** Unposted deliverables past SLA — sub-status only; card stays in Awaiting. */
+export function isDeliverablesAtRisk(engagement) {
+  if (engagement.conversation_status !== 'awaiting_final_deliverables') return false;
+  const { posted, total } = deliverableProgress(engagement.id);
+  if (total === 0 || posted === total) return false;
+  const visitDate = engagement.visit_completed_date ?? engagement.visit_date;
+  if (!visitDate) return false;
+  const slaDeadline = addDaysToIsoDate(visitDate, DELIVERABLES_AT_RISK_SLA_DAYS);
+  return todayIso() > slaDeadline;
 }
 
 export function isFollowUpOverdue(date) {

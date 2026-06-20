@@ -15,6 +15,7 @@ const PERSISTED_ENGAGEMENT_FIELDS = [
   'no_reply_count',
   'last_contact_log_type',
   'visit_completed_date',
+  'drop_failed_at_stage',
 ];
 
 function loadStore() {
@@ -118,6 +119,12 @@ export function getBlacklistOverride(contactId) {
 export function saveBlacklistOverride(contactId, record) {
   const store = loadStore();
   store.blacklist[contactId] = record;
+  saveStore(store);
+}
+
+export function clearBlacklistOverride(contactId) {
+  const store = loadStore();
+  delete store.blacklist[contactId];
   saveStore(store);
 }
 

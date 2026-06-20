@@ -13,15 +13,21 @@ import {
   addEngagementImport,
   getDemoCampaign,
   getDemoContacts,
+  getDemoDeliverables,
   getDemoEngagementsForCampaign,
   getDemoEngagement,
   pickList,
   pickRecord,
+  saveDeliverablesOverride,
 } from '../lib/demo.js';
 import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { todayIso } from '../lib/dates.js';
 import {
+  clearBlacklistOverride,
   getEngagementOverride,
+  getBlacklistOverride,
+  saveBlacklistOverride,
   saveEngagementOverride,
 } from '../lib/demoStore.js';
 
@@ -29,6 +35,7 @@ export function CampaignViewPage() {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [campaign, setCampaign] = useState(() => getDemoCampaign(id));
   const [engagements, setEngagements] = useState(() => getDemoEngagementsForCampaign(id));
   const [demo, setDemo] = useState(true);
@@ -37,6 +44,7 @@ export function CampaignViewPage() {
   const [viewMode, setViewMode] = useState('board');
   const [quickEditId, setQuickEditId] = useState(null);
   const [toast, setToast] = useState(null);
+  const [boardRevision, setBoardRevision] = useState(0);
 
   function reloadEngagements() {
     setEngagements(getDemoEngagementsForCampaign(id));
@@ -81,6 +89,16 @@ export function CampaignViewPage() {
     [filteredEngagements],
   );
 
+  function bumpBoard() {
+    reloadEngagements();
+    setBoardRevision((r) => r + 1);
+  }
+
+  function showActionToast(message, onUndo) {
+    setToast({ message, onUndo });
+    window.setTimeout(() => setToast((t) => (t?.message === message ? null : t)), 8000);
+  }
+
   function applyEngagementLogging(engagementId, patch, message, snapshotKeys) {
     const base = {
       ...getDemoEngagement(engagementId),
@@ -91,16 +109,58 @@ export function CampaignViewPage() {
       snapshot[key] = base[key];
     }
     saveEngagementOverride(engagementId, patch);
-    reloadEngagements();
-    setToast({
-      message,
-      onUndo: () => {
-        saveEngagementOverride(engagementId, snapshot);
-        reloadEngagements();
-        setToast(null);
-      },
+    bumpBoard();
+    showActionToast(message, () => {
+      saveEngagementOverride(engagementId, snapshot);
+      bumpBoard();
+      setToast(null);
     });
-    window.setTimeout(() => setToast((t) => (t?.message === message ? null : t)), 8000);
+  }
+
+  function applyDeliverablesLogging(engagementId, nextList, message) {
+    const snapshot = getDemoDeliverables(engagementId).map((d) => ({ ...d }));
+    saveDeliverablesOverride(engagementId, nextList);
+    bumpBoard();
+    showActionToast(message, () => {
+      saveDeliverablesOverride(engagementId, snapshot);
+      bumpBoard();
+      setToast(null);
+    });
+  }
+
+  function applyDidntDeliverLogging(engagementId, { engagementPatch, blacklist, message }) {
+    const base = {
+      ...getDemoEngagement(engagementId),
+      ...getEngagementOverride(engagementId),
+    };
+    const engagementSnapshot = {};
+    for (const key of Object.keys(engagementPatch)) {
+      engagementSnapshot[key] = base[key];
+    }
+    const contactId = base.contact_id;
+    const priorBlacklistOverride = contactId ? getBlacklistOverride(contactId) : null;
+    const wasBlacklistedBefore = Boolean(priorBlacklistOverride);
+
+    saveEngagementOverride(engagementId, engagementPatch);
+    if (blacklist && contactId) {
+      saveBlacklistOverride(contactId, {
+        reason: "Didn't deliver",
+        blacklisted_at: todayIso(),
+      });
+    }
+    bumpBoard();
+    showActionToast(message, () => {
+      saveEngagementOverride(engagementId, engagementSnapshot);
+      if (blacklist && contactId) {
+        if (wasBlacklistedBefore) {
+          saveBlacklistOverride(contactId, priorBlacklistOverride);
+        } else {
+          clearBlacklistOverride(contactId);
+        }
+      }
+      bumpBoard();
+      setToast(null);
+    });
   }
 
   const columns = [
@@ -198,8 +258,12 @@ export function CampaignViewPage() {
       {viewMode === 'board' ? (
         <CampaignKanbanBoard
           engagements={boardEngagements}
+          userRole={user?.role}
+          boardRevision={boardRevision}
           onCardClick={(row) => setQuickEditId(row.id)}
           onApplyLogging={applyEngagementLogging}
+          onApplyDeliverables={applyDeliverablesLogging}
+          onApplyDidntDeliver={applyDidntDeliverLogging}
           onLoggingError={(message) => {
             setToast({ message, onUndo: null });
             window.setTimeout(() => setToast((t) => (t?.message === message ? null : t)), 5000);

@@ -202,7 +202,7 @@ function CreatorCardHeader({ engagement }) {
             />
           </div>
         </div>
-        {whatsAppUrl && (
+        {whatsAppUrl ? (
           <a
             href={whatsAppUrl}
             target="_blank"
@@ -215,6 +215,14 @@ function CreatorCardHeader({ engagement }) {
           >
             <WhatsAppIcon />
           </a>
+        ) : (
+          <span
+            aria-label={`WhatsApp unavailable for ${engagement.contact_name}`}
+            title="No phone on file"
+            className="shrink-0 cursor-not-allowed rounded-full border border-line p-1.5 text-ink-tertiary/50"
+          >
+            <WhatsAppIcon />
+          </span>
         )}
       </div>
     </div>

@@ -35,6 +35,9 @@ import {
 import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 import {
   agreedFeeRules,
+  canSetDeliverableStatus,
+  deliverableStatusBlockReason,
+  deliverableStatusOptionsForEngagement,
   deliverablesRules,
   feedbackRules,
   followUpRules,
@@ -55,13 +58,6 @@ const interestOptions = [
   { value: 'medium', label: 'Medium' },
   { value: 'low', label: 'Low' },
 ];
-
-const deliverableStatusOptions = [
-  'pending',
-  'received',
-  'approved',
-  'posted',
-].map((v) => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) }));
 
 const DELIVERABLE_TYPES = [
   { value: 'reel', label: 'Reel' },
@@ -124,6 +120,14 @@ export function EngagementRecordPage() {
   };
 
   const updateDeliverable = (delId, patch) => {
+    const engagementStatus = engagement.conversation_status;
+    if (patch.status && !canSetDeliverableStatus(engagementStatus, patch.status)) {
+      setToast(
+        deliverableStatusBlockReason(engagementStatus, patch.status)
+          ?? 'This status is not available at the current stage',
+      );
+      return;
+    }
     persistDeliverables(
       deliverables.map((d) => (d.id === delId ? { ...d, ...patch } : d)),
     );
@@ -168,6 +172,7 @@ export function EngagementRecordPage() {
   const followUp = followUpRules(status);
   const visit = visitRules(status);
   const deliverablesRule = deliverablesRules(status);
+  const deliverableStatusOptions = deliverableStatusOptionsForEngagement(status);
   const feedback = feedbackRules(status);
   const feeRule = agreedFeeRules(status);
   const interestRule = interestRules(status);
@@ -565,8 +570,9 @@ export function EngagementRecordPage() {
         deliverables={deliverables}
         canAdd={deliverablesRule.canAdd}
         canEditStatus={deliverablesRule.canEditStatus}
+        deliverableStatusOptions={deliverableStatusOptions}
         onAdd={() => openAddDeliverable('reel')}
-        onStatusChange={(delId, status) => updateDeliverable(delId, { status })}
+        onStatusChange={(delId, nextStatus) => updateDeliverable(delId, { status: nextStatus })}
         onUpdate={updateDeliverable}
         onSaved={() => setToast('Proof saved')}
       />
@@ -753,7 +759,19 @@ function FollowUpField({ value, suggestion, editable, lockedHint, onChange, onAc
   );
 }
 
-function DeliverablesModal({ open, onClose, contactName, deliverables, canAdd, canEditStatus, onAdd, onStatusChange, onUpdate, onSaved }) {
+function DeliverablesModal({
+  open,
+  onClose,
+  contactName,
+  deliverables,
+  canAdd,
+  canEditStatus,
+  deliverableStatusOptions,
+  onAdd,
+  onStatusChange,
+  onUpdate,
+  onSaved,
+}) {
   return (
     <Modal
       open={open}

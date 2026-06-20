@@ -562,8 +562,8 @@ export const MOCK_ENGAGEMENT = MOCK_ENGAGEMENTS_BY_ID.e1;
 
 export const MOCK_DELIVERABLES_BY_ENGAGEMENT = {
   e1: [
-    { id: 'd1', deliverable_type: 'reel', quantity: 1, due_date: '2026-06-20', status: 'pending', is_overdue: false },
-    { id: 'd2', deliverable_type: 'story', quantity: 3, due_date: '2026-06-18', status: 'posted', is_overdue: true },
+    { id: 'd1', deliverable_type: 'reel', quantity: 1, due_date: '2026-06-28', status: 'pending', is_overdue: false },
+    { id: 'd2', deliverable_type: 'story', quantity: 3, due_date: '2026-06-30', status: 'pending', is_overdue: false },
   ],
   e2: [
     { id: 'd3', deliverable_type: 'reel', quantity: 1, due_date: '2026-06-05', status: 'posted', is_overdue: false },

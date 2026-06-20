@@ -62,6 +62,7 @@ export function visitRules(status) {
 /**
  * Deliverables: add/edit during delivery phase; read-only when Complete or Dropped.
  * Primary phase: Awaiting Final Deliverables.
+ * Posted content requires Awaiting Final Deliverables — never during outreach stages.
  */
 export function deliverablesRules(status) {
   if (isComplete(status)) {
@@ -86,7 +87,7 @@ export function deliverablesRules(status) {
       canAdd: true,
       canEditStatus: true,
       lockedReason: null,
-      hint: 'Add deliverables once commercials are agreed',
+      hint: 'Plan deliverables here — move to Awaiting Final Deliverables before content goes live',
     };
   }
   return {
@@ -94,6 +95,50 @@ export function deliverablesRules(status) {
     canEditStatus: false,
     lockedReason: 'Start outreach before adding deliverables',
   };
+}
+
+export const DELIVERABLE_STATUSES = ['pending', 'received', 'approved', 'posted'];
+
+const DELIVERABLE_STATUS_LABELS = {
+  pending: 'Pending',
+  received: 'Received',
+  approved: 'Approved',
+  posted: 'Posted',
+};
+
+/** Statuses allowed for an engagement stage (PRD funnel §10). */
+export function allowedDeliverableStatuses(engagementStatus) {
+  if (engagementStatus === 'awaiting_final_deliverables') {
+    return DELIVERABLE_STATUSES;
+  }
+  if (['in_conversation', 'scheduled', 'no_response'].includes(engagementStatus)) {
+    return ['pending'];
+  }
+  return [];
+}
+
+export function deliverableStatusOptionsForEngagement(engagementStatus) {
+  return allowedDeliverableStatuses(engagementStatus).map((value) => ({
+    value,
+    label: DELIVERABLE_STATUS_LABELS[value],
+  }));
+}
+
+export function canSetDeliverableStatus(engagementStatus, nextStatus) {
+  return allowedDeliverableStatuses(engagementStatus).includes(nextStatus);
+}
+
+export function deliverableStatusBlockReason(engagementStatus, nextStatus) {
+  if (nextStatus === 'posted') {
+    return 'Move to Awaiting Final Deliverables before marking content Posted';
+  }
+  if (['received', 'approved'].includes(nextStatus)) {
+    return 'Content tracking starts in Awaiting Final Deliverables';
+  }
+  if (nextStatus === 'pending') {
+    return null;
+  }
+  return 'This status is not available at the current stage';
 }
 
 /** Feedback: after collaboration completion only (PRD Module 9). */

@@ -93,8 +93,8 @@ export function Drawer({ open, title, children, footer, onClose }) {
   return (
     <div className="fixed inset-0 z-40 flex justify-end bg-ink/20">
       <div className="flex h-full w-full max-w-[480px] flex-col border-l border-line bg-white">
-        <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-          <h3 className="text-sm font-semibold text-ink">{title}</h3>
+        <div className="flex items-center justify-end border-b border-line px-5 py-3.5">
+          {title ? <h3 className="mr-auto text-sm font-semibold text-ink">{title}</h3> : null}
           <button type="button" onClick={onClose} className="text-ink-tertiary hover:text-ink">×</button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>

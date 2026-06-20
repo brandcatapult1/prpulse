@@ -4,17 +4,18 @@ import { StatusButton } from '../ui/DataKit.jsx';
 import { Drawer, Modal, Toast } from '../ui/Primitives.jsx';
 import { DeliverableRow } from '../deliverables/DeliverableProofSection.jsx';
 import { DeliverableTypeButtons, deliverableTypeLabel } from '../deliverables/DeliverableTypeButtons.jsx';
-import { formatDate, formatFee, formatStatus } from '../../lib/format.jsx';
-import { collaborationReasonLabel, COLLABORATION_REASONS } from '../../lib/collaborationReasons.js';
+import { formatDate, formatStatus, Pill } from '../../lib/format.jsx';
+import { COLLABORATION_REASONS } from '../../lib/collaborationReasons.js';
 import { buildNewDeliverable } from '../../lib/deliverableTypes.js';
-import { addDaysIso, todayIso } from '../../lib/dates.js';
+import { addDaysIso } from '../../lib/dates.js';
 import {
   getDemoDeliverables,
   getDemoEngagement,
   saveDeliverablesOverride,
   saveEngagementOverride,
 } from '../../lib/demo.js';
-import { getEngagementOverride } from '../../lib/demoStore.js';
+import { getEngagementOverride, saveContactProfileOverride } from '../../lib/demoStore.js';
+import { getDrawerContactIdentity } from '../../lib/contactSocialLinks.js';
 import { recordEngagementPatchActivity } from '../../lib/activityLog.js';
 import { STAGE, transitionStage } from '../../lib/engagementTransitions.js';
 import {
@@ -25,7 +26,6 @@ import {
   canRemoveDeliverable,
   followUpSuggestionForStatus,
   getStatusOptions,
-  interestRules,
   isComplete,
   sideEffectsOnStatusChange,
 } from '../../lib/engagementRules.js';
@@ -35,17 +35,215 @@ const REASON_OPTIONS = [
   ...COLLABORATION_REASONS,
 ];
 
-const INTEREST_OPTIONS = [
-  { value: 'high', label: 'High' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'low', label: 'Low' },
-];
+function SectionLabel({ children }) {
+  return (
+    <p className="mb-3 text-2xs font-medium uppercase tracking-wide text-ink-tertiary">
+      {children}
+    </p>
+  );
+}
+
+function IconButton({ label, title, href, disabled, onClick, children, className = '' }) {
+  const shared = `inline-flex h-8 w-8 items-center justify-center rounded-md border border-line transition-colors ${className}`;
+  if (href && !disabled) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={label}
+        title={title}
+        className={`${shared} hover:bg-canvas`}
+      >
+        {children}
+      </a>
+    );
+  }
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={title}
+      disabled={disabled}
+      onClick={onClick}
+      className={`${shared} ${disabled ? 'cursor-not-allowed opacity-40' : 'hover:bg-canvas'}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function WhatsAppIcon({ className = 'h-4 w-4' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.435 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+    </svg>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <rect x="9" y="9" width="11" height="11" rx="1.5" />
+      <path d="M6 15H5a2 2 0 01-2-2V5a2 2 0 012-2h8a2 2 0 012 2v1" />
+    </svg>
+  );
+}
+
+function PhoneIcon() {
+  return (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <path d="M5 4h4l1.5 5-2.2 1.4a11 11 0 005.3 5.3L15 13.5 20 15v4a2 2 0 01-2.2 2A16 16 0 013 6.2 2 2 0 015 4z" />
+    </svg>
+  );
+}
+
+function ExternalIcon() {
+  return (
+    <svg className="ml-0.5 inline h-3 w-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M14 3h7v7M10 14L21 3M21 10v11H3V3h11" />
+    </svg>
+  );
+}
+
+function DrawerIdentityHeader({ engagement, onEmailSaved, onToast }) {
+  const identity = getDrawerContactIdentity(engagement);
+  const [emailDraft, setEmailDraft] = useState(identity.email ?? '');
+  const [editingEmail, setEditingEmail] = useState(!identity.email);
+
+  useEffect(() => {
+    setEmailDraft(identity.email ?? '');
+    setEditingEmail(!identity.email);
+  }, [engagement.id, identity.email]);
+
+  function saveEmail() {
+    if (!identity.contactId) return;
+    const trimmed = emailDraft.trim();
+    if (trimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      onToast?.('Enter a valid email address');
+      return;
+    }
+    saveContactProfileOverride(identity.contactId, { email: trimmed || null });
+    onEmailSaved?.();
+    setEditingEmail(!trimmed);
+    onToast?.(trimmed ? 'Email saved' : 'Email cleared');
+  }
+
+  async function copyNumber() {
+    if (!identity.mobileDisplay) return;
+    try {
+      await navigator.clipboard.writeText(identity.mobileDisplay);
+      onToast?.('Number copied');
+    } catch {
+      onToast?.('Could not copy number');
+    }
+  }
+
+  return (
+    <section className="pb-5">
+      <h2 className="text-lg font-semibold tracking-tight text-ink">{engagement.contact_name}</h2>
+      <div className="mt-0.5">
+        {identity.profileUrl ? (
+          <a
+            href={identity.profileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center text-2xs text-brand hover:underline"
+          >
+            {identity.handleLabel}
+            <ExternalIcon />
+          </a>
+        ) : (
+          <span className="text-2xs text-ink-tertiary">{identity.handleLabel}</span>
+        )}
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-sm text-ink-secondary">
+          {identity.mobileDisplay ?? 'No phone on file'}
+        </span>
+        <div className="flex items-center gap-1">
+          <IconButton
+            label="WhatsApp"
+            title="WhatsApp"
+            href={identity.whatsAppUrl}
+            disabled={!identity.whatsAppUrl}
+            className="text-health-green"
+          >
+            <WhatsAppIcon />
+          </IconButton>
+          <IconButton
+            label="Copy number"
+            title="Copy number"
+            disabled={!identity.mobileDisplay}
+            onClick={copyNumber}
+          >
+            <CopyIcon />
+          </IconButton>
+          <IconButton
+            label="Call"
+            title="Call"
+            href={identity.telUrl}
+            disabled={!identity.telUrl}
+          >
+            <PhoneIcon />
+          </IconButton>
+        </div>
+      </div>
+
+      <div className="mt-2">
+        {editingEmail ? (
+          <div className="flex items-center gap-2">
+            <input
+              type="email"
+              className="input-field h-8 flex-1 text-2xs"
+              value={emailDraft}
+              onChange={(e) => setEmailDraft(e.target.value)}
+              placeholder="Add email"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveEmail();
+                if (e.key === 'Escape') {
+                  setEmailDraft(identity.email ?? '');
+                  setEditingEmail(Boolean(identity.email));
+                }
+              }}
+            />
+            <button type="button" className="btn-secondary !h-8 !px-2 text-2xs" onClick={saveEmail}>
+              Save
+            </button>
+            {identity.email && (
+              <button
+                type="button"
+                className="btn-ghost !h-8 text-2xs"
+                onClick={() => {
+                  setEmailDraft(identity.email ?? '');
+                  setEditingEmail(false);
+                }}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="text-2xs text-brand hover:underline"
+            onClick={() => setEditingEmail(true)}
+          >
+            {identity.email ? identity.email : '+ email'}
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
 
 export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated }) {
   const [engagement, setEngagement] = useState(null);
   const [deliverables, setDeliverables] = useState([]);
   const [visitOpen, setVisitOpen] = useState(false);
   const [toast, setToast] = useState(null);
+  const [identityRevision, setIdentityRevision] = useState(0);
 
   useEffect(() => {
     if (!open || !engagementId) return;
@@ -58,10 +256,10 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
   const canComplete =
     deliverables.length > 0 && deliverables.every((d) => d.status === 'posted');
   const status = engagement.conversation_status;
-  const interestEditable = interestRules(status).editable;
   const deliverablesRule = deliverablesRules(status);
   const deliverableStatusOptions = deliverableStatusOptionsForEngagement(status);
   const postedCount = deliverables.filter((d) => d.status === 'posted').length;
+  const collabType = engagement.collaboration_type === 'paid' ? 'paid' : 'barter';
 
   function persistDeliverables(nextList, message) {
     saveDeliverablesOverride(engagementId, nextList);
@@ -143,11 +341,25 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
       }
       return;
     }
-    persist(
-      result.patch,
-      `Visit set for ${formatDate(visitDate)}`,
-    );
+    persist(result.patch, `Visit set for ${formatDate(visitDate)}`);
     setVisitOpen(false);
+  }
+
+  function makePaid() {
+    persist({ collaboration_type: 'paid' }, 'Switched to paid');
+  }
+
+  function makeBarter() {
+    persist({ collaboration_type: 'barter', agreed_fee: null }, 'Switched to barter');
+  }
+
+  function saveAgreedFee(raw) {
+    const fee = raw === '' ? null : Number(raw);
+    if (collabType === 'paid' && (fee == null || Number.isNaN(fee) || fee <= 0)) {
+      setToast('Agreed fee is required for paid collabs');
+      return;
+    }
+    persist({ agreed_fee: fee }, 'Fee updated');
   }
 
   const statusOptions = getStatusOptions({
@@ -160,11 +372,9 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
     <>
       <Drawer
         open={open}
-        title={engagement.contact_name}
-        subtitle={engagement.campaign_name}
         onClose={onClose}
         footer={
-          <div className="flex justify-end gap-2">
+          <div className="flex items-center justify-between gap-3">
             <button type="button" className="btn-secondary" onClick={onClose}>Done</button>
             <Link to={`/engagements/${engagementId}`} className="btn-ghost text-2xs" onClick={onClose}>
               Full record →
@@ -172,30 +382,21 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
           </div>
         }
       >
-        <div className="space-y-5">
-          {/* Primary action — status update (PRD §5.2) */}
-          <section className="rounded-lg border border-brand/20 bg-brand-soft/40 p-4">
-            <p className="text-2xs font-medium uppercase tracking-wide text-brand">What&apos;s next?</p>
-            <p className="mt-0.5 text-2xs text-ink-secondary">Move this creator — takes one tap</p>
-            <div className="mt-3">
-              <StatusButton
-                value={status}
-                options={statusOptions}
-                onChange={handleStatusChange}
-                hint={
-                  !canComplete && status !== 'collaboration_complete'
-                    ? 'Complete unlocks when all deliverables are Posted'
-                    : undefined
-                }
-              />
-            </div>
-          </section>
+        <div className="divide-y divide-line">
+          <DrawerIdentityHeader
+            key={`${engagement.id}-${identityRevision}`}
+            engagement={engagement}
+            onEmailSaved={() => setIdentityRevision((r) => r + 1)}
+            onToast={setToast}
+          />
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block text-2xs text-ink-secondary">
-              Collab reason
+          <section className="py-5">
+            <div className="rounded-lg border border-brand/20 bg-brand-soft/40 p-4">
+              <p className="text-2xs font-medium text-brand">
+                Collab reason · why this creator
+              </p>
               <select
-                className="input-field mt-1"
+                className="input-field mt-2"
                 value={engagement.primary_collaboration_reason ?? ''}
                 onChange={(e) =>
                   persist(
@@ -209,25 +410,31 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
                 ))}
               </select>
               {!engagement.primary_collaboration_reason && (
-                <span className="mt-1 block text-[11px] text-health-amber">Required before marking complete</span>
+                <p className="mt-1.5 text-[11px] text-health-amber">
+                  Required before marking complete
+                </p>
               )}
-            </label>
+            </div>
+          </section>
 
+          <section className="py-5">
+            <SectionLabel>Status &amp; next step</SectionLabel>
             <label className="block text-2xs text-ink-secondary">
-              Interest
-              <select
-                className="input-field mt-1"
-                disabled={!interestEditable}
-                value={engagement.interest_level ?? 'medium'}
-                onChange={(e) => persist({ interest_level: e.target.value }, 'Interest updated')}
-              >
-                {INTEREST_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
+              Move to
+              <div className="mt-1">
+                <StatusButton
+                  value={status}
+                  options={statusOptions}
+                  onChange={handleStatusChange}
+                  hint={
+                    !canComplete && status !== 'collaboration_complete'
+                      ? 'Complete unlocks when all deliverables are Posted'
+                      : undefined
+                  }
+                />
+              </div>
             </label>
-
-            <label className="block text-2xs text-ink-secondary">
+            <label className="mt-3 block text-2xs text-ink-secondary">
               Next follow-up
               <input
                 type="date"
@@ -239,73 +446,98 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
                 }
               />
             </label>
+          </section>
 
-            <div>
-              <p className="text-2xs text-ink-secondary">Agreed fee</p>
-              <p className="mt-1 text-sm font-medium text-ink">{formatFee(engagement.agreed_fee)}</p>
-            </div>
-          </div>
+          <section className="py-5">
+            <SectionLabel>The deal</SectionLabel>
 
-          {collaborationReasonLabel(engagement.primary_collaboration_reason) && (
-            <p className="text-2xs text-ink-tertiary">
-              Reason: <span className="font-medium text-ink">{collaborationReasonLabel(engagement.primary_collaboration_reason)}</span>
-            </p>
-          )}
-
-          <div id="campaign-drawer-deliverables">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-ink">Deliverables</h3>
-              <span className="text-2xs text-ink-tertiary">
-                {postedCount}/{deliverables.length} posted
-              </span>
-            </div>
-
-            {deliverablesRule.lockedReason && (
-              <p className="mt-2 rounded-lg bg-canvas px-3 py-2 text-2xs text-ink-secondary">
-                {deliverablesRule.lockedReason}
-              </p>
-            )}
-            {deliverablesRule.hint && (
-              <p className="mt-2 text-2xs text-ink-tertiary">{deliverablesRule.hint}</p>
-            )}
-
-            {deliverablesRule.canAdd && (
-              <div className="mt-3">
-                <p className="mb-2 text-2xs font-medium text-ink-tertiary">Add content type</p>
-                <DeliverableTypeButtons onAdd={addDeliverable} />
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-2xs text-ink-secondary">
+                <span>Type</span>
+                <Pill tone={collabType === 'paid' ? 'info' : 'success'}>
+                  {collabType === 'paid' ? 'Paid' : 'Barter'}
+                </Pill>
               </div>
+              {collabType === 'barter' ? (
+                <button type="button" className="text-2xs text-brand hover:underline" onClick={makePaid}>
+                  Make paid →
+                </button>
+              ) : (
+                <button type="button" className="text-2xs text-ink-tertiary hover:text-ink hover:underline" onClick={makeBarter}>
+                  Switch to barter
+                </button>
+              )}
+            </div>
+
+            {collabType === 'paid' && (
+              <label className="mt-3 block text-2xs text-ink-secondary">
+                Agreed fee (₹) *
+                <input
+                  type="number"
+                  min={0}
+                  className="input-field mt-1"
+                  value={engagement.agreed_fee ?? ''}
+                  onChange={(e) => setEngagement((prev) => ({ ...prev, agreed_fee: e.target.value }))}
+                  onBlur={(e) => saveAgreedFee(e.target.value)}
+                  placeholder="40000"
+                />
+              </label>
             )}
 
-            {deliverables.length === 0 ? (
-              <p className="mt-3 text-2xs text-ink-secondary">
-                {deliverablesRule.canAdd
-                  ? 'None yet — tap a type above once commercials are agreed.'
-                  : 'None yet.'}
-              </p>
-            ) : (
-              <div className="mt-3 space-y-2">
-                {deliverables.map((d) => (
-                  <DeliverableRow
-                    key={d.id}
-                    deliverable={d}
-                    canEditStatus={deliverablesRule.canEditStatus}
-                    canEditProof={false}
-                    canRemove={canRemoveDeliverable(status, d)}
-                    deliverableStatusOptions={deliverableStatusOptions}
-                    onStatusChange={(delId, nextStatus) => updateDeliverable(delId, { status: nextStatus })}
-                    onUpdate={updateDeliverable}
-                    onRemove={removeDeliverable}
-                    compact
-                  />
-                ))}
+            <div id="campaign-drawer-deliverables" className="mt-5">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-medium text-ink">Deliverables</h3>
+                <span className="text-2xs text-ink-tertiary">
+                  {postedCount}/{deliverables.length} posted
+                </span>
               </div>
-            )}
-          </div>
 
-          <div>
-            <h3 className="text-sm font-semibold text-ink">Notes</h3>
+              {deliverablesRule.lockedReason && (
+                <p className="mt-2 rounded-lg bg-canvas px-3 py-2 text-2xs text-ink-secondary">
+                  {deliverablesRule.lockedReason}
+                </p>
+              )}
+              {deliverablesRule.hint && (
+                <p className="mt-2 text-2xs text-ink-tertiary">{deliverablesRule.hint}</p>
+              )}
+
+              {deliverablesRule.canAdd && (
+                <div className="mt-3">
+                  <DeliverableTypeButtons onAdd={addDeliverable} />
+                </div>
+              )}
+
+              {deliverables.length === 0 ? (
+                <p className="mt-3 text-2xs text-ink-secondary">
+                  {deliverablesRule.canAdd
+                    ? 'None yet — tap a type above once commercials are agreed.'
+                    : 'None yet.'}
+                </p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {deliverables.map((d) => (
+                    <DeliverableRow
+                      key={d.id}
+                      deliverable={d}
+                      canEditStatus={deliverablesRule.canEditStatus}
+                      canEditProof={false}
+                      canRemove={canRemoveDeliverable(status, d)}
+                      deliverableStatusOptions={deliverableStatusOptions}
+                      onStatusChange={(delId, nextStatus) => updateDeliverable(delId, { status: nextStatus })}
+                      onUpdate={updateDeliverable}
+                      onRemove={removeDeliverable}
+                      compact
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="py-5">
+            <SectionLabel>Notes</SectionLabel>
             <textarea
-              className="input-field mt-2 min-h-[80px] w-full text-sm"
+              className="input-field min-h-[88px] w-full text-sm"
               value={engagement.notes ?? ''}
               placeholder="Quick context for the team…"
               onChange={(e) => setEngagement((prev) => ({ ...prev, notes: e.target.value }))}
@@ -316,15 +548,7 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
                 }
               }}
             />
-          </div>
-
-          <button
-            type="button"
-            className="btn-secondary w-full"
-            onClick={() => persist({ last_contact_date: todayIso() }, 'Logged contact for today')}
-          >
-            Log contact for today
-          </button>
+          </section>
         </div>
       </Drawer>
 

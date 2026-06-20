@@ -91,3 +91,37 @@ export function getCreatorCardIdentity(engagement) {
     whatsAppUrl: contact?.mobile_number ? whatsAppUrl(contact.mobile_number) : null,
   };
 }
+
+export function formatMobileDisplay(mobile) {
+  if (!mobile) return null;
+  const normalized = whatsAppWaMeNumber(mobile) ?? digitsOnly(mobile);
+  if (!normalized) return null;
+  if (normalized.startsWith('91') && normalized.length === 12) {
+    return `+91 ${normalized.slice(2, 7)} ${normalized.slice(7)}`;
+  }
+  return mobile.trim().startsWith('+') ? mobile.trim() : `+${normalized}`;
+}
+
+export function telUrl(mobile) {
+  const normalized = whatsAppWaMeNumber(mobile) ?? digitsOnly(mobile);
+  return normalized ? `tel:+${normalized}` : null;
+}
+
+/** Contact identity for the campaign quick-edit drawer. */
+export function getDrawerContactIdentity(engagement) {
+  const contact = engagement?.contact_id ? getDemoContact(engagement.contact_id) : null;
+  const extras = contact ? getContactProfileExtras(contact.id) : {};
+  const social = getCreatorCardIdentity(engagement);
+  const mobile = contact?.mobile_number ?? null;
+
+  return {
+    contactId: contact?.id ?? null,
+    handleLabel: social.handleLabel,
+    profileUrl: social.profileUrl,
+    whatsAppUrl: social.whatsAppUrl,
+    mobile,
+    mobileDisplay: formatMobileDisplay(mobile),
+    telUrl: telUrl(mobile),
+    email: extras.email ?? contact?.email ?? null,
+  };
+}

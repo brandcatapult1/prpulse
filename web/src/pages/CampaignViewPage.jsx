@@ -300,7 +300,7 @@ export function CampaignViewPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-2">
+    <div className="mx-auto max-w-6xl space-y-1.5">
       <PageHeader
         title={campaign.campaign_name}
         subtitle={`${MODULES.campaignView.pageTitle} · ${campaign.brand_name}`}
@@ -311,7 +311,7 @@ export function CampaignViewPage() {
 
       <CampaignMetricTiles campaign={campaign} />
 
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <CampaignFilterBar
           engagements={engagements}
           filters={activeFilters}

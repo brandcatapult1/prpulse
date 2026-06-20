@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { StatusButton } from '../ui/DataKit.jsx';
 import { Drawer, Modal, Toast } from '../ui/Primitives.jsx';
-import { AddDeliverableModal } from '../deliverables/AddDeliverableModal.jsx';
 import { DeliverableRow } from '../deliverables/DeliverableProofSection.jsx';
+import { DeliverableTypeButtons, deliverableTypeLabel } from '../deliverables/DeliverableTypeButtons.jsx';
 import { formatDate, formatFee, formatStatus } from '../../lib/format.jsx';
 import { collaborationReasonLabel, COLLABORATION_REASONS } from '../../lib/collaborationReasons.js';
-import { buildNewDeliverable, DELIVERABLE_TYPES } from '../../lib/deliverableTypes.js';
+import { buildNewDeliverable } from '../../lib/deliverableTypes.js';
 import { addDaysIso, todayIso } from '../../lib/dates.js';
 import {
   getDemoDeliverables,
@@ -43,8 +43,6 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
   const [engagement, setEngagement] = useState(null);
   const [deliverables, setDeliverables] = useState([]);
   const [visitOpen, setVisitOpen] = useState(false);
-  const [addDeliverableType, setAddDeliverableType] = useState('reel');
-  const [addDeliverableOpen, setAddDeliverableOpen] = useState(false);
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
@@ -84,19 +82,13 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
     );
   }
 
-  function handleAddDeliverable({ type, quantity, dueDate }) {
-    const newItem = buildNewDeliverable({ type, quantity, dueDate });
+  function addDeliverable(type) {
+    if (!deliverablesRule.canAdd) return;
+    const newItem = buildNewDeliverable({ type, engagementStatus: status });
     persistDeliverables(
       [...deliverables, newItem],
-      `Added ${type} ×${newItem.quantity}`,
+      `Added ${deliverableTypeLabel(type)} ×${newItem.quantity}`,
     );
-    setAddDeliverableOpen(false);
-  }
-
-  function openAddDeliverable(type = 'reel') {
-    if (!deliverablesRule.canAdd) return;
-    setAddDeliverableType(type);
-    setAddDeliverableOpen(true);
   }
 
   function persist(patch, message) {
@@ -262,25 +254,14 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
             {deliverablesRule.canAdd && (
               <div className="mt-3">
                 <p className="mb-2 text-2xs font-medium text-ink-tertiary">Add content type</p>
-                <div className="flex flex-wrap gap-2">
-                  {DELIVERABLE_TYPES.map(({ value, label }) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className="btn-secondary !py-1 text-[11px]"
-                      onClick={() => openAddDeliverable(value)}
-                    >
-                      + {label}
-                    </button>
-                  ))}
-                </div>
+                <DeliverableTypeButtons onAdd={addDeliverable} />
               </div>
             )}
 
             {deliverables.length === 0 ? (
               <p className="mt-3 text-2xs text-ink-secondary">
                 {deliverablesRule.canAdd
-                  ? 'None yet — tap + Reel, + Story, or + Post once commercials are agreed.'
+                  ? 'None yet — tap a type above once commercials are agreed.'
                   : 'None yet.'}
               </p>
             ) : (
@@ -332,14 +313,6 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
         contactName={engagement.contact_name}
         onClose={() => setVisitOpen(false)}
         onSave={handleVisitSave}
-      />
-
-      <AddDeliverableModal
-        open={addDeliverableOpen}
-        initialType={addDeliverableType}
-        contactName={engagement.contact_name}
-        onClose={() => setAddDeliverableOpen(false)}
-        onAdd={handleAddDeliverable}
       />
 
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}

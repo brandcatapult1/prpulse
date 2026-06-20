@@ -8,7 +8,7 @@ import {
 } from '../components/ui/Primitives.jsx';
 import { RatingStars, StatusButton } from '../components/ui/DataKit.jsx';
 import { DeliverableRow } from '../components/deliverables/DeliverableProofSection.jsx';
-import { AddDeliverableModal } from '../components/deliverables/AddDeliverableModal.jsx';
+import { DeliverableTypeButtons, deliverableTypeLabel } from '../components/deliverables/DeliverableTypeButtons.jsx';
 import { FeedbackModal } from '../components/feedback/FeedbackModal.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import {
@@ -60,7 +60,7 @@ const interestOptions = [
   { value: 'low', label: 'Low' },
 ];
 
-import { buildNewDeliverable, DELIVERABLE_TYPES } from '../lib/deliverableTypes.js';
+import { buildNewDeliverable } from '../lib/deliverableTypes.js';
 
 export function EngagementRecordPage() {
   const { id } = useParams();
@@ -68,7 +68,6 @@ export function EngagementRecordPage() {
   const [toast, setToast] = useState(null);
   const [demo, setDemo] = useState(true);
   const [followUpSuggestion, setFollowUpSuggestion] = useState(null);
-  const [addDeliverableType, setAddDeliverableType] = useState('reel');
   const [engagement, setEngagement] = useState(() => getDemoEngagement(id));
   const [deliverables, setDeliverables] = useState(() => getDemoDeliverables(id));
   const [timeline, setTimeline] = useState(() => getDemoTimeline(id));
@@ -216,17 +215,11 @@ export function EngagementRecordPage() {
     setToast(`Follow-up set to ${formatDate(date)}`);
   };
 
-  const openAddDeliverable = (type = 'reel') => {
+  const addDeliverable = (type) => {
     if (!deliverablesRule.canAdd) return;
-    setAddDeliverableType(type);
-    setModal('add-deliverable');
-  };
-
-  const handleAddDeliverable = ({ type, quantity, dueDate }) => {
-    const newItem = buildNewDeliverable({ type, quantity, dueDate });
+    const newItem = buildNewDeliverable({ type, engagementStatus: status });
     persistDeliverables([...deliverables, newItem]);
-    setModal(null);
-    setToast(`Added ${type} ×${newItem.quantity}`);
+    setToast(`Added ${deliverableTypeLabel(type)} ×${newItem.quantity}`);
   };
 
   const postedCount = deliverables.filter((d) => d.status === 'posted').length;
@@ -401,23 +394,12 @@ export function EngagementRecordPage() {
             {deliverablesRule.canAdd && (
               <div className="mt-4">
                 <p className="mb-2 text-2xs font-medium text-ink-tertiary">Add content type</p>
-                <div className="flex flex-wrap gap-2">
-                  {DELIVERABLE_TYPES.map(({ value, label }) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => openAddDeliverable(value)}
-                    >
-                      + {label}
-                    </button>
-                  ))}
-                  {deliverables.length > 0 && (
-                    <button type="button" className="btn-ghost" onClick={() => setModal('deliverables')}>
-                      Manage all
-                    </button>
-                  )}
-                </div>
+                <DeliverableTypeButtons onAdd={addDeliverable} className="[&_button]:text-2xs [&_button]:!py-1.5" />
+                {deliverables.length > 0 && (
+                  <button type="button" className="btn-ghost mt-2" onClick={() => setModal('deliverables')}>
+                    Manage all
+                  </button>
+                )}
               </div>
             )}
 
@@ -434,7 +416,7 @@ export function EngagementRecordPage() {
                 <p className="text-sm text-ink-secondary">No deliverables yet</p>
                 <p className="mt-1 text-2xs text-ink-tertiary">
                   {deliverablesRule.canAdd
-                    ? 'Tap + Reel, + Story, or + Post above once commercials are agreed.'
+                    ? 'Tap a content type above once commercials are agreed.'
                     : deliverablesRule.lockedReason}
                 </p>
               </div>
@@ -555,18 +537,10 @@ export function EngagementRecordPage() {
         canAdd={deliverablesRule.canAdd}
         canEditStatus={deliverablesRule.canEditStatus}
         deliverableStatusOptions={deliverableStatusOptions}
-        onAdd={() => openAddDeliverable('reel')}
+        onAddType={addDeliverable}
         onStatusChange={(delId, nextStatus) => updateDeliverable(delId, { status: nextStatus })}
         onUpdate={updateDeliverable}
         onSaved={() => setToast('Proof saved')}
-      />
-
-      <AddDeliverableModal
-        open={modal === 'add-deliverable'}
-        initialType={addDeliverableType}
-        onClose={() => setModal(null)}
-        contactName={engagement.contact_name}
-        onAdd={handleAddDeliverable}
       />
 
       <FeedbackModal
@@ -751,7 +725,7 @@ function DeliverablesModal({
   canAdd,
   canEditStatus,
   deliverableStatusOptions,
-  onAdd,
+  onAddType,
   onStatusChange,
   onUpdate,
   onSaved,
@@ -762,15 +736,13 @@ function DeliverablesModal({
       title={`All deliverables · ${contactName}`}
       onClose={onClose}
       footer={
-        <div className="flex justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           {canAdd ? (
-            <button type="button" className="btn-secondary" onClick={onAdd}>
-              + Add deliverable
-            </button>
+            <DeliverableTypeButtons onAdd={onAddType} className="[&_button]:text-2xs" />
           ) : (
             <span className="text-2xs text-ink-tertiary">Read-only</span>
           )}
-          <button type="button" className="btn-primary" onClick={onClose}>
+          <button type="button" className="btn-primary ml-auto" onClick={onClose}>
             Done
           </button>
         </div>
@@ -779,12 +751,10 @@ function DeliverablesModal({
       {deliverables.length === 0 ? (
         <EmptyState
           title="No deliverables yet"
-          description="Use + Reel, + Story, or + Post on the engagement page."
+          description="Tap a content type below once commercials are agreed."
           action={
             canAdd ? (
-              <button type="button" className="btn-primary" onClick={onAdd}>
-                Add first deliverable
-              </button>
+              <DeliverableTypeButtons onAdd={onAddType} className="justify-center [&_button]:text-2xs" />
             ) : null
           }
         />

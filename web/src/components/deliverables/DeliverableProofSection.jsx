@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ExpandableSection } from '../ui/DataKit.jsx';
+import { deliverableTypeLabel } from '../../lib/deliverableTypes.js';
 
 /**
  * Inline proof capture for a deliverable — content link + screenshots (PRD Module 6).
@@ -272,12 +273,14 @@ export function DeliverableRow({
     <div className="rounded-lg border border-line bg-canvas px-3 py-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <span className="text-sm font-medium capitalize text-ink">
-            {deliverable.deliverable_type} ×{deliverable.quantity}
+          <span className="text-sm font-medium text-ink">
+            {deliverableTypeLabel(deliverable.deliverable_type)} ×{deliverable.quantity}
           </span>
-          <span className="ml-2 text-2xs text-ink-tertiary">
-            Due {formatDateShort(deliverable.due_date)}
-          </span>
+          {deliverable.due_date && (
+            <span className="ml-2 text-2xs text-ink-tertiary">
+              Due {formatDateShort(deliverable.due_date)}
+            </span>
+          )}
           {!compact && deliverable.content_link && (
             <p className="mt-1 truncate text-2xs text-brand">{deliverable.content_link}</p>
           )}

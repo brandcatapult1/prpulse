@@ -9,8 +9,8 @@ export function AppShell({ onQuickAdd }) {
   const navigate = useNavigate();
 
   return (
-    <div className="flex w-full bg-canvas">
-      <aside className="sticky top-0 hidden h-dvh w-[220px] shrink-0 flex-col overflow-y-auto border-r border-line bg-white md:flex">
+    <div className="bg-canvas">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[220px] flex-col overflow-y-auto border-r border-line bg-white md:flex">
         <div className="px-4 py-5">
           <div className="text-sm font-semibold tracking-tight text-ink">PR Pulse</div>
           <div className="text-2xs text-ink-tertiary">Brand Catapult</div>
@@ -49,8 +49,8 @@ export function AppShell({ onQuickAdd }) {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col self-start">
-        <header className="flex h-12 items-center gap-3 border-b border-line bg-white px-4 md:px-5">
+      <div className="flex flex-col md:pl-[220px]">
+        <header className="sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-line bg-white px-4 md:px-5">
           <div className="md:hidden text-sm font-semibold text-ink">PR Pulse</div>
           <button
             type="button"

@@ -1,11 +1,20 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { registrationsApi } from '../lib/api.js';
 import { addRegistrationSubmission } from '../lib/demoStore.js';
 import { CREATOR_CATEGORIES } from '../lib/creatorCategories.js';
 
+const COUNTRY_OPTIONS = [
+  { code: 'IN', dialCode: '+91', label: 'India' },
+  { code: 'AE', dialCode: '+971', label: 'UAE' },
+  { code: 'GB', dialCode: '+44', label: 'UK' },
+  { code: 'US', dialCode: '+1', label: 'USA' },
+];
+
 const EMPTY = {
   full_name: '',
+  country_code: 'IN',
   mobile_number: '',
   email: '',
   city: '',
@@ -21,6 +30,7 @@ const EMPTY = {
 
 export function PublicRegistrationPage() {
   const [form, setForm] = useState(EMPTY);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -35,6 +45,9 @@ export function PublicRegistrationPage() {
       }
       return next;
     });
+    if (field === 'mobile_number' || field === 'email' || field === 'country_code') {
+      setFieldErrors((prev) => ({ ...prev, [field]: null, mobile_number: null }));
+    }
   };
 
   const toggleCategory = (name) => {
@@ -48,10 +61,38 @@ export function PublicRegistrationPage() {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.full_name.trim() || !form.mobile_number.trim()) {
-      setError('Full name and mobile number are required.');
+    const nextFieldErrors = {};
+    const fullName = form.full_name.trim();
+    const mobileRaw = form.mobile_number.trim();
+    const emailRaw = form.email.trim();
+
+    if (!fullName) {
+      setError('Full name is required.');
       return;
     }
+
+    if (!mobileRaw) {
+      nextFieldErrors.mobile_number = 'Mobile number is required.';
+    }
+
+    const parsedPhone = mobileRaw
+      ? parsePhoneNumberFromString(mobileRaw, form.country_code)
+      : null;
+    if (mobileRaw && (!parsedPhone || !parsedPhone.isValid())) {
+      nextFieldErrors.mobile_number = 'Enter a valid mobile number for the selected country.';
+    }
+
+    if (emailRaw && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) {
+      nextFieldErrors.email = 'Enter a valid email address.';
+    }
+
+    if (Object.values(nextFieldErrors).some(Boolean)) {
+      setFieldErrors(nextFieldErrors);
+      setError(null);
+      return;
+    }
+
+    setFieldErrors({});
     if (form.categories.length === 0) {
       setError('Pick at least one category.');
       return;
@@ -61,9 +102,9 @@ export function PublicRegistrationPage() {
     setError(null);
 
     const payload = {
-      full_name: form.full_name.trim(),
-      mobile_number: form.mobile_number.trim(),
-      email: form.email.trim() || null,
+      full_name: fullName,
+      mobile_number: parsedPhone.number.replace(/\D/g, ''),
+      email: emailRaw || null,
       city: form.city.trim() || null,
       instagram_link: form.instagram_link.trim() || null,
       youtube_link: form.youtube_link.trim() || null,
@@ -128,10 +169,38 @@ export function PublicRegistrationPage() {
             <input className="input-field" required value={form.full_name} onChange={set('full_name')} placeholder="Your name" />
           </Field>
           <Field label="Mobile number *">
-            <input className="input-field" required type="tel" value={form.mobile_number} onChange={set('mobile_number')} placeholder="+91 98765 43210" />
+            <div className="grid grid-cols-[140px_1fr] gap-2">
+              <select className="input-field" value={form.country_code} onChange={set('country_code')}>
+                {COUNTRY_OPTIONS.map((country) => (
+                  <option key={country.code} value={country.code}>
+                    {country.dialCode} · {country.label}
+                  </option>
+                ))}
+              </select>
+              <input
+                className={`input-field ${fieldErrors.mobile_number ? 'border-red-400 focus:border-red-500 focus:ring-red-100' : ''}`}
+                required
+                type="tel"
+                value={form.mobile_number}
+                onChange={set('mobile_number')}
+                placeholder="98765 43210"
+              />
+            </div>
+            {fieldErrors.mobile_number && (
+              <p className="mt-1 text-2xs text-red-700">{fieldErrors.mobile_number}</p>
+            )}
           </Field>
           <Field label="Email">
-            <input className="input-field" type="email" value={form.email} onChange={set('email')} placeholder="you@email.com" />
+            <input
+              className={`input-field ${fieldErrors.email ? 'border-red-400 focus:border-red-500 focus:ring-red-100' : ''}`}
+              type="email"
+              value={form.email}
+              onChange={set('email')}
+              placeholder="you@email.com"
+            />
+            {fieldErrors.email && (
+              <p className="mt-1 text-2xs text-red-700">{fieldErrors.email}</p>
+            )}
           </Field>
           <Field label="City">
             <input className="input-field" value={form.city} onChange={set('city')} placeholder="Delhi" />

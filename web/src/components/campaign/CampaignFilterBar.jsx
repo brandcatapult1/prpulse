@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { formatStatus } from '../../lib/format.jsx';
-
-const EMPTY_FILTERS = { status: null, owner: null, followUpDue: false };
+import { COLLABORATION_REASONS } from '../../lib/collaborationReasons.js';
+import {
+  CAMPAIGN_EMPTY_FILTERS,
+  CAMPAIGN_RISK_FILTERS,
+  collabReasonFilterLabel,
+  riskFilterLabel,
+} from '../../lib/campaignBoardFilters.js';
 
 function FilterIcon() {
   return (
@@ -75,7 +79,7 @@ function FilterMenu({ options, onSelect, onClose }) {
   return (
     <div
       ref={ref}
-      className="absolute left-0 top-full z-20 mt-1 min-w-[10rem] rounded-md border border-line/80 bg-white py-1 shadow-sm"
+      className="absolute left-0 top-full z-20 mt-1 min-w-[11rem] rounded-md border border-line/80 bg-white py-1 shadow-sm"
     >
       {options.map((opt) => (
         <button
@@ -94,24 +98,50 @@ function FilterMenu({ options, onSelect, onClose }) {
   );
 }
 
+function FilterDropdown({ label, active, valueLabel, options, open, onToggle, onClose, onSelect, onClear }) {
+  if (active) {
+    return (
+      <ActiveFilterChip label={label} valueLabel={valueLabel} onClear={onClear} />
+    );
+  }
+  return (
+    <div className="relative">
+      <FilterDropdownChip label={label} onOpen={onToggle} />
+      {open && (
+        <FilterMenu options={options} onSelect={onSelect} onClose={onClose} />
+      )}
+    </div>
+  );
+}
+
 export function CampaignFilterBar({ engagements, filters, onChange }) {
   const [openMenu, setOpenMenu] = useState(null);
-
-  const statusOptions = useMemo(() => {
-    const values = [...new Set(engagements.map((e) => e.conversation_status).filter(Boolean))].sort();
-    return values.map((value) => ({ value, label: formatStatus(value) }));
-  }, [engagements]);
 
   const ownerOptions = useMemo(() => {
     const values = [...new Set(engagements.map((e) => e.owner_name).filter(Boolean))].sort();
     return values.map((value) => ({ value, label: value }));
   }, [engagements]);
 
-  const hasActive = Boolean(filters.status || filters.owner || filters.followUpDue);
+  const reasonOptions = useMemo(() => {
+    const present = new Set(
+      engagements.map((e) => e.primary_collaboration_reason).filter(Boolean),
+    );
+    return COLLABORATION_REASONS.filter((r) => present.has(r.value));
+  }, [engagements]);
+
+  const hasActive = Boolean(filters.owner || filters.collabReason || filters.risk);
+
+  function toggleMenu(menu) {
+    setOpenMenu((prev) => (prev === menu ? null : menu));
+  }
+
+  function closeMenu() {
+    setOpenMenu(null);
+  }
 
   function clearAll() {
-    onChange(EMPTY_FILTERS);
-    setOpenMenu(null);
+    onChange(CAMPAIGN_EMPTY_FILTERS);
+    closeMenu();
   }
 
   return (
@@ -120,68 +150,41 @@ export function CampaignFilterBar({ engagements, filters, onChange }) {
         <FilterIcon />
       </span>
 
-      {filters.owner && (
-        <ActiveFilterChip
-          label="Owner"
-          valueLabel={ownerShortName(filters.owner)}
-          onClear={() => onChange({ ...filters, owner: null })}
-        />
-      )}
+      <FilterDropdown
+        label="Owner"
+        active={Boolean(filters.owner)}
+        valueLabel={ownerShortName(filters.owner)}
+        options={ownerOptions}
+        open={openMenu === 'owner'}
+        onToggle={() => toggleMenu('owner')}
+        onClose={closeMenu}
+        onSelect={(value) => onChange({ ...filters, owner: value })}
+        onClear={() => onChange({ ...filters, owner: null })}
+      />
 
-      {filters.status && (
-        <ActiveFilterChip
-          label="Status"
-          valueLabel={formatStatus(filters.status)}
-          onClear={() => onChange({ ...filters, status: null })}
-        />
-      )}
+      <FilterDropdown
+        label="Collab reason"
+        active={Boolean(filters.collabReason)}
+        valueLabel={collabReasonFilterLabel(filters.collabReason)}
+        options={reasonOptions}
+        open={openMenu === 'reason'}
+        onToggle={() => toggleMenu('reason')}
+        onClose={closeMenu}
+        onSelect={(value) => onChange({ ...filters, collabReason: value })}
+        onClear={() => onChange({ ...filters, collabReason: null })}
+      />
 
-      {filters.followUpDue && (
-        <ActiveFilterChip
-          label="Follow-up due"
-          valueLabel="Due"
-          onClear={() => onChange({ ...filters, followUpDue: false })}
-        />
-      )}
-
-      {!filters.status && (
-        <div className="relative">
-          <FilterDropdownChip
-            label="Status"
-            onOpen={() => setOpenMenu(openMenu === 'status' ? null : 'status')}
-          />
-          {openMenu === 'status' && (
-            <FilterMenu
-              options={statusOptions}
-              onSelect={(value) => onChange({ ...filters, status: value })}
-              onClose={() => setOpenMenu(null)}
-            />
-          )}
-        </div>
-      )}
-
-      {!filters.owner && (
-        <div className="relative">
-          <FilterDropdownChip
-            label="Owner"
-            onOpen={() => setOpenMenu(openMenu === 'owner' ? null : 'owner')}
-          />
-          {openMenu === 'owner' && (
-            <FilterMenu
-              options={ownerOptions}
-              onSelect={(value) => onChange({ ...filters, owner: value })}
-              onClose={() => setOpenMenu(null)}
-            />
-          )}
-        </div>
-      )}
-
-      {!filters.followUpDue && (
-        <FilterDropdownChip
-          label="Follow-up due"
-          onOpen={() => onChange({ ...filters, followUpDue: true })}
-        />
-      )}
+      <FilterDropdown
+        label="Risk"
+        active={Boolean(filters.risk)}
+        valueLabel={riskFilterLabel(filters.risk)}
+        options={CAMPAIGN_RISK_FILTERS}
+        open={openMenu === 'risk'}
+        onToggle={() => toggleMenu('risk')}
+        onClose={closeMenu}
+        onSelect={(value) => onChange({ ...filters, risk: value })}
+        onClear={() => onChange({ ...filters, risk: null })}
+      />
 
       {hasActive && (
         <button
@@ -196,4 +199,4 @@ export function CampaignFilterBar({ engagements, filters, onChange }) {
   );
 }
 
-export { EMPTY_FILTERS as CAMPAIGN_EMPTY_FILTERS };
+export { CAMPAIGN_EMPTY_FILTERS };

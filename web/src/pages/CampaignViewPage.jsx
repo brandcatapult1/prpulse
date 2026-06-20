@@ -8,6 +8,7 @@ import { CampaignQuickEditDrawer } from '../components/campaign/CampaignQuickEdi
 import { CampaignMetricTiles } from '../components/campaign/CampaignMetricTiles.jsx';
 import { CampaignFilterBar, CAMPAIGN_EMPTY_FILTERS } from '../components/campaign/CampaignFilterBar.jsx';
 import { QuickAddModal } from '../components/contacts/QuickAddModal.jsx';
+import { filterCampaignEngagements } from '../../lib/campaignBoardFilters.js';
 import { Pill, formatStatus, formatDate, formatFee, statusTone } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
 import { campaignsApi, engagementsApi } from '../lib/api.js';
@@ -89,32 +90,22 @@ export function CampaignViewPage() {
     });
   }, [id, location.key]);
 
-  const filteredEngagements = useMemo(() => {
-    let rows = engagements;
-    if (activeFilters.status) {
-      rows = rows.filter((r) => r.conversation_status === activeFilters.status);
-    }
-    if (activeFilters.owner) {
-      rows = rows.filter((r) => r.owner_name === activeFilters.owner);
-    }
-    if (activeFilters.followUpDue) {
-      const today = todayIso();
-      rows = rows.filter(
-        (r) => r.next_follow_up_date && r.next_follow_up_date.slice(0, 10) <= today,
-      );
-    }
-    return rows;
-  }, [engagements, activeFilters]);
-
-  const boardEngagements = useMemo(
+  const mergedEngagements = useMemo(
     () =>
-      filteredEngagements.map((row) => ({
+      engagements.map((row) => ({
         ...getDemoEngagement(row.id),
         ...row,
         ...getEngagementOverride(row.id),
       })),
-    [filteredEngagements],
+    [engagements, boardRevision],
   );
+
+  const filteredEngagements = useMemo(
+    () => filterCampaignEngagements(mergedEngagements, activeFilters),
+    [mergedEngagements, activeFilters],
+  );
+
+  const boardEngagements = filteredEngagements;
 
   function bumpBoard() {
     reloadEngagements();
@@ -313,7 +304,7 @@ export function CampaignViewPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <CampaignFilterBar
-          engagements={engagements}
+          engagements={mergedEngagements}
           filters={activeFilters}
           onChange={setActiveFilters}
         />

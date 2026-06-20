@@ -424,24 +424,26 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
           />
 
           <section className="py-3">
-            <SectionLabel>Collab reason</SectionLabel>
-            <select
-              className="input-field h-8"
-              value={engagement.primary_collaboration_reason ?? ''}
-              onChange={(e) =>
-                persist(
-                  { primary_collaboration_reason: e.target.value || null },
-                  'Reason updated',
-                )
-              }
-            >
-              {REASON_OPTIONS.map((o) => (
-                <option key={o.value || 'empty'} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-            {!engagement.primary_collaboration_reason && (
-              <p className="mt-1 text-[10px] text-health-amber">Required before complete</p>
-            )}
+            <div className="rounded-md border border-brand/10 bg-brand-soft/30 px-3 py-2.5">
+              <SectionLabel className="mb-1 text-brand/70">Collab reason</SectionLabel>
+              <select
+                className="input-field h-8"
+                value={engagement.primary_collaboration_reason ?? ''}
+                onChange={(e) =>
+                  persist(
+                    { primary_collaboration_reason: e.target.value || null },
+                    'Reason updated',
+                  )
+                }
+              >
+                {REASON_OPTIONS.map((o) => (
+                  <option key={o.value || 'empty'} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              {!engagement.primary_collaboration_reason && (
+                <p className="mt-1 text-[10px] text-health-amber">Required before complete</p>
+              )}
+            </div>
           </section>
 
           <section className="py-3">
@@ -449,7 +451,7 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
             <div className="space-y-2.5">
               <label className="block">
                 <FieldLabel>Move to</FieldLabel>
-                <div className="mt-1">
+                <div className="mt-1 [&_select]:max-w-none">
                   <StatusButton
                     value={status}
                     options={statusOptions}

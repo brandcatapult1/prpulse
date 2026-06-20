@@ -3,8 +3,10 @@
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply min-h-screen bg-canvas text-ink antialiased;
+  html,
+  body,
+  #root {
+    @apply bg-canvas text-ink antialiased;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 }

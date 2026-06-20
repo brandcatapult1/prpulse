@@ -153,7 +153,25 @@ function WhatsAppIcon({ className = 'h-3.5 w-3.5' }) {
   );
 }
 
-function CreatorIdentityRow({ engagement }) {
+function CreatorHandle({ handleLabel, profileUrl, onLinkClick }) {
+  if (profileUrl) {
+    return (
+      <a
+        href={profileUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="truncate text-2xs text-ink-tertiary hover:text-brand hover:underline"
+        onClick={onLinkClick}
+        onMouseDown={onLinkClick}
+      >
+        {handleLabel}
+      </a>
+    );
+  }
+  return <span className="truncate text-2xs text-ink-tertiary">{handleLabel}</span>;
+}
+
+function CreatorCardHeader({ engagement }) {
   const { handleLabel, profileUrl, whatsAppUrl } = getCreatorCardIdentity(engagement);
 
   function stopCardOpen(event) {
@@ -161,35 +179,44 @@ function CreatorIdentityRow({ engagement }) {
   }
 
   return (
-    <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
-      {profileUrl ? (
-        <a
-          href={profileUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="truncate text-2xs text-ink-tertiary hover:text-brand hover:underline"
-          onClick={stopCardOpen}
-          onMouseDown={stopCardOpen}
-        >
-          {handleLabel}
-        </a>
-      ) : (
-        <span className="truncate text-2xs text-ink-tertiary">{handleLabel}</span>
-      )}
-      {whatsAppUrl && (
-        <a
-          href={whatsAppUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`WhatsApp ${engagement.contact_name}`}
-          title="WhatsApp"
-          className="shrink-0 rounded p-0.5 text-ink-tertiary transition-colors hover:bg-canvas hover:text-health-green"
-          onClick={stopCardOpen}
-          onMouseDown={stopCardOpen}
-        >
-          <WhatsAppIcon />
-        </a>
-      )}
+    <div className="flex items-start gap-2.5">
+      <div
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-2xs font-semibold text-brand"
+        aria-hidden
+      >
+        {contactInitials(engagement.contact_name)}
+      </div>
+      <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-medium leading-tight text-ink">
+              {engagement.contact_name}
+            </span>
+            <InterestDot level={engagement.interest_level} />
+          </div>
+          <div className="mt-0.5">
+            <CreatorHandle
+              handleLabel={handleLabel}
+              profileUrl={profileUrl}
+              onLinkClick={stopCardOpen}
+            />
+          </div>
+        </div>
+        {whatsAppUrl && (
+          <a
+            href={whatsAppUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`WhatsApp ${engagement.contact_name}`}
+            title="WhatsApp"
+            className="shrink-0 rounded-full border border-line p-1.5 text-health-green transition-colors hover:border-health-green/40 hover:bg-teal-50/80"
+            onClick={stopCardOpen}
+            onMouseDown={stopCardOpen}
+          >
+            <WhatsAppIcon />
+          </a>
+        )}
+      </div>
     </div>
   );
 }
@@ -249,23 +276,7 @@ export function CreatorKanbanCard({
         onKeyDown={onCardKeyDown}
         className="w-full cursor-pointer text-left outline-none focus-visible:ring-2 focus-visible:ring-brand/30 rounded-md"
       >
-        <div className="flex items-start gap-2.5">
-          <div
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-2xs font-semibold text-brand"
-            aria-hidden
-          >
-            {contactInitials(engagement.contact_name)}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <span className="truncate text-sm font-medium leading-tight text-ink">
-                {engagement.contact_name}
-              </span>
-              <InterestDot level={engagement.interest_level} />
-            </div>
-            <CreatorIdentityRow engagement={engagement} />
-          </div>
-        </div>
+        <CreatorCardHeader engagement={engagement} />
 
         <div className="mt-2.5 min-h-[1.25rem]">
           <StatusLine engagement={engagement} columnId={columnId} />

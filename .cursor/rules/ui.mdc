@@ -20,6 +20,13 @@ The screen contracts are in `@docs/PR_Pulse_UX_Spec.md`. Build to them.
 - Agreed Fee / Collaboration Type render **read-only while Completed** (lock + "Reopen to amend").
 - **Overdue** is a computed badge from `v_deliverables`, never a status choice.
 
+## Visual density (default for drawers & side panels)
+- **Density, not sprawl:** tight vertical rhythm (`py-3` sections), modest padding, sections separated by a single subtle divider (`divide-line/80`), not large gaps.
+- **Summaries as chips:** planned items (deliverables, tags) render as compact removable chips — never large bordered cards with nested controls.
+- **Progressive disclosure:** don't surface a control until the stage needs it (e.g. agreed fee only when paid; follow-up hidden when complete/dropped).
+- **Restraint:** subtle 0.5px borders, two font weights (regular + medium), muted uppercase micro-labels (`text-[10px] tracking-wider`) for section headers, brand accent used sparingly, minimal contextual helper text (no verbose always-on hints).
+- **Posting status:** deliverable Posted status is set only through the Awaiting Final Deliverables "Log deliverable" flow (requires proof) — never via a status dropdown in quick-edit drawers.
+
 ## Conventions
 - Functional components, **named exports**, explicit prop types, Tailwind utility classes.
 - **Optimistic UI** on status changes; reconcile on response; surface guard rejections as `Toast`.

@@ -35,6 +35,14 @@ import {
   getFeedbackOverride,
 } from '../lib/demoStore.js';
 import { getContactProfileExtras } from '../lib/contactProfile.js';
+import { setActivityActor, clearActivityActor } from '../lib/activityActor.js';
+import {
+  recordFeedbackActivity,
+  recordDeliverablesPatchActivity,
+  recordDidntDeliverActivity,
+  recordEngagementPatchActivity,
+  recordReopenActivity,
+} from '../lib/activityLog.js';
 
 export function CampaignViewPage() {
   const { id } = useParams();
@@ -54,6 +62,11 @@ export function CampaignViewPage() {
   function reloadEngagements() {
     setEngagements(getDemoEngagementsForCampaign(id));
   }
+
+  useEffect(() => {
+    if (user) setActivityActor(user);
+    return () => clearActivityActor();
+  }, [user]);
 
   useEffect(() => {
     if (!id) return;
@@ -114,6 +127,7 @@ export function CampaignViewPage() {
       snapshot[key] = base[key];
     }
     saveEngagementOverride(engagementId, patch);
+    recordEngagementPatchActivity(engagementId, base, patch);
     bumpBoard();
     showActionToast(message, () => {
       saveEngagementOverride(engagementId, snapshot);
@@ -123,8 +137,18 @@ export function CampaignViewPage() {
   }
 
   function applyDeliverablesLogging(engagementId, nextList, message) {
+    const baseEngagement = {
+      ...getDemoEngagement(engagementId),
+      ...getEngagementOverride(engagementId),
+    };
     const snapshot = getDemoDeliverables(engagementId).map((d) => ({ ...d }));
     saveDeliverablesOverride(engagementId, nextList);
+    recordDeliverablesPatchActivity(
+      engagementId,
+      baseEngagement.campaign_id,
+      snapshot,
+      nextList,
+    );
     bumpBoard();
     showActionToast(message, () => {
       saveDeliverablesOverride(engagementId, snapshot);
@@ -153,6 +177,12 @@ export function CampaignViewPage() {
         blacklisted_at: todayIso(),
       });
     }
+    recordEngagementPatchActivity(engagementId, base, engagementPatch);
+    recordDidntDeliverActivity(engagementId, base.campaign_id, {
+      engagementPatch,
+      blacklist,
+      contactId,
+    });
     bumpBoard();
     showActionToast(message, () => {
       saveEngagementOverride(engagementId, engagementSnapshot);
@@ -187,6 +217,12 @@ export function CampaignViewPage() {
     if (clearBlacklist && contactId) {
       clearBlacklistOverride(contactId);
     }
+    recordReopenActivity(engagementId, base.campaign_id, {
+      engagementPatch,
+      clearBlacklist,
+      contactId,
+      before: base,
+    });
     bumpBoard();
     showActionToast(message, () => {
       saveEngagementOverride(engagementId, engagementSnapshot);
@@ -208,8 +244,14 @@ export function CampaignViewPage() {
     };
     const priorFeedback = getFeedbackOverride(engagementId);
 
+    const baseEngagement = {
+      ...getDemoEngagement(engagementId),
+      ...getEngagementOverride(engagementId),
+    };
+
     saveContactProfileOverride(contactId, contactProfilePatch);
     saveFeedbackOverride(engagementId, engagementFeedback);
+    recordFeedbackActivity(engagementId, baseEngagement.campaign_id, { engagementFeedback });
     bumpBoard();
     showActionToast(message, () => {
       const profileSnapshot = {};

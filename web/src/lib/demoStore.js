@@ -24,7 +24,7 @@ const PERSISTED_ENGAGEMENT_FIELDS = [
 function loadStore() {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [], brands: {}, contactAdds: [], campaignAdds: [], engagementAdds: [], contactProfiles: {}, users: {} };
+    if (!raw) return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [], brands: {}, contactAdds: [], campaignAdds: [], engagementAdds: [], contactProfiles: {}, users: {}, activityEvents: [] };
     const parsed = JSON.parse(raw);
     return {
       engagements: parsed.engagements ?? {},
@@ -39,9 +39,10 @@ function loadStore() {
       engagementAdds: parsed.engagementAdds ?? [],
       contactProfiles: parsed.contactProfiles ?? {},
       users: parsed.users ?? {},
+      activityEvents: Array.isArray(parsed.activityEvents) ? parsed.activityEvents : [],
     };
   } catch {
-    return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [], brands: {}, contactAdds: [], campaignAdds: [], engagementAdds: [], contactProfiles: {}, users: {} };
+    return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [], brands: {}, contactAdds: [], campaignAdds: [], engagementAdds: [], contactProfiles: {}, users: {}, activityEvents: [] };
   }
 }
 
@@ -225,4 +226,15 @@ export function saveUserOverride(id, patch) {
   const store = loadStore();
   store.users[id] = { ...(store.users[id] ?? {}), ...patch };
   saveStore(store);
+}
+
+export function getActivityEvents() {
+  return loadStore().activityEvents ?? [];
+}
+
+export function appendActivityEvent(event) {
+  const store = loadStore();
+  store.activityEvents = [...(store.activityEvents ?? []), event];
+  saveStore(store);
+  return event;
 }

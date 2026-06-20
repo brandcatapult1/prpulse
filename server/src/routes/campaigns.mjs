@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool, withUserTransaction } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
+import { listActivityEventsForCampaign } from '../lib/activityEvents.mjs';
 
 export const campaignsRouter = Router();
 
@@ -36,6 +37,14 @@ campaignsRouter.get('/:id', requireAuth, async (req, res) => {
   );
   if (!rows[0]) return res.status(404).json({ error: 'Campaign not found' });
   res.json(rows[0]);
+});
+
+campaignsRouter.get('/:id/activity-events', requireAuth, async (req, res) => {
+  const { rows } = await pool.query('SELECT id FROM campaigns WHERE id = $1', [req.params.id]);
+  if (!rows[0]) return res.status(404).json({ error: 'Campaign not found' });
+
+  const events = await listActivityEventsForCampaign(pool, req.params.id);
+  res.json(events);
 });
 
 campaignsRouter.post('/:id/populate', requireAuth, async (req, res) => {

@@ -8,6 +8,7 @@ import {
 } from '../components/ui/Primitives.jsx';
 import { RatingStars, StatusButton } from '../components/ui/DataKit.jsx';
 import { DeliverableRow } from '../components/deliverables/DeliverableProofSection.jsx';
+import { AddDeliverableModal } from '../components/deliverables/AddDeliverableModal.jsx';
 import { FeedbackModal } from '../components/feedback/FeedbackModal.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import {
@@ -59,12 +60,7 @@ const interestOptions = [
   { value: 'low', label: 'Low' },
 ];
 
-const DELIVERABLE_TYPES = [
-  { value: 'reel', label: 'Reel' },
-  { value: 'story', label: 'Story' },
-  { value: 'post', label: 'Post' },
-  { value: 'video', label: 'Video' },
-];
+import { buildNewDeliverable, DELIVERABLE_TYPES } from '../lib/deliverableTypes.js';
 
 export function EngagementRecordPage() {
   const { id } = useParams();
@@ -227,19 +223,7 @@ export function EngagementRecordPage() {
   };
 
   const handleAddDeliverable = ({ type, quantity, dueDate }) => {
-    const newItem = {
-      id: `d-${Date.now()}`,
-      deliverable_type: type,
-      quantity: Number(quantity) || 1,
-      due_date: dueDate || addDaysIso(7),
-      status: 'pending',
-      is_overdue: false,
-      content_link: null,
-      screenshots: [],
-      brief_compliance: null,
-      brand_tag_verified: null,
-      internal_rating: null,
-    };
+    const newItem = buildNewDeliverable({ type, quantity, dueDate });
     persistDeliverables([...deliverables, newItem]);
     setModal(null);
     setToast(`Added ${type} ×${newItem.quantity}`);
@@ -820,73 +804,6 @@ function DeliverablesModal({
           ))}
         </div>
       )}
-    </Modal>
-  );
-}
-
-function AddDeliverableModal({ open, initialType, onClose, contactName, onAdd }) {
-  const [type, setType] = useState(initialType);
-  const [quantity, setQuantity] = useState(1);
-  const [dueDate, setDueDate] = useState(() => addDaysIso(7));
-
-  useEffect(() => {
-    if (open) {
-      setType(initialType);
-      setQuantity(1);
-      setDueDate(addDaysIso(7));
-    }
-  }, [open, initialType]);
-
-  const submit = () => {
-    onAdd({ type, quantity, dueDate });
-  };
-
-  return (
-    <Modal
-      open={open}
-      title={`Add deliverable · ${contactName}`}
-      onClose={onClose}
-      footer={
-        <div className="flex justify-end gap-2">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button type="button" className="btn-primary" onClick={submit}>Add to engagement</button>
-        </div>
-      }
-    >
-      <p className="mb-4 text-2xs text-ink-secondary">
-        Choose the content type you agreed on with this creator.
-      </p>
-      <div className="grid gap-3">
-        <div>
-          <label className="mb-1.5 block text-2xs font-medium text-ink-secondary">Type</label>
-          <select className="input-field" value={type} onChange={(e) => setType(e.target.value)}>
-            {DELIVERABLE_TYPES.map(({ value, label }) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-            <option value="carousel">Carousel</option>
-            <option value="live">Live</option>
-          </select>
-        </div>
-        <div>
-          <label className="mb-1.5 block text-2xs font-medium text-ink-secondary">Quantity</label>
-          <input
-            type="number"
-            className="input-field"
-            value={quantity}
-            min={1}
-            onChange={(e) => setQuantity(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-2xs font-medium text-ink-secondary">Due date</label>
-          <input
-            type="date"
-            className="input-field"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-          />
-        </div>
-      </div>
     </Modal>
   );
 }

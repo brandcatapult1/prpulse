@@ -38,7 +38,13 @@ import {
   addEngagementImport,
   getUserOverride,
   saveUserOverride,
+  getActivityEvents,
 } from './demoStore.js';
+import {
+  activityEventToTimelineEntry,
+  getActivityEventsForEngagement,
+  getActivityEventsForCampaign,
+} from './activityLog.js';
 
 export {
   saveEngagementOverride,
@@ -132,8 +138,16 @@ export function getDemoDeliverables(engagementId) {
 }
 
 export function getDemoTimeline(engagementId) {
-  return MOCK_TIMELINE_BY_ENGAGEMENT[engagementId] ?? [];
+  const fromEvents = getActivityEventsForEngagement(engagementId).map(activityEventToTimelineEntry);
+  const seed = MOCK_TIMELINE_BY_ENGAGEMENT[engagementId] ?? [];
+  return [...fromEvents, ...seed].sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
 }
+
+export function getDemoActivityEventsForCampaign(campaignId) {
+  return getActivityEventsForCampaign(campaignId);
+}
+
+export { getActivityEvents };
 
 export function getDemoFeedback(engagementId) {
   return getFeedbackOverride(engagementId) ?? MOCK_FEEDBACK_BY_ENGAGEMENT[engagementId] ?? null;

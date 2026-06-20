@@ -1,6 +1,13 @@
 import { Router } from 'express';
 import { pool, withUserTransaction } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
+import {
+  ACTIVITY_ACTION,
+  activityRowToTimelineEntry,
+  tryInsertActivityEvent,
+  listActivityEventsForCampaign,
+  listActivityEventsForEngagement,
+} from '../lib/activityEvents.mjs';
 
 export const engagementsRouter = Router();
 
@@ -92,7 +99,22 @@ async function patchEngagement(req, res) {
           primary_collaboration_reason ?? null,
         ],
       );
-      return rows[0];
+
+      const updated = rows[0];
+      if (updated && conversation_status && conversation_status !== cur.conversation_status) {
+        await tryInsertActivityEvent(client, req.user, {
+          campaignId: cur.campaign_id,
+          engagementId: cur.id,
+          action: ACTIVITY_ACTION.STAGE_CHANGED,
+          details: {
+            fromStage: cur.conversation_status,
+            toStage: conversation_status,
+            reason: conversation_status.startsWith('dropped_') ? conversation_status : null,
+            droppedFrom: updated.dropped_from ?? null,
+          },
+        });
+      }
+      return updated;
     });
     res.json(updated);
   } catch (err) {
@@ -107,8 +129,17 @@ engagementsRouter.get('/:id/deliverables', requireAuth, async (req, res) => {
 });
 
 engagementsRouter.get('/:id/timeline', requireAuth, async (req, res) => {
+  const activityRows = await listActivityEventsForEngagement(pool, req.params.id);
+  if (activityRows.length > 0) {
+    return res.json(activityRows.map(activityRowToTimelineEntry));
+  }
+
   const { rows } = await pool.query(
-    `SELECT * FROM timeline_entries WHERE engagement_id = $1 ORDER BY occurred_at DESC`,
+    `SELECT te.*, u.full_name AS user_name
+     FROM timeline_entries te
+     LEFT JOIN users u ON u.id = te.user_id
+     WHERE te.engagement_id = $1
+     ORDER BY te.occurred_at DESC`,
     [req.params.id],
   );
   res.json(rows);

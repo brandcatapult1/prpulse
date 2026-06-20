@@ -3,6 +3,8 @@ import { deliverableHasProof } from './deliverableLogging.js';
 import { todayIso } from './dates.js';
 import { canMarkDidntDeliver } from './campaignPermissions.js';
 import { sideEffectsOnStatusChange } from './engagementRules.js';
+import { ACTIVITY_ACTION } from './activityEvents.js';
+import { queueStageTransitionActivity } from './activityLog.js';
 import {
   conversationStatusToDroppedFrom,
   droppedFromToStatus,
@@ -56,6 +58,30 @@ function buildDropPatch(engagement, dropReason, payload) {
   };
 }
 
+function queueStageChange(engagement, patch, payload) {
+  const fromStage = engagement.conversation_status;
+  const toStage = patch?.conversation_status;
+  if (!toStage || fromStage === toStage) return;
+  queueStageTransitionActivity({
+    campaignId: engagement.campaign_id,
+    engagementId: engagement.id,
+    action: ACTIVITY_ACTION.STAGE_CHANGED,
+    details: {
+      fromStage,
+      toStage,
+      reason: payload.dropReason ?? (toStage.startsWith('dropped_') ? toStage : null),
+      droppedFrom: patch.dropped_from ?? payload.droppedFrom ?? null,
+    },
+  });
+}
+
+function okTransition(engagement, payload, result) {
+  if (result.ok && result.patch) {
+    queueStageChange(engagement, result.patch, payload);
+  }
+  return result;
+}
+
 /**
  * Single entry point for stage changes (board drag, card logging, drawer).
  * Returns { ok, patch } or { ok: false, needsPrompt, error }.
@@ -78,28 +104,28 @@ export function transitionStage(engagement, target, payload = {}) {
       return { ok: false, error: 'Senior Manager or Admin required to reopen' };
     }
     const targetStatus = droppedFromToStatus(droppedFrom);
-    return {
+    return okTransition(engagement, payload, {
       ok: true,
       patch: {
         conversation_status: targetStatus,
         dropped_from: null,
       },
       clearBlacklist: Boolean(payload.clearBlacklist),
-    };
+    });
   }
 
   if (normalized === STAGE.SCHEDULED || normalized === 'scheduled') {
     if (!payload.visitDate) {
       return { ok: false, needsPrompt: 'visit_date' };
     }
-    return {
+    return okTransition(engagement, payload, {
       ok: true,
       patch: {
         conversation_status: 'scheduled',
         visit_date: payload.visitDate,
         next_follow_up_date: payload.visitDate,
       },
-    };
+    });
   }
 
   if (
@@ -121,14 +147,14 @@ export function transitionStage(engagement, target, payload = {}) {
         .map((d) => d.due_date)
         .filter(Boolean)
         .sort()[0] ?? visitCompletedDate;
-    return {
+    return okTransition(engagement, payload, {
       ok: true,
       patch: {
         conversation_status: 'awaiting_final_deliverables',
         visit_completed_date: visitCompletedDate,
         next_follow_up_date: nextFollowUp,
       },
-    };
+    });
   }
 
   if (normalized === STAGE.DROPPED || normalized === 'Dropped') {
@@ -138,20 +164,20 @@ export function transitionStage(engagement, target, payload = {}) {
     if (!isValidDropReason(payload.dropReason, engagement.conversation_status)) {
       return { ok: false, error: 'Invalid drop reason for this stage' };
     }
-    return {
+    return okTransition(engagement, payload, {
       ok: true,
       patch: buildDropPatch(engagement, payload.dropReason, payload),
-    };
+    });
   }
 
   if (normalized === STAGE.NO_RESPONSE || normalized === 'no_response') {
-    return {
+    return okTransition(engagement, payload, {
       ok: true,
       patch: {
         conversation_status: 'no_response',
         next_follow_up_date: payload.nextFollowUpDate ?? null,
       },
-    };
+    });
   }
 
   if (normalized === STAGE.IN_CONVERSATION || normalized === 'in_conversation') {
@@ -169,7 +195,7 @@ export function transitionStage(engagement, target, payload = {}) {
       patch.last_contact_log_type = 'conversation';
       patch.no_reply_count = 0;
     }
-    return { ok: true, patch };
+    return okTransition(engagement, payload, { ok: true, patch });
   }
 
   if (
@@ -180,13 +206,13 @@ export function transitionStage(engagement, target, payload = {}) {
     if (!canCompleteEngagement(engagement.id)) {
       return { ok: false, error: 'Complete when all deliverables are Posted with proof' };
     }
-    return {
+    return okTransition(engagement, payload, {
       ok: true,
       patch: {
         conversation_status: 'collaboration_complete',
         ...sideEffectsOnStatusChange('collaboration_complete'),
       },
-    };
+    });
   }
 
   return { ok: false, error: 'Unknown stage' };

@@ -2,16 +2,25 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { StatusButton } from '../ui/DataKit.jsx';
 import { Drawer, Modal, Toast } from '../ui/Primitives.jsx';
+import { AddDeliverableModal } from '../deliverables/AddDeliverableModal.jsx';
 import { DeliverableRow } from '../deliverables/DeliverableProofSection.jsx';
 import { formatDate, formatFee, formatStatus } from '../../lib/format.jsx';
 import { collaborationReasonLabel, COLLABORATION_REASONS } from '../../lib/collaborationReasons.js';
+import { buildNewDeliverable, DELIVERABLE_TYPES } from '../../lib/deliverableTypes.js';
 import { addDaysIso, todayIso } from '../../lib/dates.js';
 import {
   getDemoDeliverables,
   getDemoEngagement,
+  saveDeliverablesOverride,
   saveEngagementOverride,
 } from '../../lib/demo.js';
+import { getEngagementOverride } from '../../lib/demoStore.js';
+import { recordEngagementPatchActivity } from '../../lib/activityLog.js';
 import {
+  canSetDeliverableStatus,
+  deliverableStatusBlockReason,
+  deliverableStatusOptionsForEngagement,
+  deliverablesRules,
   followUpSuggestionForStatus,
   getStatusOptions,
   interestRules,
@@ -32,26 +41,73 @@ const INTEREST_OPTIONS = [
 
 export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated }) {
   const [engagement, setEngagement] = useState(null);
+  const [deliverables, setDeliverables] = useState([]);
   const [visitOpen, setVisitOpen] = useState(false);
+  const [addDeliverableType, setAddDeliverableType] = useState('reel');
+  const [addDeliverableOpen, setAddDeliverableOpen] = useState(false);
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
     if (!open || !engagementId) return;
     setEngagement(getDemoEngagement(engagementId));
+    setDeliverables(getDemoDeliverables(engagementId));
   }, [open, engagementId]);
 
   if (!engagementId || !engagement) return null;
 
-  const deliverables = getDemoDeliverables(engagementId);
   const canComplete =
     deliverables.length > 0 && deliverables.every((d) => d.status === 'posted');
   const status = engagement.conversation_status;
   const interestEditable = interestRules(status).editable;
+  const deliverablesRule = deliverablesRules(status);
+  const deliverableStatusOptions = deliverableStatusOptionsForEngagement(status);
+  const postedCount = deliverables.filter((d) => d.status === 'posted').length;
+
+  function persistDeliverables(nextList, message) {
+    saveDeliverablesOverride(engagementId, nextList);
+    setDeliverables(nextList);
+    onUpdated?.();
+    if (message) setToast(message);
+  }
+
+  function updateDeliverable(delId, patch) {
+    if (patch.status && !canSetDeliverableStatus(status, patch.status)) {
+      setToast(
+        deliverableStatusBlockReason(status, patch.status)
+          ?? 'This status is not available at the current stage',
+      );
+      return;
+    }
+    persistDeliverables(
+      deliverables.map((d) => (d.id === delId ? { ...d, ...patch } : d)),
+      patch.status ? 'Deliverable updated' : 'Proof saved',
+    );
+  }
+
+  function handleAddDeliverable({ type, quantity, dueDate }) {
+    const newItem = buildNewDeliverable({ type, quantity, dueDate });
+    persistDeliverables(
+      [...deliverables, newItem],
+      `Added ${type} ×${newItem.quantity}`,
+    );
+    setAddDeliverableOpen(false);
+  }
+
+  function openAddDeliverable(type = 'reel') {
+    if (!deliverablesRule.canAdd) return;
+    setAddDeliverableType(type);
+    setAddDeliverableOpen(true);
+  }
 
   function persist(patch, message) {
+    const before = {
+      ...getDemoEngagement(engagementId),
+      ...getEngagementOverride(engagementId),
+    };
     const next = { ...engagement, ...patch };
     setEngagement(next);
     saveEngagementOverride(engagementId, patch);
+    recordEngagementPatchActivity(engagementId, before, patch);
     onUpdated?.();
     if (message) setToast(message);
   }
@@ -189,21 +245,55 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
           <div>
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-ink">Deliverables</h3>
-              <span className="text-2xs text-ink-tertiary">{deliverables.length} total</span>
+              <span className="text-2xs text-ink-tertiary">
+                {postedCount}/{deliverables.length} posted
+              </span>
             </div>
+
+            {deliverablesRule.lockedReason && (
+              <p className="mt-2 rounded-lg bg-canvas px-3 py-2 text-2xs text-ink-secondary">
+                {deliverablesRule.lockedReason}
+              </p>
+            )}
+            {deliverablesRule.hint && (
+              <p className="mt-2 text-2xs text-ink-tertiary">{deliverablesRule.hint}</p>
+            )}
+
+            {deliverablesRule.canAdd && (
+              <div className="mt-3">
+                <p className="mb-2 text-2xs font-medium text-ink-tertiary">Add content type</p>
+                <div className="flex flex-wrap gap-2">
+                  {DELIVERABLE_TYPES.map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className="btn-secondary !py-1 text-[11px]"
+                      onClick={() => openAddDeliverable(value)}
+                    >
+                      + {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {deliverables.length === 0 ? (
-              <p className="mt-2 text-2xs text-ink-secondary">None yet — add from the full record.</p>
+              <p className="mt-3 text-2xs text-ink-secondary">
+                {deliverablesRule.canAdd
+                  ? 'None yet — tap + Reel, + Story, or + Post once commercials are agreed.'
+                  : 'None yet.'}
+              </p>
             ) : (
               <div className="mt-3 space-y-2">
                 {deliverables.map((d) => (
                   <DeliverableRow
                     key={d.id}
                     deliverable={d}
-                    canEditStatus={false}
+                    canEditStatus={deliverablesRule.canEditStatus}
                     canEditProof={false}
-                    deliverableStatusOptions={[]}
-                    onStatusChange={() => {}}
-                    onUpdate={() => {}}
+                    deliverableStatusOptions={deliverableStatusOptions}
+                    onStatusChange={(delId, nextStatus) => updateDeliverable(delId, { status: nextStatus })}
+                    onUpdate={updateDeliverable}
                     compact
                   />
                 ))}
@@ -242,6 +332,14 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
         contactName={engagement.contact_name}
         onClose={() => setVisitOpen(false)}
         onSave={handleVisitSave}
+      />
+
+      <AddDeliverableModal
+        open={addDeliverableOpen}
+        initialType={addDeliverableType}
+        contactName={engagement.contact_name}
+        onClose={() => setAddDeliverableOpen(false)}
+        onAdd={handleAddDeliverable}
       />
 
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}

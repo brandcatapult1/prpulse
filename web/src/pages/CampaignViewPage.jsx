@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { FilterBar, DataTable, MetricStrip } from '../components/ui/DataKit.jsx';
+import { DataTable, FilterBar } from '../components/ui/DataKit.jsx';
 import { Drawer, Toast } from '../components/ui/Primitives.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { CampaignKanbanBoard } from '../components/campaign/CampaignKanbanBoard.jsx';
 import { CampaignQuickEditDrawer } from '../components/campaign/CampaignQuickEditDrawer.jsx';
+import { CampaignMetricTiles } from '../components/campaign/CampaignMetricTiles.jsx';
+import { CampaignFilterBar, CAMPAIGN_EMPTY_FILTERS } from '../components/campaign/CampaignFilterBar.jsx';
 import { QuickAddModal } from '../components/contacts/QuickAddModal.jsx';
-import { Pill, healthTone, formatStatus, formatDate, formatFee, statusTone } from '../lib/format.jsx';
+import { Pill, formatStatus, formatDate, formatFee, statusTone } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
 import { campaignsApi, engagementsApi } from '../lib/api.js';
 import {
@@ -54,7 +56,7 @@ export function CampaignViewPage() {
   const [engagements, setEngagements] = useState(() => getDemoEngagementsForCampaign(id));
   const [demo, setDemo] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
-  const [activeFilters, setActiveFilters] = useState([]);
+  const [activeFilters, setActiveFilters] = useState(CAMPAIGN_EMPTY_FILTERS);
   const [viewMode, setViewMode] = useState('board');
   const [quickEditId, setQuickEditId] = useState(null);
   const [toast, setToast] = useState(null);
@@ -89,11 +91,17 @@ export function CampaignViewPage() {
 
   const filteredEngagements = useMemo(() => {
     let rows = engagements;
-    if (activeFilters.includes('Follow-up due')) {
-      rows = rows.filter((r) => r.next_follow_up_date);
+    if (activeFilters.status) {
+      rows = rows.filter((r) => r.conversation_status === activeFilters.status);
     }
-    if (activeFilters.includes('Status')) {
-      rows = rows.filter((r) => r.conversation_status && r.conversation_status !== 'collaboration_complete');
+    if (activeFilters.owner) {
+      rows = rows.filter((r) => r.owner_name === activeFilters.owner);
+    }
+    if (activeFilters.followUpDue) {
+      const today = todayIso();
+      rows = rows.filter(
+        (r) => r.next_follow_up_date && r.next_follow_up_date.slice(0, 10) <= today,
+      );
     }
     return rows;
   }, [engagements, activeFilters]);
@@ -292,7 +300,7 @@ export function CampaignViewPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-6xl space-y-2">
       <PageHeader
         title={campaign.campaign_name}
         subtitle={`${MODULES.campaignView.pageTitle} · ${campaign.brand_name}`}
@@ -301,44 +309,15 @@ export function CampaignViewPage() {
 
       <DemoBanner show={demo} />
 
-      <div className="panel p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <MetricStrip
-            items={[
-              { label: 'Target', value: campaign.target_collaborations ?? '—' },
-              { label: 'Completed', value: campaign.completed_collaborations, tone: 'accent' },
-              { label: 'Remaining', value: campaign.remaining_collaborations ?? '—' },
-              {
-                label: 'Health',
-                value: campaign.campaign_health === 'not_set'
-                  ? 'No target set'
-                  : `${campaign.achievement_pct ?? 0}%`,
-                tone: 'accent',
-              },
-            ]}
-          />
-          <Pill tone={healthTone(campaign.campaign_health)}>
-            {campaign.campaign_health === 'not_set' ? 'Not set' : campaign.campaign_health}
-          </Pill>
-        </div>
-      </div>
+      <CampaignMetricTiles campaign={campaign} />
 
-      <p className="text-2xs text-ink-tertiary">
-        {viewMode === 'board'
-          ? <>Click a creator card for a quick summary, or switch to <span className="font-medium text-ink-secondary">List</span> for the full table.</>
-          : <>Click any creator row to open their <span className="font-medium text-ink-secondary">Engagement Record</span></>}
-      </p>
-
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <FilterBar
-          filters={['Status', 'Owner', 'Interest', 'Follow-up due']}
-          active={activeFilters}
-          onToggle={(f) =>
-            setActiveFilters((prev) => (prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]))
-          }
-          onClear={() => setActiveFilters([])}
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+        <CampaignFilterBar
+          engagements={engagements}
+          filters={activeFilters}
+          onChange={setActiveFilters}
         />
-        <div className="flex rounded-md border border-line p-0.5">
+        <div className="flex rounded-md border border-line/80 p-0.5">
           <button
             type="button"
             onClick={() => setViewMode('board')}

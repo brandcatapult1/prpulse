@@ -22,6 +22,20 @@ export function healthTone(health) {
   return 'muted';
 }
 
+export function healthLabel(health) {
+  if (health === 'green') return 'On track';
+  if (health === 'amber') return 'At risk';
+  if (health === 'red') return 'Behind';
+  return 'No target set';
+}
+
+export function healthDotClass(health) {
+  if (health === 'green') return 'bg-health-green';
+  if (health === 'amber') return 'bg-health-amber';
+  if (health === 'red') return 'bg-health-red';
+  return 'bg-ink-tertiary/50';
+}
+
 export function statusTone(status) {
   if (status === 'collaboration_complete') return 'success';
   if (status?.startsWith('dropped_')) return 'muted';

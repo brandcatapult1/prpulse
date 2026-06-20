@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { Card, Toast } from '../components/ui/Primitives.jsx';
 import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
-import { Pill, healthTone, formatDate } from '../lib/format.jsx';
+import { HealthBadge } from '../components/ui/HealthBadge.jsx';
+import { Pill, formatDate } from '../lib/format.jsx';
 import { MODULES, DASHBOARD_WIDGETS } from '../lib/modules.js';
 import { dashboardApi } from '../lib/api.js';
 import { MOCK_DASHBOARD } from '../data/mock.js';
@@ -183,9 +184,7 @@ export function DashboardPage() {
                   {c.completed_collaborations}/{c.target_collaborations ?? '—'} · {c.achievement_pct ?? 0}%
                 </div>
               </Link>
-              <Pill tone={healthTone(c.campaign_health)}>
-                {c.campaign_health === 'not_set' ? 'No target set' : c.campaign_health}
-              </Pill>
+              <HealthBadge health={c.campaign_health} />
             </li>
           ))}
         </ul>

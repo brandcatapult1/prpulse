@@ -4,7 +4,7 @@ import { DataTable } from '../components/ui/DataKit.jsx';
 import { Toast } from '../components/ui/Primitives.jsx';
 import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
-import { Pill, healthTone } from '../lib/format.jsx';
+import { HealthBadge } from '../components/ui/HealthBadge.jsx';
 import { MODULES } from '../lib/modules.js';
 import { campaignsApi } from '../lib/api.js';
 import { getDemoCampaigns, pickList } from '../lib/demo.js';
@@ -63,11 +63,7 @@ export function CampaignsPage() {
     {
       key: 'health',
       label: 'Health',
-      render: (r) => (
-        <Pill tone={healthTone(r.campaign_health)}>
-          {r.campaign_health === 'not_set' ? 'No target set' : r.campaign_health}
-        </Pill>
-      ),
+      render: (r) => <HealthBadge health={r.campaign_health} />,
     },
   ];
 

@@ -8,8 +8,19 @@ alwaysApply: false
 
 The screen contracts are in `@docs/PR_Pulse_UX_Spec.md`. Build to them.
 
+## Design charter (standing principle)
+Act as a senior UI designer: **premium, restrained, easy-to-use** for daily power-users (account managers).
+- **Calm light palette** — ONE accent (`brand`) used sparingly; color is punctuation, not decoration.
+- **Typography** — two weights only: regular (400) and medium (500); never heavier. Clear hierarchy via size and color, not boldness.
+- **Density over sprawl** — disciplined spacing, no large empty padding; subtle `border-line/80` dividers; radii 8–12px (`rounded-md` / `rounded-lg`).
+- **No heavy fills or raw default controls** — style every input, select, and button; never ship browser-default form chrome.
+- **Reference data as chips/tiles** — compact chips or metric tiles, not form-blocks or run-on label:value strings.
+- **Progressive disclosure** — never surface a control before its moment.
+- **Shared tokens** — use kit components (`HealthBadge`, `MetricTile`, `Pill`, `SectionBlock`) so nothing is a one-off.
+- **Campaign health** — always `HealthBadge` (dot + human label); never print raw colour names (`green`/`amber`/`red`).
+
 ## Structure
-- **Build the primitive component kit first**, then compose every screen from it: `AppShell`, `DataTable`, `FilterBar`, `Drawer`, `Modal`, `SidePanel`, `ExpandableSection`, `StatusButton`, `QuickAction`, `Card`, `Pill`/`Tag`, `RatingStars`, `Toast`, `EmptyState`, `Skeleton`, `ConfirmDialog`. Do not invent per-screen form layouts.
+- **Build the primitive component kit first**, then compose every screen from it: `AppShell`, `DataTable`, `FilterBar`, `Drawer`, `Modal`, `SidePanel`, `ExpandableSection`, `StatusButton`, `QuickAction`, `Card`, `Pill`/`Tag`, `HealthBadge`, `RatingStars`, `Toast`, `EmptyState`, `Skeleton`, `ConfirmDialog`. Do not invent per-screen form layouts.
 - **Progressive disclosure:** no screen shows all of an entity's fields. Secondary workflows open in `Drawer`/`Modal`/`SidePanel`. **Drawers are one level deep**; on mobile they are full-screen sheets — never stack a second drawer.
 - **Engagement Record stays compact:** main view = Contact, Campaign, Status, Interest, Owner, Last Contact, Next Follow-up, Agreed Fee, Notes. Deliverables / Feedback / Visit / Timeline are **drawers**, never inline sections.
 - Records are **read-first** with an explicit Edit affordance. Buttons over typing.

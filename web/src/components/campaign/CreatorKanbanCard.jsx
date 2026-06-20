@@ -10,7 +10,7 @@ import {
   isDeliverablesAtRisk,
   isFollowUpOverdue,
   isVisitOverdue,
-  regionLabel,
+  commercialTypeLabel,
 } from '../../lib/campaignKanban.js';
 import { isContactBlacklisted } from '../../lib/demo.js';
 import { InConversationCardLogging } from './InConversationCardLogging.jsx';
@@ -152,9 +152,9 @@ export function CreatorKanbanCard({
     columnId === 'awaiting_final' && engagement.conversation_status === 'awaiting_final_deliverables';
   const owner = engagement.owner_name?.split(' ')[0] ?? '—';
   const contentType = contentTypeSummary(engagement.id);
-  const region = regionLabel(engagement);
+  const commercial = commercialTypeLabel(engagement);
   const reason = collaborationReasonLabel(engagement.primary_collaboration_reason);
-  const footerParts = [owner, reason ?? 'Reason not set', contentType, region].filter(Boolean);
+  const footerParts = [owner, reason ?? 'Reason not set', contentType, commercial].filter(Boolean);
 
   return (
     <div className="group/card campaign-kanban-card w-full text-left">

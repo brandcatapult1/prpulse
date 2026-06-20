@@ -11,6 +11,7 @@ const PERSISTED_ENGAGEMENT_FIELDS = [
   'visit_notes',
   'notes',
   'agreed_fee',
+  'collaboration_type',
   'primary_collaboration_reason',
   'no_reply_count',
   'last_contact_log_type',

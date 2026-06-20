@@ -421,6 +421,7 @@ export const MOCK_ENGAGEMENTS_BY_ID = {
     last_contact_date: '2026-06-18',
     next_follow_up_date: '2026-06-24',
     agreed_fee: null,
+    collaboration_type: 'barter',
     primary_collaboration_reason: 'virality',
     no_reply_count: 0,
     last_contact_log_type: null,

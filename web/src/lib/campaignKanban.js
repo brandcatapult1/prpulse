@@ -135,6 +135,17 @@ export function regionLabel(engagement) {
   return contact?.city ?? null;
 }
 
+/** Display-only commercial tag for board cards — not operationally gated. */
+export function commercialTypeLabel(engagement) {
+  const explicit = engagement.collaboration_type?.toLowerCase();
+  if (explicit === 'paid') return 'Paid';
+  if (explicit === 'barter') return 'Barter';
+  if (engagement.agreed_fee != null && Number(engagement.agreed_fee) > 0) {
+    return 'Paid';
+  }
+  return null;
+}
+
 export function groupEngagementsByColumn(engagements) {
   const groups = Object.fromEntries(CAMPAIGN_KANBAN_COLUMNS.map((c) => [c.id, []]));
   for (const row of engagements) {

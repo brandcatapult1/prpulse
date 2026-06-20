@@ -8,7 +8,7 @@ import { CampaignQuickEditDrawer } from '../components/campaign/CampaignQuickEdi
 import { CampaignMetricTiles } from '../components/campaign/CampaignMetricTiles.jsx';
 import { CampaignFilterBar, CAMPAIGN_EMPTY_FILTERS } from '../components/campaign/CampaignFilterBar.jsx';
 import { QuickAddModal } from '../components/contacts/QuickAddModal.jsx';
-import { filterCampaignEngagements } from '../../lib/campaignBoardFilters.js';
+import { filterCampaignEngagements } from '../lib/campaignBoardFilters.js';
 import { Pill, formatStatus, formatDate, formatFee, statusTone } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
 import { campaignsApi, engagementsApi } from '../lib/api.js';

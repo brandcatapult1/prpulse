@@ -48,6 +48,7 @@ import {
   visitRules,
 } from '../lib/engagementRules.js';
 import { getContactProfileExtras, getEngagementsForContact } from '../lib/contactProfile.js';
+import { formatCollaborationReason } from '../lib/collaborationReasons.js';
 
 const interestOptions = [
   { value: 'high', label: 'High' },
@@ -380,7 +381,7 @@ export function EngagementRecordPage() {
               />
               <DetailItem
                 label="Reason"
-                value={engagement.primary_collaboration_reason ?? '—'}
+                value={formatCollaborationReason(engagement.primary_collaboration_reason)}
                 className="sm:col-span-2"
               />
             </dl>

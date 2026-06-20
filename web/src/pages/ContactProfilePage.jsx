@@ -13,6 +13,7 @@ import {
   getContactProfileExtras,
   getFeedbackHistoryForContact,
 } from '../lib/contactProfile.js';
+import { formatCollaborationReason } from '../lib/collaborationReasons.js';
 import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 
 export function ContactProfilePage() {
@@ -186,7 +187,7 @@ export function ContactProfilePage() {
             {
               key: 'primary_collaboration_reason',
               label: 'Primary reason',
-              render: (r) => r.primary_collaboration_reason?.replace('_', ' ') ?? '—',
+              render: (r) => formatCollaborationReason(r.primary_collaboration_reason),
             },
             { key: 'agreed_fee', label: 'Fee', render: (r) => formatFee(r.agreed_fee) },
             { key: 'deliverables_completed', label: 'Deliverables' },

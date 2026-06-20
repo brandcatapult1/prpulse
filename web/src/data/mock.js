@@ -421,7 +421,7 @@ export const MOCK_ENGAGEMENTS_BY_ID = {
     last_contact_date: '2026-06-18',
     next_follow_up_date: '2026-06-24',
     agreed_fee: null,
-    primary_collaboration_reason: 'business',
+    primary_collaboration_reason: 'virality',
     notes: 'Interested in barter for launch week. Follow up after menu tasting.',
   },
   e2: {
@@ -437,7 +437,7 @@ export const MOCK_ENGAGEMENTS_BY_ID = {
     last_contact_date: '2026-06-10',
     next_follow_up_date: null,
     agreed_fee: 40000,
-    primary_collaboration_reason: 'business',
+    primary_collaboration_reason: 'expert',
     notes: 'Smooth collab — would repeat for festive menu.',
   },
   e3: {
@@ -454,7 +454,7 @@ export const MOCK_ENGAGEMENTS_BY_ID = {
     next_follow_up_date: '2026-06-22',
     visit_date: '2026-06-22',
     agreed_fee: 25000,
-    primary_collaboration_reason: 'business',
+    primary_collaboration_reason: 'positioning',
     notes: 'Outlet visit booked — Connaught Place.',
   },
   e4: {
@@ -470,7 +470,7 @@ export const MOCK_ENGAGEMENTS_BY_ID = {
     last_contact_date: '2026-06-15',
     next_follow_up_date: '2026-06-20',
     agreed_fee: 85000,
-    primary_collaboration_reason: 'business',
+    primary_collaboration_reason: 'virality',
     notes: 'Reel pending — story already posted.',
   },
   e5: {
@@ -518,7 +518,7 @@ export const MOCK_ENGAGEMENTS_BY_ID = {
     last_contact_date: '2026-05-28',
     next_follow_up_date: null,
     agreed_fee: 120000,
-    primary_collaboration_reason: 'business',
+    primary_collaboration_reason: 'positioning',
     notes: 'Flagship store launch reel.',
   },
   e8: {
@@ -534,7 +534,7 @@ export const MOCK_ENGAGEMENTS_BY_ID = {
     last_contact_date: '2026-06-16',
     next_follow_up_date: '2026-06-21',
     agreed_fee: null,
-    primary_collaboration_reason: 'business',
+    primary_collaboration_reason: 'expert',
     notes: 'Negotiating package — 1 reel + 2 stories.',
   },
   e10: {
@@ -550,7 +550,7 @@ export const MOCK_ENGAGEMENTS_BY_ID = {
     last_contact_date: '2026-06-18',
     next_follow_up_date: '2026-06-19',
     agreed_fee: 15000,
-    primary_collaboration_reason: 'business',
+    primary_collaboration_reason: 'positioning',
     notes: 'Skincare routine integration.',
   },
 };

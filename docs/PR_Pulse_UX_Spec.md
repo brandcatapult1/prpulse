@@ -191,7 +191,7 @@
 │ Main (read-first, inline-editable)                        │
 │  Status [In Conversation ▾]   Interest [Medium ▾]         │
 │  Owner  Priya ▾    Last contact 18 Jun   Next FU 24 Jun   │
-│  Agreed fee  ₹—            Reason [Business ▾]            │
+│  Agreed fee  ₹—            Reason [Virality ▾]            │
 │  Notes  ……………………………………………………                    │
 │                                                           │
 │  [ Deliverables 2 ] [ Feedback ] [ Visit ] [ Timeline ]   │ ← open drawers

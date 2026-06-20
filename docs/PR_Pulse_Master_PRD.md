@@ -242,7 +242,7 @@ The Engagement Record is the primary operational workspace. Every Contact + Camp
 - `completed_at` — set the first time the engagement satisfies the count rule (used by monthly reporting; see below).
 
 ### Collaboration Reasons
-Primary *(mandatory)* and Secondary *(optional)*, each one of: Business · Vitality · Positioning.
+Primary *(mandatory)* and Secondary *(optional)*, each one of: Virality · Expert · Positioning.
 
 ### Interest Level
 High · Medium · Low · Unknown.

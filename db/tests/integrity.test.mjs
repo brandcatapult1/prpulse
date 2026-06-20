@@ -107,7 +107,7 @@ async function runTests() {
         client,
         `UPDATE engagements
          SET conversation_status = 'collaboration_complete',
-             primary_collaboration_reason = 'business'
+             primary_collaboration_reason = 'expert'
          WHERE id = $1`,
         [engagementId],
         'requires at least one deliverable',
@@ -125,7 +125,7 @@ async function runTests() {
         client,
         `UPDATE engagements
          SET conversation_status = 'collaboration_complete',
-             primary_collaboration_reason = 'business'
+             primary_collaboration_reason = 'expert'
          WHERE id = $1`,
         [engagementId],
         'requires at least one deliverable',
@@ -148,7 +148,7 @@ async function runTests() {
       await client.query(
         `UPDATE engagements
          SET conversation_status = 'collaboration_complete',
-             primary_collaboration_reason = 'business'
+             primary_collaboration_reason = 'expert'
          WHERE id = $1`,
         [engagementId],
       );
@@ -176,7 +176,7 @@ async function runTests() {
       await client.query(
         `UPDATE engagements
          SET conversation_status = 'collaboration_complete',
-             primary_collaboration_reason = 'business'
+             primary_collaboration_reason = 'expert'
          WHERE id = $1`,
         [engagementId],
       );
@@ -241,7 +241,7 @@ async function runTests() {
       await client.query(
         `UPDATE engagements
          SET conversation_status = 'collaboration_complete',
-             primary_collaboration_reason = 'business',
+             primary_collaboration_reason = 'expert',
              agreed_fee = 5000
          WHERE id = $1`,
         [engagementId],

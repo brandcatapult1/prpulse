@@ -60,7 +60,7 @@ CREATE TYPE conversation_status AS ENUM (
 
 CREATE TYPE interest_level AS ENUM ('high','medium','low','unknown');
 
-CREATE TYPE collaboration_reason AS ENUM ('business','vitality','positioning');
+CREATE TYPE collaboration_reason AS ENUM ('virality','expert','positioning');
 
 CREATE TYPE deliverable_type AS ENUM ('reel','story','static_carousel_post','other');
 

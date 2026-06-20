@@ -4,7 +4,7 @@ import { StatusButton } from '../ui/DataKit.jsx';
 import { Drawer, Modal, Toast } from '../ui/Primitives.jsx';
 import { DeliverableRow } from '../deliverables/DeliverableProofSection.jsx';
 import { formatDate, formatFee, formatStatus } from '../../lib/format.jsx';
-import { collaborationReasonLabel } from '../../lib/campaignKanban.js';
+import { collaborationReasonLabel, COLLABORATION_REASONS } from '../../lib/collaborationReasons.js';
 import { addDaysIso, todayIso } from '../../lib/dates.js';
 import {
   getDemoDeliverables,
@@ -21,9 +21,7 @@ import {
 
 const REASON_OPTIONS = [
   { value: '', label: 'Select reason…' },
-  { value: 'business', label: 'Business' },
-  { value: 'vitality', label: 'Vitality' },
-  { value: 'positioning', label: 'Positioning' },
+  ...COLLABORATION_REASONS,
 ];
 
 const INTEREST_OPTIONS = [

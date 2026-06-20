@@ -1,5 +1,6 @@
 import { getDemoContact, getDemoDeliverables } from './demo.js';
 import { getContactProfileExtras } from './contactProfile.js';
+import { collaborationReasonLabel } from './collaborationReasons.js';
 import { todayIso } from './dates.js';
 
 /** PRD Module 5 conversation statuses — one Kanban column per parent stage. */
@@ -40,16 +41,7 @@ export const CAMPAIGN_KANBAN_COLUMNS = [
   },
 ];
 
-const REASON_LABELS = {
-  business: 'Business',
-  vitality: 'Vitality',
-  positioning: 'Positioning',
-};
-
-export function collaborationReasonLabel(reason) {
-  if (!reason) return null;
-  return REASON_LABELS[reason] ?? reason.replace(/_/g, ' ');
-}
+export { collaborationReasonLabel };
 
 export function columnIdForStatus(status) {
   const col = CAMPAIGN_KANBAN_COLUMNS.find((c) => c.statuses.includes(status));

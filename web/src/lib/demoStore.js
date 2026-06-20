@@ -1,3 +1,5 @@
+import { MOCK_ENGAGEMENTS_BY_CAMPAIGN, MOCK_ENGAGEMENTS_BY_ID } from '../data/mock.js';
+
 const STORAGE_KEY = 'prpulse-demo-session';
 
 const PERSISTED_ENGAGEMENT_FIELDS = [
@@ -186,23 +188,47 @@ export function getEngagementAdds() {
   return loadStore().engagementAdds ?? [];
 }
 
+/** Contact IDs already on a campaign (mock seed + session adds). */
+export function contactIdsInCampaign(campaignId) {
+  const ids = new Set();
+  for (const row of MOCK_ENGAGEMENTS_BY_CAMPAIGN[campaignId] ?? []) {
+    const contactId = MOCK_ENGAGEMENTS_BY_ID[row.id]?.contact_id;
+    if (contactId != null) ids.add(String(contactId));
+  }
+  for (const added of getEngagementAdds()) {
+    if (added.campaign_id === campaignId && added.contact_id != null) {
+      ids.add(String(added.contact_id));
+    }
+  }
+  return ids;
+}
+
+export function isContactInCampaign(campaignId, contactId) {
+  if (!campaignId || contactId == null) return false;
+  return contactIdsInCampaign(campaignId).has(String(contactId));
+}
+
 export function addEngagementImport({ contactId, contactName, campaignId, campaignName, ownerName }) {
+  if (isContactInCampaign(campaignId, contactId)) {
+    return { added: false, skipped: true, row: null };
+  }
+
   const store = loadStore();
   const row = {
-    id: `eq-${Date.now()}`,
+    id: `eq-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     campaign_id: campaignId,
     contact_id: contactId,
     contact_name: contactName,
     campaign_name: campaignName,
     owner_name: ownerName ?? 'You',
-    conversation_status: 'new',
+    conversation_status: 'not_contacted',
     interest_level: null,
     next_follow_up_date: null,
     agreed_fee: null,
   };
   store.engagementAdds = [...(store.engagementAdds ?? []), row];
   saveStore(store);
-  return row;
+  return { added: true, skipped: false, row };
 }
 
 export function getContactProfileOverride(id) {

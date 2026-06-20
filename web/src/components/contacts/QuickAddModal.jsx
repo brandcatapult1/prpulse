@@ -4,7 +4,8 @@ import { Modal, Toast } from '../ui/Primitives.jsx';
 import { contactsApi, campaignsApi } from '../../lib/api.js';
 import {
   addContactImports,
-  addEngagementImport,
+  importContactsToCampaignDemo,
+  isContactInCampaign,
   getDemoCampaigns,
   getDemoContacts,
 } from '../../lib/demo.js';
@@ -101,16 +102,35 @@ export function QuickAddModal({ open, onClose, onSaved, defaultCampaignId = '' }
     const campaign = campaigns.find((c) => c.id === campaignId);
     if (!campaign) return;
 
+    if (isContactInCampaign(campaignId, contact.id)) {
+      throw new Error(`${contact.full_name} is already on this campaign`);
+    }
+
     try {
-      await campaignsApi.populate(campaignId, { contact_ids: [contact.id] });
-    } catch {
-      addEngagementImport({
-        contactId: contact.id,
-        contactName: contact.full_name,
+      const result = await campaignsApi.populate(campaignId, { contact_ids: [contact.id] });
+      const created = Array.isArray(result) ? result : result?.created ?? [];
+      if (created.length === 0) {
+        const { added } = importContactsToCampaignDemo({
+          campaignId,
+          campaignName: campaign.campaign_name ?? campaign.name,
+          contacts: [contact],
+          ownerName: user?.full_name,
+        });
+        if (added.length === 0) {
+          throw new Error(`${contact.full_name} is already on this campaign`);
+        }
+      }
+    } catch (err) {
+      if (err.message?.includes('already on this campaign')) throw err;
+      const { added } = importContactsToCampaignDemo({
         campaignId,
         campaignName: campaign.campaign_name ?? campaign.name,
+        contacts: [contact],
         ownerName: user?.full_name,
       });
+      if (added.length === 0) {
+        throw new Error(`${contact.full_name} is already on this campaign`);
+      }
     }
   }
 

@@ -10,12 +10,13 @@ import { Pill, healthTone, formatStatus, formatDate, formatFee, statusTone } fro
 import { MODULES } from '../lib/modules.js';
 import { campaignsApi, engagementsApi } from '../lib/api.js';
 import {
-  addEngagementImport,
   getDemoCampaign,
   getDemoContacts,
   getDemoDeliverables,
   getDemoEngagementsForCampaign,
   getDemoEngagement,
+  getContactIdsInCampaign,
+  importContactsToCampaignDemo,
   pickList,
   pickRecord,
   saveDeliverablesOverride,
@@ -426,8 +427,15 @@ function AddCreatorsDrawer({ open, onClose, campaignId, campaignName, onAdded })
   const [adding, setAdding] = useState(false);
   const contacts = getDemoContacts().filter((c) => !c.is_blacklisted && c.status !== 'archived');
 
-  const toggle = (rowId) =>
+  const inCampaignIds = useMemo(
+    () => getContactIdsInCampaign(campaignId),
+    [campaignId, open],
+  );
+
+  const toggle = (rowId) => {
+    if (inCampaignIds.has(String(rowId))) return;
     setSelected((s) => (s.includes(rowId) ? s.filter((x) => x !== rowId) : [...s, rowId]));
+  };
 
   useEffect(() => {
     if (!open) {
@@ -436,27 +444,49 @@ function AddCreatorsDrawer({ open, onClose, campaignId, campaignName, onAdded })
   }, [open]);
 
   async function handleAddToCampaign() {
-    if (selected.length === 0) {
-      setToast('Select at least one creator');
+    const picked = contacts.filter(
+      (c) => selected.includes(c.id) && !inCampaignIds.has(String(c.id)),
+    );
+    if (picked.length === 0) {
+      if (selected.length > 0) {
+        setToast('Selected creators are already on this campaign');
+      } else {
+        setToast('Select at least one creator');
+      }
       return;
     }
+
     setAdding(true);
-    const picked = contacts.filter((c) => selected.includes(c.id));
+    const skippedCount = selected.length - picked.length;
+
     try {
-      await campaignsApi.populate(campaignId, { contact_ids: selected });
-    } catch {
-      for (const c of picked) {
-        addEngagementImport({
-          contactId: c.id,
-          contactName: c.full_name,
+      const result = await campaignsApi.populate(campaignId, {
+        contact_ids: picked.map((c) => c.id),
+      });
+      const created = Array.isArray(result) ? result : result?.created ?? [];
+      if (created.length === 0 && picked.length > 0) {
+        importContactsToCampaignDemo({
           campaignId,
           campaignName,
+          contacts: picked,
           ownerName: user?.full_name,
         });
       }
+    } catch {
+      importContactsToCampaignDemo({
+        campaignId,
+        campaignName,
+        contacts: picked,
+        ownerName: user?.full_name,
+      });
     }
+
     setAdding(false);
-    setToast(`Added ${picked.length} creator${picked.length === 1 ? '' : 's'} to campaign`);
+    let message = `Added ${picked.length} creator${picked.length === 1 ? '' : 's'} to campaign`;
+    if (skippedCount > 0) {
+      message += ` · ${skippedCount} already on campaign`;
+    }
+    setToast(message);
     onAdded?.();
     setSelected([]);
     onClose();
@@ -470,7 +500,9 @@ function AddCreatorsDrawer({ open, onClose, campaignId, campaignName, onAdded })
         onClose={onClose}
         footer={
           <div className="flex items-center justify-between">
-            <span className="text-2xs text-ink-tertiary">{selected.length} selected · blacklisted hidden</span>
+            <span className="text-2xs text-ink-tertiary">
+              {selected.length} selected · blacklisted hidden
+            </span>
             <div className="flex gap-2">
               <button type="button" className="btn-secondary" onClick={() => setQuickOpen(true)}>
                 Quick Add
@@ -493,8 +525,22 @@ function AddCreatorsDrawer({ open, onClose, campaignId, campaignName, onAdded })
           selectable
           selected={selected}
           onSelect={toggle}
+          isRowDisabled={(row) => inCampaignIds.has(String(row.id))}
           columns={[
-            { key: 'full_name', label: 'Name' },
+            {
+              key: 'full_name',
+              label: 'Name',
+              render: (r, { disabled }) => (
+                <div>
+                  <span className={disabled ? 'text-ink-tertiary' : 'font-medium text-ink'}>
+                    {r.full_name}
+                  </span>
+                  {disabled && (
+                    <span className="mt-0.5 block text-2xs text-ink-tertiary">Already on campaign</span>
+                  )}
+                </div>
+              ),
+            },
             { key: 'city', label: 'City' },
             { key: 'classification', label: 'Class', render: (r) => r.classification?.replace('_', ' ') ?? '—' },
           ]}

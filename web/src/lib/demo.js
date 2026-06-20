@@ -131,6 +131,50 @@ export function getDemoEngagement(id) {
   return mergeEngagementRecord({ ...base });
 }
 
+/** Contact IDs with an engagement on this campaign (for populate dedup). */
+export function getContactIdsInCampaign(campaignId) {
+  const ids = new Set();
+  for (const row of getDemoEngagementsForCampaign(campaignId)) {
+    const engagement = getDemoEngagement(row.id);
+    if (engagement?.contact_id != null) ids.add(String(engagement.contact_id));
+  }
+  return ids;
+}
+
+export { isContactInCampaign } from './demoStore.js';
+
+export function partitionContactsForCampaign(campaignId, contacts) {
+  const inCampaign = getContactIdsInCampaign(campaignId);
+  const available = [];
+  const skipped = [];
+  for (const c of contacts) {
+    if (inCampaign.has(String(c.id))) skipped.push(c);
+    else available.push(c);
+  }
+  return { available, skipped };
+}
+
+export function importContactsToCampaignDemo({
+  campaignId,
+  campaignName,
+  contacts,
+  ownerName,
+}) {
+  const { available, skipped } = partitionContactsForCampaign(campaignId, contacts);
+  const added = [];
+  for (const c of available) {
+    const result = addEngagementImport({
+      contactId: c.id,
+      contactName: c.full_name,
+      campaignId,
+      campaignName,
+      ownerName,
+    });
+    if (result.added && result.row) added.push(result.row);
+  }
+  return { added, skipped };
+}
+
 export function getDemoDeliverables(engagementId) {
   return getDeliverablesOverride(engagementId)
     ?? MOCK_DELIVERABLES_BY_ENGAGEMENT[engagementId]

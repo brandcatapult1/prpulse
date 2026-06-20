@@ -69,5 +69,8 @@ campaignsRouter.post('/:id/populate', requireAuth, async (req, res) => {
     return results;
   });
 
-  res.status(201).json(created);
+  const createdIds = new Set(created.map((row) => String(row.contact_id)));
+  const skipped = contact_ids.filter((id) => !createdIds.has(String(id)));
+
+  res.status(201).json({ created, skipped });
 });

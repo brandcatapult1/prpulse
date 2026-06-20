@@ -1,4 +1,12 @@
-export function DataTable({ columns, rows, onRowClick, selectable = false, selected = [], onSelect }) {
+export function DataTable({
+  columns,
+  rows,
+  onRowClick,
+  selectable = false,
+  selected = [],
+  onSelect,
+  isRowDisabled,
+}) {
   if (!rows.length) {
     return (
       <div className="panel px-4 py-10 text-center text-2xs text-ink-secondary">
@@ -21,29 +29,41 @@ export function DataTable({ columns, rows, onRowClick, selectable = false, selec
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {rows.map((row) => {
+            const disabled = isRowDisabled?.(row) ?? false;
+            return (
             <tr
               key={row.id}
-              className="group border-b border-line/80 last:border-0 transition-colors hover:bg-brand-soft/40 cursor-pointer"
-              onClick={() => onRowClick?.(row)}
+              className={`group border-b border-line/80 last:border-0 transition-colors ${
+                disabled
+                  ? 'cursor-not-allowed bg-canvas/40 opacity-60'
+                  : 'cursor-pointer hover:bg-brand-soft/40'
+              }`}
+              onClick={() => {
+                if (!disabled) onRowClick?.(row);
+              }}
             >
               {selectable && (
                 <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
-                    className="rounded border-line text-brand focus:ring-brand/30"
+                    className="rounded border-line text-brand focus:ring-brand/30 disabled:cursor-not-allowed"
                     checked={selected.includes(row.id)}
-                    onChange={() => onSelect?.(row.id)}
+                    disabled={disabled}
+                    onChange={() => {
+                      if (!disabled) onSelect?.(row.id);
+                    }}
                   />
                 </td>
               )}
               {columns.map((col) => (
                 <td key={col.key} className="px-4 py-2.5 text-sm text-ink">
-                  {col.render ? col.render(row) : row[col.key]}
+                  {col.render ? col.render(row, { disabled }) : row[col.key]}
                 </td>
               ))}
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>

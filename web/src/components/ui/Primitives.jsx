@@ -34,14 +34,14 @@ export function Skeleton({ className = 'h-4 w-full' }) {
 export function Toast({ message, tone = 'info', onClose }) {
   const colors =
     tone === 'error'
-      ? 'border-red-200 bg-red-50 text-red-800'
-      : 'border-line bg-white text-ink';
+      ? 'border-red-400/80 bg-red-700 text-white shadow-lg shadow-red-950/30'
+      : 'border-zinc-700 bg-ink text-white shadow-lg shadow-ink/30';
   return (
     <div className={`fixed bottom-4 right-4 z-50 max-w-sm rounded-lg border px-4 py-3 text-sm ${colors}`}>
       <div className="flex items-start justify-between gap-3">
         <span>{message}</span>
         {onClose && (
-          <button type="button" onClick={onClose} className="text-ink-tertiary hover:text-ink">
+          <button type="button" onClick={onClose} className="text-white/70 hover:text-white">
             ×
           </button>
         )}

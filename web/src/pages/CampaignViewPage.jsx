@@ -400,13 +400,13 @@ export function CampaignViewPage() {
       />
 
       {toast && (
-        <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-lg border border-line bg-white px-4 py-3 text-sm shadow-lg">
+        <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-lg border border-zinc-700 bg-ink px-4 py-3 text-sm text-white shadow-lg shadow-ink/30">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-ink">{toast.message}</span>
+            <span>{toast.message}</span>
             {toast.onUndo && (
               <button
                 type="button"
-                className="shrink-0 text-2xs font-medium text-brand hover:underline"
+                className="shrink-0 text-2xs font-medium text-white/90 underline-offset-2 hover:underline"
                 onClick={toast.onUndo}
               >
                 Undo

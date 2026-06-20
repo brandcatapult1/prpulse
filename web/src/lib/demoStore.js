@@ -12,6 +12,8 @@ const PERSISTED_ENGAGEMENT_FIELDS = [
   'notes',
   'agreed_fee',
   'primary_collaboration_reason',
+  'no_reply_count',
+  'last_contact_log_type',
 ];
 
 function loadStore() {

@@ -1,7 +1,7 @@
 import { CAMPAIGN_KANBAN_COLUMNS, groupEngagementsByColumn } from '../../lib/campaignKanban.js';
 import { CreatorKanbanCard } from './CreatorKanbanCard.jsx';
 
-export function CampaignKanbanBoard({ engagements, onCardClick }) {
+export function CampaignKanbanBoard({ engagements, onCardClick, onApplyLogging }) {
   const grouped = groupEngagementsByColumn(engagements);
 
   return (
@@ -26,6 +26,9 @@ export function CampaignKanbanBoard({ engagements, onCardClick }) {
                     key={engagement.id}
                     engagement={engagement}
                     onClick={() => onCardClick?.(engagement)}
+                    onApplyLogging={(patch, message, snapshotKeys) =>
+                      onApplyLogging?.(engagement.id, patch, message, snapshotKeys)
+                    }
                   />
                 ))
               )}

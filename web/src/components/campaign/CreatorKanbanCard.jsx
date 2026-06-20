@@ -10,6 +10,7 @@ import {
   isFollowUpOverdue,
   regionLabel,
 } from '../../lib/campaignKanban.js';
+import { InConversationCardLogging } from './InConversationCardLogging.jsx';
 
 function InterestDot({ level }) {
   const title = level ? `${level} interest` : 'Interest not set';
@@ -67,15 +68,6 @@ function StatusLine({ engagement, columnId }) {
     );
   }
 
-  if (columnId === 'scheduled') {
-    const visitDate = engagement.visit_date ?? engagement.next_follow_up_date;
-    return (
-      <p className="text-2xs text-ink-secondary">
-        Visit {visitDate ? formatDate(visitDate) : '—'}
-      </p>
-    );
-  }
-
   if (columnId === 'awaiting_final') {
     const { posted, total, pct } = deliverableProgress(engagement.id);
     if (total === 0) {
@@ -111,10 +103,12 @@ function StatusLine({ engagement, columnId }) {
 
 /**
  * Glanceable creator summary for the campaign Kanban board.
- * Tap opens CampaignQuickEditDrawer for status + reason updates.
+ * Card body opens quick-edit drawer; In conversation cards add inline logging on hover.
  */
-export function CreatorKanbanCard({ engagement, onClick }) {
+export function CreatorKanbanCard({ engagement, onClick, onApplyLogging }) {
   const columnId = columnIdForStatus(engagement.conversation_status);
+  const showLogging =
+    columnId === 'in_conversation' && engagement.conversation_status === 'in_conversation';
   const owner = engagement.owner_name?.split(' ')[0] ?? '—';
   const contentType = contentTypeSummary(engagement.id);
   const region = regionLabel(engagement);
@@ -122,39 +116,42 @@ export function CreatorKanbanCard({ engagement, onClick }) {
   const footerParts = [owner, reason ?? 'Reason not set', contentType, region].filter(Boolean);
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="campaign-kanban-card w-full text-left"
-    >
-      {/* Zone 1 — Identity */}
-      <div className="flex items-start gap-2.5">
-        <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-2xs font-semibold text-brand"
-          aria-hidden
-        >
-          {contactInitials(engagement.contact_name)}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="truncate text-sm font-medium leading-tight text-ink">
-              {engagement.contact_name}
-            </span>
-            <InterestDot level={engagement.interest_level} />
+    <div className="group/card campaign-kanban-card w-full text-left">
+      <button
+        type="button"
+        onClick={onClick}
+        className="w-full text-left"
+      >
+        <div className="flex items-start gap-2.5">
+          <div
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-2xs font-semibold text-brand"
+            aria-hidden
+          >
+            {contactInitials(engagement.contact_name)}
           </div>
-          <p className="truncate text-2xs text-ink-tertiary">{contactHandle(engagement)}</p>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="truncate text-sm font-medium leading-tight text-ink">
+                {engagement.contact_name}
+              </span>
+              <InterestDot level={engagement.interest_level} />
+            </div>
+            <p className="truncate text-2xs text-ink-tertiary">{contactHandle(engagement)}</p>
+          </div>
         </div>
-      </div>
 
-      {/* Zone 2 — Column-aware status */}
-      <div className="mt-2.5 min-h-[1.25rem]">
-        <StatusLine engagement={engagement} columnId={columnId} />
-      </div>
+        <div className="mt-2.5 min-h-[1.25rem]">
+          <StatusLine engagement={engagement} columnId={columnId} />
+        </div>
 
-      {/* Zone 3 — Quiet metadata footer (includes collab reason per PRD) */}
-      <p className="mt-2.5 truncate text-[11px] leading-snug text-ink-tertiary">
-        {footerParts.join(' · ')}
-      </p>
-    </button>
+        <p className="mt-2.5 truncate text-[11px] leading-snug text-ink-tertiary">
+          {footerParts.join(' · ')}
+        </p>
+      </button>
+
+      {showLogging && onApplyLogging && (
+        <InConversationCardLogging engagement={engagement} onApply={onApplyLogging} />
+      )}
+    </div>
   );
 }

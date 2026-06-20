@@ -422,6 +422,8 @@ export const MOCK_ENGAGEMENTS_BY_ID = {
     next_follow_up_date: '2026-06-24',
     agreed_fee: null,
     primary_collaboration_reason: 'virality',
+    no_reply_count: 0,
+    last_contact_log_type: null,
     notes: 'Interested in barter for launch week. Follow up after menu tasting.',
   },
   e2: {

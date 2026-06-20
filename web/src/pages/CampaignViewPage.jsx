@@ -20,6 +20,10 @@ import {
 } from '../lib/demo.js';
 import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import {
+  getEngagementOverride,
+  saveEngagementOverride,
+} from '../lib/demoStore.js';
 
 export function CampaignViewPage() {
   const { id } = useParams();
@@ -32,6 +36,7 @@ export function CampaignViewPage() {
   const [activeFilters, setActiveFilters] = useState([]);
   const [viewMode, setViewMode] = useState('board');
   const [quickEditId, setQuickEditId] = useState(null);
+  const [toast, setToast] = useState(null);
 
   function reloadEngagements() {
     setEngagements(getDemoEngagementsForCampaign(id));
@@ -71,9 +76,32 @@ export function CampaignViewPage() {
       filteredEngagements.map((row) => ({
         ...getDemoEngagement(row.id),
         ...row,
+        ...getEngagementOverride(row.id),
       })),
     [filteredEngagements],
   );
+
+  function applyEngagementLogging(engagementId, patch, message, snapshotKeys) {
+    const base = {
+      ...getDemoEngagement(engagementId),
+      ...getEngagementOverride(engagementId),
+    };
+    const snapshot = {};
+    for (const key of snapshotKeys) {
+      snapshot[key] = base[key];
+    }
+    saveEngagementOverride(engagementId, patch);
+    reloadEngagements();
+    setToast({
+      message,
+      onUndo: () => {
+        saveEngagementOverride(engagementId, snapshot);
+        reloadEngagements();
+        setToast(null);
+      },
+    });
+    window.setTimeout(() => setToast((t) => (t?.message === message ? null : t)), 8000);
+  }
 
   const columns = [
     {
@@ -171,6 +199,7 @@ export function CampaignViewPage() {
         <CampaignKanbanBoard
           engagements={boardEngagements}
           onCardClick={(row) => setQuickEditId(row.id)}
+          onApplyLogging={applyEngagementLogging}
         />
       ) : (
         <DataTable
@@ -194,6 +223,23 @@ export function CampaignViewPage() {
         onClose={() => setAddOpen(false)}
         onAdded={reloadEngagements}
       />
+
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-50 max-w-sm rounded-lg border border-line bg-white px-4 py-3 text-sm shadow-lg">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-ink">{toast.message}</span>
+            {toast.onUndo && (
+              <button
+                type="button"
+                className="shrink-0 text-2xs font-medium text-brand hover:underline"
+                onClick={toast.onUndo}
+              >
+                Undo
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

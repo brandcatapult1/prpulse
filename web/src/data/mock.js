@@ -603,6 +603,10 @@ export const MOCK_DELIVERABLES_BY_ENGAGEMENT = {
   e7: [
     { id: 'd7', deliverable_type: 'reel', quantity: 1, due_date: '2026-05-20', status: 'posted', is_overdue: false },
   ],
+  e3: [
+    { id: 'd8', deliverable_type: 'reel', quantity: 1, due_date: '2026-06-25', status: 'pending', is_overdue: false },
+    { id: 'd9', deliverable_type: 'story', quantity: 2, due_date: '2026-06-27', status: 'pending', is_overdue: false },
+  ],
 };
 
 /** @deprecated */

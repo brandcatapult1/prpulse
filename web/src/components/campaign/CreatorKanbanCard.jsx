@@ -8,9 +8,11 @@ import {
   deliverableProgress,
   droppedReasonLabel,
   isFollowUpOverdue,
+  isVisitOverdue,
   regionLabel,
 } from '../../lib/campaignKanban.js';
 import { InConversationCardLogging } from './InConversationCardLogging.jsx';
+import { ScheduledCardLogging } from './ScheduledCardLogging.jsx';
 
 function InterestDot({ level }) {
   const title = level ? `${level} interest` : 'Interest not set';
@@ -61,10 +63,18 @@ function StatusLine({ engagement, columnId }) {
 
   if (columnId === 'scheduled') {
     const visitDate = engagement.visit_date ?? engagement.next_follow_up_date;
+    const overdue = isVisitOverdue(engagement);
     return (
-      <p className="text-2xs text-ink-secondary">
-        Visit {visitDate ? formatDate(visitDate) : '—'}
-      </p>
+      <div className="space-y-1">
+        {overdue && (
+          <span className="inline-flex rounded px-1.5 py-0.5 text-2xs font-medium text-health-red ring-1 ring-red-200">
+            Visit overdue
+          </span>
+        )}
+        <p className={`text-2xs ${overdue ? 'font-medium text-health-red' : 'text-ink-secondary'}`}>
+          Visit {visitDate ? formatDate(visitDate) : '—'}
+        </p>
+      </div>
     );
   }
 
@@ -105,10 +115,12 @@ function StatusLine({ engagement, columnId }) {
  * Glanceable creator summary for the campaign Kanban board.
  * Card body opens quick-edit drawer; In conversation cards add inline logging on hover.
  */
-export function CreatorKanbanCard({ engagement, onClick, onApplyLogging }) {
+export function CreatorKanbanCard({ engagement, onClick, onApplyLogging, onLoggingError }) {
   const columnId = columnIdForStatus(engagement.conversation_status);
-  const showLogging =
+  const showInConversationLogging =
     columnId === 'in_conversation' && engagement.conversation_status === 'in_conversation';
+  const showScheduledLogging =
+    columnId === 'scheduled' && engagement.conversation_status === 'scheduled';
   const owner = engagement.owner_name?.split(' ')[0] ?? '—';
   const contentType = contentTypeSummary(engagement.id);
   const region = regionLabel(engagement);
@@ -149,8 +161,16 @@ export function CreatorKanbanCard({ engagement, onClick, onApplyLogging }) {
         </p>
       </button>
 
-      {showLogging && onApplyLogging && (
+      {showInConversationLogging && onApplyLogging && (
         <InConversationCardLogging engagement={engagement} onApply={onApplyLogging} />
+      )}
+
+      {showScheduledLogging && onApplyLogging && (
+        <ScheduledCardLogging
+          engagement={engagement}
+          onApply={onApplyLogging}
+          onError={onLoggingError}
+        />
       )}
     </div>
   );

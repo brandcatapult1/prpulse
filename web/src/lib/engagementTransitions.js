@@ -4,6 +4,7 @@ import { sideEffectsOnStatusChange } from './engagementRules.js';
 /** Shared stage targets for drag-and-drop and inline card flows. */
 export const STAGE = {
   SCHEDULED: 'Scheduled',
+  AWAITING_FINAL_DELIVERABLES: 'AwaitingFinalDeliverables',
   DROPPED: 'Dropped',
   COMPLETE: 'Complete',
   NO_RESPONSE: 'No Response',
@@ -38,6 +39,35 @@ export function transitionStage(engagement, target, payload = {}) {
         conversation_status: 'scheduled',
         visit_date: payload.visitDate,
         next_follow_up_date: payload.visitDate,
+      },
+    };
+  }
+
+  if (
+    normalized === STAGE.AWAITING_FINAL_DELIVERABLES
+    || normalized === 'awaiting_final_deliverables'
+    || normalized === 'Awaiting Final Deliverables'
+  ) {
+    const visitCompletedDate =
+      payload.visitCompletedDate ?? engagement.visit_date ?? engagement.next_follow_up_date;
+    if (!visitCompletedDate) {
+      return { ok: false, error: 'Visit date required' };
+    }
+    const dels = getDemoDeliverables(engagement.id);
+    if (dels.length === 0) {
+      return { ok: false, error: 'Add deliverables before logging visit complete' };
+    }
+    const nextFollowUp =
+      dels
+        .map((d) => d.due_date)
+        .filter(Boolean)
+        .sort()[0] ?? visitCompletedDate;
+    return {
+      ok: true,
+      patch: {
+        conversation_status: 'awaiting_final_deliverables',
+        visit_completed_date: visitCompletedDate,
+        next_follow_up_date: nextFollowUp,
       },
     };
   }

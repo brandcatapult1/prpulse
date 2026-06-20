@@ -200,6 +200,10 @@ export function CampaignViewPage() {
           engagements={boardEngagements}
           onCardClick={(row) => setQuickEditId(row.id)}
           onApplyLogging={applyEngagementLogging}
+          onLoggingError={(message) => {
+            setToast({ message, onUndo: null });
+            window.setTimeout(() => setToast((t) => (t?.message === message ? null : t)), 5000);
+          }}
         />
       ) : (
         <DataTable

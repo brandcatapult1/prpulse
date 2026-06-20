@@ -106,6 +106,14 @@ export function isFollowUpOverdue(date) {
   return date < todayIso();
 }
 
+/** Scheduled visit past due with no outcome logged — sub-status only, never moves the card. */
+export function isVisitOverdue(engagement) {
+  if (engagement.conversation_status !== 'scheduled') return false;
+  const visitDate = engagement.visit_date ?? engagement.next_follow_up_date;
+  if (!visitDate) return false;
+  return visitDate < todayIso();
+}
+
 export function regionLabel(engagement) {
   const contact = engagement.contact_id ? getDemoContact(engagement.contact_id) : null;
   return contact?.city ?? null;

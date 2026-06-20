@@ -14,6 +14,7 @@ const PERSISTED_ENGAGEMENT_FIELDS = [
   'primary_collaboration_reason',
   'no_reply_count',
   'last_contact_log_type',
+  'visit_completed_date',
 ];
 
 function loadStore() {

@@ -1,0 +1,113 @@
+import {
+  contactsApi,
+  engagementsApi,
+  campaignsApi,
+  dashboardApi,
+  reportsApi,
+} from './api.js';
+
+/** Patch engagement fields; returns updated row from server. */
+export async function patchEngagement(id, patch) {
+  return engagementsApi.update(id, patch);
+}
+
+export async function fetchEngagementsForCampaign(campaignId) {
+  return engagementsApi.byCampaign(campaignId);
+}
+
+export async function fetchEngagement(id) {
+  return engagementsApi.get(id);
+}
+
+export async function fetchDeliverables(engagementId) {
+  return engagementsApi.deliverables(engagementId);
+}
+
+export async function createDeliverable(engagementId, body) {
+  return engagementsApi.createDeliverable(engagementId, body);
+}
+
+export async function updateDeliverable(engagementId, deliverableId, body) {
+  return engagementsApi.updateDeliverable(engagementId, deliverableId, body);
+}
+
+export async function deleteDeliverable(engagementId, deliverableId) {
+  return engagementsApi.deleteDeliverable(engagementId, deliverableId);
+}
+
+/** Replace full deliverable list via diff (create/update/delete). */
+export async function syncDeliverables(engagementId, beforeList, afterList) {
+  const beforeIds = new Set(beforeList.map((d) => d.id));
+  const afterIds = new Set(afterList.map((d) => d.id));
+
+  for (const item of beforeList) {
+    if (!afterIds.has(item.id)) {
+      await deleteDeliverable(engagementId, item.id);
+    }
+  }
+
+  const results = [];
+  for (const item of afterList) {
+    const isNew = !beforeIds.has(item.id) || String(item.id).startsWith('d-');
+    if (isNew) {
+      const { id: _omit, ...body } = item;
+      const created = await createDeliverable(engagementId, body);
+      results.push(created);
+    } else {
+      const updated = await updateDeliverable(engagementId, item.id, item);
+      results.push(updated);
+    }
+  }
+  return results;
+}
+
+export async function saveFeedback(engagementId, record) {
+  return engagementsApi.saveFeedback(engagementId, record);
+}
+
+export async function fetchFeedback(engagementId) {
+  return engagementsApi.feedback(engagementId);
+}
+
+export async function patchContact(id, patch) {
+  return contactsApi.update(id, patch);
+}
+
+export async function blacklistContact(contactId, reason) {
+  return contactsApi.blacklist(contactId, reason);
+}
+
+export async function clearBlacklist(contactId) {
+  return contactsApi.clearBlacklist(contactId);
+}
+
+export async function populateCampaign(campaignId, contactIds, assignedManager) {
+  return campaignsApi.populate(campaignId, {
+    contact_ids: contactIds,
+    assigned_manager: assignedManager,
+  });
+}
+
+export async function fetchPopulationContacts(campaignId) {
+  return contactsApi.populationForCampaign(campaignId);
+}
+
+export async function fetchDashboardWorkspace() {
+  return dashboardApi.workspace();
+}
+
+export async function logVisitReminder(engagementId, details) {
+  return engagementsApi.visitReminder(engagementId, details);
+}
+
+export async function fetchCampaignReport(campaignId, period) {
+  return reportsApi.campaign(campaignId, period);
+}
+
+export async function fetchReportPeriods() {
+  return reportsApi.periods();
+}
+
+export async function fetchEngagementTimeline(engagementId) {
+  return engagementsApi.timeline(engagementId);
+}

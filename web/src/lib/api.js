@@ -22,14 +22,21 @@ export const authApi = {
 
 export const dashboardApi = {
   get: () => api('/dashboard'),
+  workspace: () => api('/dashboard/workspace'),
 };
 
 export const contactsApi = {
   list: () => api('/contacts'),
   get: (id) => api(`/contacts/${id}`),
+  update: (id, body) => api(`/contacts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   quickAdd: (body) => api('/contacts/quick-add', { method: 'POST', body: JSON.stringify(body) }),
   lookupMobile: (mobile) =>
     api(`/contacts/lookup/mobile/${encodeURIComponent(mobile)}`),
+  populationForCampaign: (campaignId) =>
+    api(`/contacts/population/campaign/${campaignId}`),
+  blacklist: (id, reason) =>
+    api(`/contacts/${id}/blacklist`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  clearBlacklist: (id) => api(`/contacts/${id}/blacklist`, { method: 'DELETE' }),
 };
 
 export const campaignsApi = {
@@ -41,9 +48,25 @@ export const campaignsApi = {
 
 export const engagementsApi = {
   byCampaign: (campaignId) => api(`/engagements/campaign/${campaignId}`),
+  assignedToMe: () => api('/engagements/assigned/me'),
   get: (id) => api(`/engagements/${id}`),
   update: (id, body) => api(`/engagements/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deliverables: (id) => api(`/engagements/${id}/deliverables`),
+  createDeliverable: (id, body) =>
+    api(`/engagements/${id}/deliverables`, { method: 'POST', body: JSON.stringify(body) }),
+  updateDeliverable: (engagementId, deliverableId, body) =>
+    api(`/engagements/${engagementId}/deliverables/${deliverableId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  deleteDeliverable: (engagementId, deliverableId) =>
+    api(`/engagements/${engagementId}/deliverables/${deliverableId}`, { method: 'DELETE' }),
+  feedback: (id) => api(`/engagements/${id}/feedback`),
+  saveFeedback: (id, body) =>
+    api(`/engagements/${id}/feedback`, { method: 'PUT', body: JSON.stringify(body) }),
+  timeline: (id) => api(`/engagements/${id}/timeline`),
+  visitReminder: (id, body) =>
+    api(`/engagements/${id}/visit-reminder`, { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export const registrationsApi = {
@@ -78,4 +101,10 @@ export const adminApi = {
 export const orgBrandingApi = {
   get: () => api('/org/branding'),
   update: (body) => api('/admin/org-branding', { method: 'PATCH', body: JSON.stringify(body) }),
+};
+
+export const reportsApi = {
+  campaign: (campaignId, period) =>
+    api(`/reports/campaign/${campaignId}?period=${encodeURIComponent(period)}`),
+  periods: () => api('/reports/periods'),
 };

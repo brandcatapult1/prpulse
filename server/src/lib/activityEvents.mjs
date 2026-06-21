@@ -69,6 +69,7 @@ const ACTION_LABELS = {
   [ACTIVITY_ACTION.BLACKLIST_SET]: 'Contact blacklisted',
   [ACTIVITY_ACTION.BLACKLIST_CLEARED]: 'Blacklist cleared',
   [ACTIVITY_ACTION.FEEDBACK_LOGGED]: 'Feedback logged',
+  visit_reminded: 'Visit reminder sent',
 };
 
 export function activityRowToTimelineEntry(row) {

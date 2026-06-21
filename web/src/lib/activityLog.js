@@ -283,6 +283,8 @@ function activityNotes(event) {
       return 'Contact removed from blacklist';
     case ACTIVITY_ACTION.FEEDBACK_LOGGED:
       return `★${details.rating} · ${details.wouldWorkAgain ? 'Would work again' : 'Would not repeat'}`;
+    case ACTIVITY_ACTION.VISIT_REMINDED:
+      return details.venue ? `${formatDate(details.visitDate)} · ${details.venue}` : formatDate(details.visitDate);
     default:
       return null;
   }
@@ -300,6 +302,7 @@ const ACTION_LABELS = {
   [ACTIVITY_ACTION.BLACKLIST_SET]: 'Contact blacklisted',
   [ACTIVITY_ACTION.BLACKLIST_CLEARED]: 'Blacklist cleared',
   [ACTIVITY_ACTION.FEEDBACK_LOGGED]: 'Feedback logged',
+  [ACTIVITY_ACTION.VISIT_REMINDED]: 'Visit reminder sent',
 };
 
 /** Map an ActivityEvent to the engagement timeline modal shape. */

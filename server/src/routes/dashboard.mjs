@@ -1,12 +1,17 @@
 import { Router } from 'express';
 import { pool } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
+import { loadDeliverablesForEngagement } from '../lib/deliverableRows.mjs';
 
 export const dashboardRouter = Router();
 
+function todayIst() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+}
+
 dashboardRouter.get('/', requireAuth, async (req, res) => {
   const userId = req.user.id;
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  const today = todayIst();
 
   const [followUps, overdue, campaigns] = await Promise.all([
     pool.query(
@@ -46,5 +51,49 @@ dashboardRouter.get('/', requireAuth, async (req, res) => {
     follow_ups_due: followUps.rows,
     overdue_deliverables: overdue.rows,
     active_campaigns: campaigns.rows,
+  });
+});
+
+/** Full workspace payload for the AM dashboard (engagements + campaigns + deliverables). */
+dashboardRouter.get('/workspace', requireAuth, async (req, res) => {
+  const userId = req.user.id;
+
+  const [engagementsRes, campaignsRes] = await Promise.all([
+    pool.query(
+      `SELECT e.*, c.full_name AS contact_name, u.full_name AS owner_name,
+              cam.campaign_name, cam.status AS campaign_status
+       FROM engagements e
+       JOIN contacts c ON c.id = e.contact_id
+       JOIN users u ON u.id = e.assigned_manager
+       JOIN campaigns cam ON cam.id = e.campaign_id
+       WHERE e.assigned_manager = $1 AND cam.status <> 'archived'
+       ORDER BY e.updated_at DESC`,
+      [userId],
+    ),
+    pool.query(
+      `SELECT cam.*, b.brand_name
+       FROM campaigns cam
+       JOIN brands b ON b.id = cam.brand_id
+       WHERE cam.status = 'active'
+       ORDER BY cam.updated_at DESC`,
+    ),
+  ]);
+
+  const engagements = engagementsRes.rows;
+  const deliverablesByEngagement = {};
+
+  const client = await pool.connect();
+  try {
+    for (const eng of engagements) {
+      deliverablesByEngagement[eng.id] = await loadDeliverablesForEngagement(client, eng.id);
+    }
+  } finally {
+    client.release();
+  }
+
+  res.json({
+    engagements,
+    campaigns: campaignsRes.rows,
+    deliverablesByEngagement,
   });
 });

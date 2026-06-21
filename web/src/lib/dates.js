@@ -3,6 +3,11 @@ export function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** Today as YYYY-MM-DD in IST (Asia/Kolkata). */
+export function todayIstIso() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+}
+
 /** Today + N days as YYYY-MM-DD (local calendar). */
 export function addDaysIso(days) {
   const d = new Date();

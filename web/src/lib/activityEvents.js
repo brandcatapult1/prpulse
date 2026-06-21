@@ -11,4 +11,5 @@ export const ACTIVITY_ACTION = {
   BLACKLIST_SET: 'blacklist_set',
   BLACKLIST_CLEARED: 'blacklist_cleared',
   FEEDBACK_LOGGED: 'feedback_logged',
+  VISIT_REMINDED: 'visit_reminded',
 };

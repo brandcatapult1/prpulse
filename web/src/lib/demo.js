@@ -131,6 +131,20 @@ export function getDemoEngagement(id) {
   return mergeEngagementRecord({ ...base });
 }
 
+/** All engagements across campaigns (deduped by id). */
+export function getAllDemoEngagements() {
+  const seen = new Set();
+  const rows = [];
+  for (const campaign of getDemoCampaigns()) {
+    for (const row of getDemoEngagementsForCampaign(campaign.id)) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      rows.push(getDemoEngagement(row.id));
+    }
+  }
+  return rows;
+}
+
 /** Contact IDs with an engagement on this campaign (for populate dedup). */
 export function getContactIdsInCampaign(campaignId) {
   const ids = new Set();

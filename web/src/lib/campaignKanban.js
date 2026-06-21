@@ -1,7 +1,7 @@
-import { getDemoContact, getDemoDeliverables } from './demo.js';
-import { deliverableHasProof } from './deliverableLogging.js';
-import { getContactProfileExtras } from './contactProfile.js';
 import { collaborationReasonLabel } from './collaborationReasons.js';
+import { deliverableHasProof } from './deliverableLogging.js';
+import { getCachedContact } from './contactsCache.js';
+import { getDeliverablesForEngagement } from './deliverablesCache.js';
 import { addDaysToIsoDate, todayIso } from './dates.js';
 
 /** PRD Module 5 conversation statuses — one Kanban column per parent stage. */
@@ -77,8 +77,8 @@ export function contactInitials(name) {
 }
 
 export function contactHandle(engagement) {
-  const contact = engagement.contact_id ? getDemoContact(engagement.contact_id) : null;
-  const ig = contact ? getContactProfileExtras(contact.id).instagram_url : null;
+  const contact = engagement.contact_id ? getCachedContact(engagement.contact_id) : null;
+  const ig = contact?.instagram_url ?? null;
   if (ig) {
     const match = ig.match(/instagram\.com\/([^/?]+)/i);
     if (match) return `@${match[1]}`;
@@ -91,14 +91,14 @@ export function contactHandle(engagement) {
 }
 
 export function contentTypeSummary(engagementId) {
-  const dels = getDemoDeliverables(engagementId);
+  const dels = getDeliverablesForEngagement(engagementId);
   if (!dels.length) return null;
   const types = [...new Set(dels.map((d) => d.deliverable_type))];
   return types.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join(' + ');
 }
 
 export function deliverableProgress(engagementId) {
-  const dels = getDemoDeliverables(engagementId);
+  const dels = getDeliverablesForEngagement(engagementId);
   const total = dels.length;
   const posted = dels.filter((d) => d.status === 'posted').length;
   return { posted, total, pct: total ? Math.round((posted / total) * 100) : 0 };
@@ -132,8 +132,8 @@ export function isVisitOverdue(engagement) {
 }
 
 export function regionLabel(engagement) {
-  const contact = engagement.contact_id ? getDemoContact(engagement.contact_id) : null;
-  return contact?.city ?? null;
+  const contact = engagement.contact_id ? getCachedContact(engagement.contact_id) : null;
+  return contact?.city ?? engagement.city ?? null;
 }
 
 /** Display-only commercial tag for board cards — not operationally gated. */
@@ -149,7 +149,7 @@ export function commercialTypeLabel(engagement) {
 }
 
 export function deliverableProofSummary(engagementId) {
-  const dels = getDemoDeliverables(engagementId).filter(
+  const dels = getDeliverablesForEngagement(engagementId).filter(
     (d) => d.status === 'posted' && deliverableHasProof(d),
   );
   return dels.map((d) => ({

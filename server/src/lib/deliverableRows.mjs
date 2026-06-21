@@ -1,0 +1,86 @@
+import { deliverableTypeFromDb, deliverableTypeToDb } from './deliverableTypes.mjs';
+
+export function mapDeliverableRow(row, screenshots = []) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    engagement_id: row.engagement_id,
+    deliverable_type: deliverableTypeFromDb(row.deliverable_type),
+    quantity: row.quantity,
+    due_date: row.due_date,
+    status: row.status,
+    published_date: row.published_date,
+    content_link: row.content_link,
+    brief_compliance: row.brief_compliance,
+    brand_tag_verified: row.brand_tag_verified,
+    internal_rating: row.internal_rating,
+    is_overdue: row.is_overdue ?? false,
+    screenshots,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+export async function loadScreenshotsForDeliverables(client, deliverableIds) {
+  if (!deliverableIds.length) return new Map();
+  const { rows } = await client.query(
+    `SELECT id, deliverable_id, label, url, file_path
+     FROM assets
+     WHERE deliverable_id = ANY($1::uuid[])
+       AND asset_type = 'screenshot'
+     ORDER BY created_at`,
+    [deliverableIds],
+  );
+  const byDeliverable = new Map();
+  for (const asset of rows) {
+    const list = byDeliverable.get(asset.deliverable_id) ?? [];
+    list.push({
+      id: asset.id,
+      label: asset.label ?? 'Screenshot',
+      url: asset.url ?? asset.file_path ?? null,
+    });
+    byDeliverable.set(asset.deliverable_id, list);
+  }
+  return byDeliverable;
+}
+
+export async function loadDeliverablesForEngagement(client, engagementId) {
+  const { rows } = await client.query(
+    'SELECT * FROM v_deliverables WHERE engagement_id = $1 ORDER BY created_at',
+    [engagementId],
+  );
+  const ids = rows.map((r) => r.id);
+  const screenshotsById = await loadScreenshotsForDeliverables(client, ids);
+  return rows.map((row) => mapDeliverableRow(row, screenshotsById.get(row.id) ?? []));
+}
+
+export async function syncDeliverableScreenshots(client, deliverableId, screenshots, userId) {
+  await client.query('DELETE FROM assets WHERE deliverable_id = $1 AND asset_type = $2', [
+    deliverableId,
+    'screenshot',
+  ]);
+  for (const shot of screenshots ?? []) {
+    const url = shot.url ?? shot.file_path ?? null;
+    const filePath = shot.file_path ?? null;
+    if (!url && !filePath) continue;
+    await client.query(
+      `INSERT INTO assets (asset_type, label, url, file_path, deliverable_id, uploaded_by)
+       VALUES ('screenshot', $1, $2, $3, $4, $5)`,
+      [shot.label ?? 'Screenshot', url, filePath, deliverableId, userId ?? null],
+    );
+  }
+}
+
+export function deliverableInsertFields(body) {
+  return {
+    deliverable_type: deliverableTypeToDb(body.deliverable_type),
+    quantity: body.quantity ?? 1,
+    due_date: body.due_date ?? null,
+    status: body.status ?? 'pending',
+    published_date: body.published_date ?? null,
+    content_link: body.content_link ?? null,
+    brief_compliance: body.brief_compliance ?? null,
+    brand_tag_verified: body.brand_tag_verified ?? null,
+    internal_rating: body.internal_rating ?? null,
+  };
+}

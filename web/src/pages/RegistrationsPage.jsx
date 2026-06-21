@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../components/ui/DataKit.jsx';
 import { ConfirmDialog, Drawer, EmptyState, Modal, Toast } from '../components/ui/Primitives.jsx';
-import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { Pill, formatDate } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
-import { registrationsApi } from '../lib/api.js';
-import { MOCK_CONTACTS } from '../data/mock.js';
-import { getDemoRegistrations, mergeRegistrations, saveRegistrationOverride } from '../lib/demo.js';
+import { contactsApi, registrationsApi } from '../lib/api.js';
 import { findContactByMobile } from '../lib/phone.js';
 import { formatCategories } from '../lib/creatorCategories.js';
 import { todayIso } from '../lib/dates.js';
@@ -23,24 +20,27 @@ const FILTERS = [
 ];
 
 export function RegistrationsPage() {
-  const [rows, setRows] = useState(() => getDemoRegistrations());
-  const [demo, setDemo] = useState(true);
+  const [rows, setRows] = useState([]);
+  const [contacts, setContacts] = useState([]);
+  const [loadError, setLoadError] = useState(null);
   const [filter, setFilter] = useState('pending');
   const [selected, setSelected] = useState(null);
   const [approveChoice, setApproveChoice] = useState(null);
   const [toast, setToast] = useState(null);
 
   const load = useCallback(() => {
-    registrationsApi
-      .list()
-      .then((data) => {
-        const { rows: merged, _demo } = mergeRegistrations(data);
-        setRows(merged);
-        setDemo(_demo);
+    Promise.all([
+      registrationsApi.list(),
+      contactsApi.list().catch(() => []),
+    ])
+      .then(([regs, contactRows]) => {
+        setRows(Array.isArray(regs) ? regs : []);
+        setContacts(Array.isArray(contactRows) ? contactRows : []);
+        setLoadError(null);
       })
-      .catch(() => {
-        setRows(getDemoRegistrations());
-        setDemo(true);
+      .catch((err) => {
+        setRows([]);
+        setLoadError(err.message ?? 'Could not load registrations');
       });
   }, []);
 
@@ -61,7 +61,7 @@ export function RegistrationsPage() {
       render: (r) => (
         <div>
           <span className="font-medium text-ink">{r.full_name}</span>
-          {findContactByMobile(r.mobile_number, MOCK_CONTACTS) && PENDING_STATUSES.has(r.status) && (
+          {findContactByMobile(r.mobile_number, contacts) && PENDING_STATUSES.has(r.status) && (
             <span className="ml-2 text-2xs text-health-amber">Possible duplicate</span>
           )}
         </div>
@@ -83,16 +83,14 @@ export function RegistrationsPage() {
 
   const applyAction = async (id, patch, message) => {
     try {
-      await registrationsApi.update(id, patch);
-    } catch {
-      saveRegistrationOverride(id, { ...patch, reviewed_at: todayIso() });
+      const updated = await registrationsApi.update(id, patch);
+      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...updated } : r)));
+      setToast(message);
+      setSelected(null);
+      setApproveChoice(null);
+    } catch (err) {
+      setToast(err.message ?? 'Action failed');
     }
-    setRows((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, ...patch, reviewed_at: patch.reviewed_at ?? todayIso() } : r)),
-    );
-    setSelected(null);
-    setApproveChoice(null);
-    setToast(message);
   };
 
   const handleApprove = (registration, linkToContactId = null) => {
@@ -126,7 +124,7 @@ export function RegistrationsPage() {
   };
 
   const onApproveClick = (registration) => {
-    const match = findContactByMobile(registration.mobile_number, MOCK_CONTACTS);
+    const match = findContactByMobile(registration.mobile_number, contacts);
     if (match) {
       setApproveChoice({ registration, match });
     } else {
@@ -146,7 +144,9 @@ export function RegistrationsPage() {
         }
       />
 
-      <DemoBanner show={demo} />
+      {loadError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-2xs text-red-800">{loadError}</div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {FILTERS.map((f) => (
@@ -189,6 +189,7 @@ export function RegistrationsPage() {
 
       <ReviewDrawer
         registration={selected}
+        contacts={contacts}
         onClose={() => setSelected(null)}
         onApprove={() => selected && onApproveClick(selected)}
         onReject={() => selected && handleReject(selected)}
@@ -238,10 +239,10 @@ export function RegistrationsPage() {
   );
 }
 
-function ReviewDrawer({ registration, onClose, onApprove, onReject, onMarkDuplicate }) {
+function ReviewDrawer({ registration, contacts, onClose, onApprove, onReject, onMarkDuplicate }) {
   if (!registration) return null;
 
-  const duplicate = findContactByMobile(registration.mobile_number, MOCK_CONTACTS);
+  const duplicate = findContactByMobile(registration.mobile_number, contacts);
   const isPending = PENDING_STATUSES.has(registration.status);
 
   return (

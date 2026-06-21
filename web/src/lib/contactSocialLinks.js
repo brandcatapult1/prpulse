@@ -1,9 +1,8 @@
-import { getDemoContact } from './demo.js';
-import { getContactProfileExtras } from './contactProfile.js';
+import { getCachedContact } from './contactsCache.js';
 
 function fallbackHandleLabel(engagement) {
-  const contact = engagement?.contact_id ? getDemoContact(engagement.contact_id) : null;
-  const ig = contact ? getContactProfileExtras(contact.id).instagram_url : null;
+  const contact = engagement?.contact_id ? getCachedContact(engagement.contact_id) : null;
+  const ig = contact?.instagram_url ?? null;
   if (ig) {
     const match = ig.match(/instagram\.com\/([^/?]+)/i);
     if (match) return `@${match[1].replace(/^@/, '')}`;
@@ -73,10 +72,9 @@ function youtubeProfileFromUrl(url) {
  * profileUrl null → handle renders as plain text.
  */
 export function getCreatorCardIdentity(engagement) {
-  const contact = engagement?.contact_id ? getDemoContact(engagement.contact_id) : null;
-  const extras = contact ? getContactProfileExtras(contact.id) : {};
-  const instagramUrl = extras.instagram_url || contact?.instagram_url || null;
-  const youtubeUrl = extras.youtube_url || contact?.youtube_url || null;
+  const contact = engagement?.contact_id ? getCachedContact(engagement.contact_id) : null;
+  const instagramUrl = contact?.instagram_url ?? null;
+  const youtubeUrl = contact?.youtube_url ?? null;
 
   const instagram = instagramUrl ? instagramProfileFromUrl(instagramUrl) : null;
   const youtube = !instagram?.profileUrl && youtubeUrl ? youtubeProfileFromUrl(youtubeUrl) : null;
@@ -109,8 +107,7 @@ export function telUrl(mobile) {
 
 /** Contact identity for the campaign quick-edit drawer. */
 export function getDrawerContactIdentity(engagement) {
-  const contact = engagement?.contact_id ? getDemoContact(engagement.contact_id) : null;
-  const extras = contact ? getContactProfileExtras(contact.id) : {};
+  const contact = engagement?.contact_id ? getCachedContact(engagement.contact_id) : null;
   const social = getCreatorCardIdentity(engagement);
   const mobile = contact?.mobile_number ?? null;
 
@@ -122,6 +119,6 @@ export function getDrawerContactIdentity(engagement) {
     mobile,
     mobileDisplay: formatMobileDisplay(mobile),
     telUrl: telUrl(mobile),
-    email: extras.email ?? contact?.email ?? null,
+    email: contact?.email ?? null,
   };
 }

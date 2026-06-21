@@ -7,15 +7,16 @@ import { formatDate, formatStatus, Pill } from '../../lib/format.jsx';
 import { COLLABORATION_REASONS } from '../../lib/collaborationReasons.js';
 import { buildNewDeliverable } from '../../lib/deliverableTypes.js';
 import { addDaysIso } from '../../lib/dates.js';
+import { engagementsApi } from '../../lib/api.js';
 import {
-  getDemoDeliverables,
-  getDemoEngagement,
-  saveDeliverablesOverride,
-  saveEngagementOverride,
-} from '../../lib/demo.js';
-import { getEngagementOverride, saveContactProfileOverride } from '../../lib/demoStore.js';
+  patchEngagement,
+  syncDeliverables,
+  patchContact,
+  fetchDeliverables,
+} from '../../lib/persistence.js';
+import { updateEngagementDeliverables } from '../../lib/deliverablesCache.js';
+import { updateCachedContact } from '../../lib/contactsCache.js';
 import { getDrawerContactIdentity } from '../../lib/contactSocialLinks.js';
-import { recordEngagementPatchActivity } from '../../lib/activityLog.js';
 import { STAGE, transitionStage } from '../../lib/engagementTransitions.js';
 import {
   deliverablesRules,
@@ -175,17 +176,22 @@ function DrawerIdentityHeader({ engagement, onEmailSaved, onToast }) {
     setEditingEmail(!identity.email);
   }, [engagement.id, identity.email]);
 
-  function saveEmail() {
+  async function saveEmail() {
     if (!identity.contactId) return;
     const trimmed = emailDraft.trim();
     if (trimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
       onToast?.('Enter a valid email address');
       return;
     }
-    saveContactProfileOverride(identity.contactId, { email: trimmed || null });
-    onEmailSaved?.();
-    setEditingEmail(!trimmed);
-    onToast?.(trimmed ? 'Email saved' : 'Email cleared');
+    try {
+      await patchContact(identity.contactId, { email: trimmed || null });
+      updateCachedContact(identity.contactId, { email: trimmed || null });
+      onEmailSaved?.();
+      setEditingEmail(!trimmed);
+      onToast?.(trimmed ? 'Email saved' : 'Email cleared');
+    } catch (err) {
+      onToast?.(err.message ?? 'Could not save email');
+    }
   }
 
   async function copyNumber() {
@@ -306,8 +312,17 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
 
   useEffect(() => {
     if (!open || !engagementId) return;
-    setEngagement(getDemoEngagement(engagementId));
-    setDeliverables(getDemoDeliverables(engagementId));
+    Promise.all([
+      engagementsApi.get(engagementId),
+      fetchDeliverables(engagementId),
+    ]).then(([eng, dels]) => {
+      setEngagement(eng);
+      setDeliverables(dels ?? []);
+      updateEngagementDeliverables(engagementId, dels ?? []);
+    }).catch(() => {
+      setEngagement(null);
+      setDeliverables([]);
+    });
   }, [open, engagementId]);
 
   if (!engagementId || !engagement) return null;
@@ -321,11 +336,16 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
   const deliverablesNote = drawerDeliverablesNote(status, deliverablesRule, deliverables.length);
   const completeHint = drawerCompleteHint(canComplete, status, deliverables.length);
 
-  function persistDeliverables(nextList, message) {
-    saveDeliverablesOverride(engagementId, nextList);
-    setDeliverables(nextList);
-    onUpdated?.();
-    if (message) setToast(message);
+  async function persistDeliverables(nextList, message) {
+    try {
+      const saved = await syncDeliverables(engagementId, deliverables, nextList);
+      setDeliverables(saved);
+      updateEngagementDeliverables(engagementId, saved);
+      onUpdated?.();
+      if (message) setToast(message);
+    } catch (err) {
+      setToast(err.message ?? 'Could not save deliverables');
+    }
   }
 
   function addDeliverable(type) {
@@ -346,17 +366,15 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
     );
   }
 
-  function persist(patch, message) {
-    const before = {
-      ...getDemoEngagement(engagementId),
-      ...getEngagementOverride(engagementId),
-    };
-    const next = { ...engagement, ...patch };
-    setEngagement(next);
-    saveEngagementOverride(engagementId, patch);
-    recordEngagementPatchActivity(engagementId, before, patch);
-    onUpdated?.();
-    if (message) setToast(message);
+  async function persist(patch, message) {
+    try {
+      const updated = await patchEngagement(engagementId, patch);
+      setEngagement((prev) => ({ ...prev, ...updated }));
+      onUpdated?.();
+      if (message) setToast(message);
+    } catch (err) {
+      setToast(err.message ?? 'Save failed');
+    }
   }
 
   function handleStatusChange(next) {

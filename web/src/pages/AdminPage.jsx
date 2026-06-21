@@ -1,20 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Card, Drawer, EmptyState, Toast } from '../components/ui/Primitives.jsx';
 import { DataTable } from '../components/ui/DataKit.jsx';
-import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { Pill, roleLabel } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
 import { AUDIT_ENTITY_TYPES, USER_ROLES, canAccessAdmin } from '../lib/adminPermissions.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { adminApi } from '../lib/api.js';
-import {
-  getDemoAuditLog,
-  getDemoUsers,
-  mergeAuditLog,
-  mergeUsers,
-  saveUserOverride,
-} from '../lib/demo.js';
 import { OrgBrandingSettings } from '../components/admin/OrgBrandingSettings.jsx';
 
 const TABS = [
@@ -27,24 +19,23 @@ export function AdminPage() {
   const { user } = useAuth();
   const allowed = canAccessAdmin(user?.role);
   const [tab, setTab] = useState('users');
-  const [users, setUsers] = useState(() => getDemoUsers());
-  const [auditRows, setAuditRows] = useState(() => getDemoAuditLog());
+  const [users, setUsers] = useState([]);
+  const [auditRows, setAuditRows] = useState([]);
   const [entityFilter, setEntityFilter] = useState('all');
   const [selectedAudit, setSelectedAudit] = useState(null);
-  const [demo, setDemo] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [toast, setToast] = useState(null);
 
   const loadUsers = useCallback(() => {
     adminApi
       .users()
       .then((data) => {
-        const { rows, _demo } = mergeUsers(data);
-        setUsers(rows);
-        setDemo(_demo);
+        setUsers(Array.isArray(data) ? data : []);
+        setLoadError(null);
       })
-      .catch(() => {
-        setUsers(getDemoUsers());
-        setDemo(true);
+      .catch((err) => {
+        setUsers([]);
+        setLoadError(err.message ?? 'Could not load users');
       });
   }, []);
 
@@ -52,14 +43,9 @@ export function AdminPage() {
     adminApi
       .auditLog(entityFilter === 'all' ? undefined : entityFilter)
       .then((data) => {
-        const { rows, _demo } = mergeAuditLog(data, entityFilter);
-        setAuditRows(rows);
-        setDemo((prev) => prev && _demo);
+        setAuditRows(Array.isArray(data) ? data : []);
       })
-      .catch(() => {
-        setAuditRows(getDemoAuditLog(entityFilter));
-        setDemo(true);
-      });
+      .catch(() => setAuditRows([]));
   }, [entityFilter]);
 
   useEffect(() => {
@@ -74,12 +60,12 @@ export function AdminPage() {
 
   const updateUser = async (userId, patch) => {
     try {
-      await adminApi.updateUser(userId, patch);
-    } catch {
-      saveUserOverride(userId, patch);
+      const saved = await adminApi.updateUser(userId, patch);
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, ...saved } : u)));
+      setToast('User updated');
+    } catch (err) {
+      setToast(err.message ?? 'Update failed');
     }
-    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, ...patch } : u)));
-    setToast('User updated');
   };
 
   const userColumns = [
@@ -169,7 +155,9 @@ export function AdminPage() {
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader title={MODULES.admin.pageTitle} subtitle={MODULES.admin.subtitle} />
 
-      <DemoBanner show={demo} />
+      {loadError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-2xs text-red-800">{loadError}</div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {TABS.map((t) => (

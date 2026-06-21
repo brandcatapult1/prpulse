@@ -2,26 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DataTable } from '../components/ui/DataKit.jsx';
 import { Drawer, EmptyState, Toast } from '../components/ui/Primitives.jsx';
-import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { Pill, healthTone } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
 import { BRAND_CATEGORIES, canManageBrands } from '../lib/brandCategories.js';
 import { brandsApi } from '../lib/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import {
-  getCampaignsForBrand,
-  getDemoBrands,
-  mergeBrands,
-  saveBrandOverride,
-} from '../lib/demo.js';
-import { MOCK_TEAM } from '../data/mock.js';
 
 export function BrandsPage() {
   const { user } = useAuth();
   const canEdit = canManageBrands(user?.role);
-  const [rows, setRows] = useState(() => getDemoBrands());
-  const [demo, setDemo] = useState(true);
+  const [rows, setRows] = useState([]);
+  const [managers, setManagers] = useState([]);
+  const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null);
   const [toast, setToast] = useState(null);
 
@@ -29,15 +22,17 @@ export function BrandsPage() {
     brandsApi
       .list()
       .then((data) => {
-        const { rows: merged, _demo } = mergeBrands(data);
-        setRows(merged);
-        setDemo(_demo);
+        setRows(Array.isArray(data) ? data : []);
+        setError(null);
       })
-      .catch(() => {
-        setRows(getDemoBrands());
-        setDemo(true);
+      .catch((err) => {
+        setRows([]);
+        setError(err.message ?? 'Could not load brands');
       });
-  }, []);
+    if (canEdit) {
+      brandsApi.accountManagers().then((m) => setManagers(Array.isArray(m) ? m : [])).catch(() => setManagers([]));
+    }
+  }, [canEdit]);
 
   useEffect(() => {
     load();
@@ -76,13 +71,13 @@ export function BrandsPage() {
 
   const saveBrand = async (id, patch, message) => {
     try {
-      await brandsApi.update(id, patch);
-    } catch {
-      saveBrandOverride(id, patch);
+      const saved = await brandsApi.update(id, patch);
+      setRows((prev) => prev.map((b) => (b.id === id ? { ...b, ...saved } : b)));
+      setSelected((prev) => (prev?.id === id ? { ...prev, ...saved } : prev));
+      setToast(message);
+    } catch (err) {
+      setToast(err.message ?? 'Save failed');
     }
-    setRows((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
-    setSelected((prev) => (prev?.id === id ? { ...prev, ...patch } : prev));
-    setToast(message);
   };
 
   return (
@@ -92,7 +87,9 @@ export function BrandsPage() {
         subtitle={MODULES.brands.subtitle}
       />
 
-      <DemoBanner show={demo} />
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-2xs text-red-800">{error}</div>
+      )}
 
       {!canEdit && (
         <div className="rounded-lg border border-line bg-canvas px-4 py-3 text-2xs text-ink-secondary">
@@ -109,6 +106,7 @@ export function BrandsPage() {
       <BrandDrawer
         brand={selected}
         canEdit={canEdit}
+        managers={managers}
         onClose={() => setSelected(null)}
         onSave={saveBrand}
       />
@@ -118,18 +116,23 @@ export function BrandsPage() {
   );
 }
 
-function BrandDrawer({ brand, canEdit, onClose, onSave }) {
+function BrandDrawer({ brand, canEdit, managers, onClose, onSave }) {
   const fileRef = useRef(null);
   const [draft, setDraft] = useState(null);
+  const [campaigns, setCampaigns] = useState([]);
 
   useEffect(() => {
-    if (brand) setDraft({ ...brand });
+    if (brand) {
+      setDraft({ ...brand });
+      brandsApi.get(brand.id).then((detail) => {
+        setCampaigns(detail.campaigns ?? []);
+      }).catch(() => setCampaigns([]));
+    }
   }, [brand]);
 
   if (!brand || !draft) return null;
 
-  const campaigns = getCampaignsForBrand(brand.id);
-  const manager = MOCK_TEAM.find((m) => m.id === draft.account_manager_id);
+  const manager = managers.find((m) => m.id === draft.account_manager_id);
 
   const setField = (field, value) => setDraft((d) => ({ ...d, [field]: value }));
 
@@ -221,7 +224,7 @@ function BrandDrawer({ brand, canEdit, onClose, onSave }) {
                 value={draft.account_manager_id ?? ''}
                 onChange={(e) => {
                   const id = e.target.value || null;
-                  const person = MOCK_TEAM.find((m) => m.id === id);
+                  const person = managers.find((m) => m.id === id);
                   setDraft((d) => ({
                     ...d,
                     account_manager_id: id,
@@ -230,7 +233,7 @@ function BrandDrawer({ brand, canEdit, onClose, onSave }) {
                 }}
               >
                 <option value="">Unassigned</option>
-                {MOCK_TEAM.map((m) => (
+                {managers.map((m) => (
                   <option key={m.id} value={m.id}>{m.full_name}</option>
                 ))}
               </select>

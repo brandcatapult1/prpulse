@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Toast } from '../components/ui/Primitives.jsx';
-import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 import { LogDeliverablePanel } from '../components/campaign/LogDeliverablePanel.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { logRepliedContact } from '../lib/contactLogging.js';
@@ -28,18 +27,7 @@ import {
   logVisitReminder,
 } from '../lib/persistence.js';
 import { setDeliverablesCache, getDeliverablesForEngagement, updateEngagementDeliverables } from '../lib/deliverablesCache.js';
-import { getCachedContact, setContactsCache } from '../lib/contactsCache.js';
-import {
-  getDemoContacts,
-  getDemoDeliverables,
-  getDemoEngagement,
-  mergeDashboardWorkspace,
-} from '../lib/demo.js';
-import {
-  getEngagementOverride,
-  saveDeliverablesOverride,
-  saveEngagementOverride,
-} from '../lib/demoStore.js';
+import { getCachedContact } from '../lib/contactsCache.js';
 
 export function DashboardPage() {
   const { user } = useAuth();
@@ -53,29 +41,14 @@ export function DashboardPage() {
     setLoading(true);
     try {
       const data = await fetchDashboardWorkspace();
-      const merged = mergeDashboardWorkspace(data);
-      if (merged._demo) {
-        setContactsCache(getDemoContacts());
-      }
-      setDeliverablesCache(merged.deliverablesByEngagement ?? {});
-      setWorkspace(merged);
+      setDeliverablesCache(data.deliverablesByEngagement ?? {});
+      setWorkspace(data);
       setRevision((r) => r + 1);
     } catch {
-      const merged = mergeDashboardWorkspace(null);
-      setContactsCache(getDemoContacts());
-      setDeliverablesCache(merged.deliverablesByEngagement ?? {});
-      setWorkspace(merged);
-      setRevision((r) => r + 1);
+      setWorkspace({ engagements: [], campaigns: [], deliverablesByEngagement: {} });
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  const refreshDemoWorkspace = useCallback(() => {
-    const merged = mergeDashboardWorkspace({ engagements: [] });
-    setDeliverablesCache(merged.deliverablesByEngagement ?? {});
-    setWorkspace(merged);
-    setRevision((r) => r + 1);
   }, []);
 
   useEffect(() => {
@@ -92,9 +65,8 @@ export function DashboardPage() {
       });
     }
     void revision;
-    const managerId = workspace._demo ? workspace.previewManagerId : user.id;
     return buildDashboardFromEngagements({
-      userId: managerId,
+      userId: user.id,
       engagements: workspace.engagements,
       campaigns: workspace.campaigns,
       getDeliverables: getDeliverablesForEngagement,
@@ -110,23 +82,6 @@ export function DashboardPage() {
 
   const applyEngagementLogging = useCallback(
     async (engagementId, patch, message, snapshotKeys) => {
-      if (workspace?._demo) {
-        const base = {
-          ...getDemoEngagement(engagementId),
-          ...getEngagementOverride(engagementId),
-        };
-        const snapshot = {};
-        for (const key of snapshotKeys) snapshot[key] = base[key];
-        saveEngagementOverride(engagementId, patch);
-        refreshDemoWorkspace();
-        showActionToast(message, () => {
-          saveEngagementOverride(engagementId, snapshot);
-          refreshDemoWorkspace();
-          setToast(null);
-        });
-        return;
-      }
-
       const base = workspace?.engagements?.find((e) => e.id === engagementId);
       const snapshot = {};
       for (const key of snapshotKeys) snapshot[key] = base?.[key];
@@ -142,25 +97,11 @@ export function DashboardPage() {
         showActionToast(err.message ?? 'Save failed', null);
       }
     },
-    [workspace, reload, refreshDemoWorkspace, showActionToast],
+    [workspace, reload, showActionToast],
   );
 
   const applyDeliverablesLogging = useCallback(
     async (engagementId, nextList, message) => {
-      if (workspace?._demo) {
-        const snapshot = getDemoDeliverables(engagementId).map((d) => ({ ...d }));
-        saveDeliverablesOverride(engagementId, nextList);
-        updateEngagementDeliverables(engagementId, nextList);
-        refreshDemoWorkspace();
-        showActionToast(message, () => {
-          saveDeliverablesOverride(engagementId, snapshot);
-          updateEngagementDeliverables(engagementId, snapshot);
-          refreshDemoWorkspace();
-          setToast(null);
-        });
-        return;
-      }
-
       const beforeList = await fetchDeliverables(engagementId);
       try {
         const saved = await syncDeliverables(engagementId, beforeList, nextList);
@@ -176,7 +117,7 @@ export function DashboardPage() {
         showActionToast(err.message ?? 'Save failed', null);
       }
     },
-    [workspace, reload, refreshDemoWorkspace, showActionToast],
+    [reload, showActionToast],
   );
 
   const handleLogContact = useCallback(
@@ -274,7 +215,6 @@ export function DashboardPage() {
       <AuroraBackground />
 
       <div className="relative mx-auto w-full max-w-[1400px] space-y-5 px-4 py-5 md:px-5 md:py-6">
-        <DemoBanner show={workspace?._demo} />
 
         <DashboardHero
           greeting={dashboardGreeting(firstName)}

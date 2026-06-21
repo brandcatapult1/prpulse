@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { DataTable } from '../components/ui/DataKit.jsx';
-import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { HealthBadge } from '../components/ui/HealthBadge.jsx';
 import { Pill } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
 import { campaignsApi } from '../lib/api.js';
-import { getDemoCampaigns, pickList } from '../lib/demo.js';
 import { canBulkImport } from '../lib/csvImport.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -15,21 +13,20 @@ export function CampaignsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const canImport = canBulkImport(user?.role);
-  const [rows, setRows] = useState(() => getDemoCampaigns());
-  const [demo, setDemo] = useState(true);
+  const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     campaignsApi
       .list()
       .then((data) => {
-        const resolved = pickList(data, getDemoCampaigns());
-        setRows(resolved);
-        setDemo(!data?.length);
+        setRows(Array.isArray(data) ? data : []);
+        setError(null);
       })
-      .catch(() => {
-        setRows(getDemoCampaigns());
-        setDemo(true);
+      .catch((err) => {
+        setRows([]);
+        setError(err.message ?? 'Could not load campaigns');
       })
       .finally(() => setLoading(false));
   }, []);
@@ -85,14 +82,17 @@ export function CampaignsPage() {
         }
       />
 
-      <DemoBanner show={demo} />
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-2xs text-red-800">{error}</div>
+      )}
 
       {loading ? (
         <div className="panel px-4 py-10 text-center text-2xs text-ink-tertiary">Loading…</div>
+      ) : rows.length === 0 ? (
+        <div className="panel px-4 py-10 text-center text-2xs text-ink-tertiary">No campaigns yet.</div>
       ) : (
         <DataTable columns={columns} rows={rows} onRowClick={(r) => navigate(`/campaigns/${r.id}`)} />
       )}
-
     </div>
   );
 }

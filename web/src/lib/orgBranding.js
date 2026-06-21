@@ -1,5 +1,4 @@
 import { orgBrandingApi } from './api.js';
-import { getOrgSettingsOverride, saveOrgSettingsOverride } from './demoStore.js';
 
 /** Bundled transparent wordmark for the light sidebar. */
 export const DEFAULT_DEMO_ORG_LOGO = '/branding/brand-catapult-wordmark.svg';
@@ -25,20 +24,7 @@ export function normalizeOrgLogoUrl(url) {
   return url;
 }
 
-export function persistOrgLogoOverride(logoUrl) {
-  saveOrgSettingsOverride({
-    logoUrl: logoUrl === null ? LOGO_CLEARED : logoUrl,
-  });
-  notifyOrgLogoChanged();
-}
-
 export async function loadOrgLogoUrl() {
-  const override = getOrgSettingsOverride();
-  if (override && Object.prototype.hasOwnProperty.call(override, 'logoUrl')) {
-    if (override.logoUrl === LOGO_CLEARED) return null;
-    return normalizeOrgLogoUrl(override.logoUrl) ?? DEFAULT_DEMO_ORG_LOGO;
-  }
-
   try {
     const data = await orgBrandingApi.get();
     if (data?.logo_url === LOGO_CLEARED) return null;
@@ -51,18 +37,9 @@ export async function loadOrgLogoUrl() {
 
 export async function saveOrgLogoUrl(logoUrl) {
   const apiValue = logoUrl === null ? LOGO_CLEARED : logoUrl;
-  persistOrgLogoOverride(logoUrl);
-
-  try {
-    await orgBrandingApi.update({ logo_url: apiValue });
-    return { ok: true, persisted: true };
-  } catch (err) {
-    return {
-      ok: true,
-      persisted: false,
-      warning: err.message ?? 'Saved for this browser session only — set DATABASE_URL and run migration 004 on the server to persist for everyone.',
-    };
-  }
+  await orgBrandingApi.update({ logo_url: apiValue });
+  notifyOrgLogoChanged();
+  return { ok: true, persisted: true };
 }
 
 export async function applyDefaultOrgLogo() {

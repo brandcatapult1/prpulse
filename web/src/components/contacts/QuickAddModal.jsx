@@ -2,14 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal, Toast } from '../ui/Primitives.jsx';
 import { contactsApi, campaignsApi } from '../../lib/api.js';
-import {
-  addContactImports,
-  importContactsToCampaignDemo,
-  isContactInCampaign,
-  getDemoCampaigns,
-  getDemoContacts,
-} from '../../lib/demo.js';
-import { findContactByMobile, normalizeMobile } from '../../lib/phone.js';
+import { populateCampaign } from '../../lib/persistence.js';
+import { mergeContactsCache } from '../../lib/contactsCache.js';
+import { normalizeMobile } from '../../lib/phone.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 const EMPTY = { full_name: '', mobile_number: '', instagram_url: '', city: '' };
@@ -23,7 +18,7 @@ export function QuickAddModal({ open, onClose, onSaved, defaultCampaignId = '' }
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
   const [campaignId, setCampaignId] = useState('');
-  const [campaigns, setCampaigns] = useState(() => getDemoCampaigns());
+  const [campaigns, setCampaigns] = useState([]);
 
   useEffect(() => {
     if (!open) return;
@@ -33,10 +28,8 @@ export function QuickAddModal({ open, onClose, onSaved, defaultCampaignId = '' }
     setCampaignId(defaultCampaignId || '');
     campaignsApi
       .list()
-      .then((data) => {
-        setCampaigns(Array.isArray(data) && data.length > 0 ? data : getDemoCampaigns());
-      })
-      .catch(() => setCampaigns(getDemoCampaigns()));
+      .then((data) => setCampaigns(Array.isArray(data) ? data : []))
+      .catch(() => setCampaigns([]));
   }, [open, defaultCampaignId]);
 
   function updateField(key, value) {
@@ -57,17 +50,11 @@ export function QuickAddModal({ open, onClose, onSaved, defaultCampaignId = '' }
 
     try {
       const match = await contactsApi.lookupMobile(mobile);
-      if (match) {
-        setDuplicate(match);
-        return;
-      }
+      setDuplicate(match ?? null);
+      if (!match) setContinueAnyway(false);
     } catch {
-      /* demo fallback below */
+      setDuplicate(null);
     }
-
-    const local = findContactByMobile(mobile, getDemoContacts());
-    setDuplicate(local ? { id: local.id, full_name: local.full_name } : null);
-    if (!local) setContinueAnyway(false);
   }
 
   const mobileValid = normalizeMobile(form.mobile_number).length >= 10;
@@ -81,56 +68,19 @@ export function QuickAddModal({ open, onClose, onSaved, defaultCampaignId = '' }
       city: form.city.trim() || null,
     };
 
-    try {
-      const result = await contactsApi.quickAdd(body);
-      return result.contact;
-    } catch {
-      const contact = {
-        id: `qa-${Date.now()}`,
-        ...body,
-        classification: 'micro',
-        status: 'active',
-        tags: [],
-        is_blacklisted: false,
-      };
-      addContactImports([contact]);
-      return contact;
-    }
+    const result = await contactsApi.quickAdd(body);
+    mergeContactsCache([result.contact]);
+    return result.contact;
   }
 
   async function assignToCampaign(contact) {
     const campaign = campaigns.find((c) => c.id === campaignId);
     if (!campaign) return;
 
-    if (isContactInCampaign(campaignId, contact.id)) {
+    const result = await populateCampaign(campaignId, [contact.id], user?.id);
+    const created = result?.created ?? [];
+    if (created.length === 0) {
       throw new Error(`${contact.full_name} is already on this campaign`);
-    }
-
-    try {
-      const result = await campaignsApi.populate(campaignId, { contact_ids: [contact.id] });
-      const created = Array.isArray(result) ? result : result?.created ?? [];
-      if (created.length === 0) {
-        const { added } = importContactsToCampaignDemo({
-          campaignId,
-          campaignName: campaign.campaign_name ?? campaign.name,
-          contacts: [contact],
-          ownerName: user?.full_name,
-        });
-        if (added.length === 0) {
-          throw new Error(`${contact.full_name} is already on this campaign`);
-        }
-      }
-    } catch (err) {
-      if (err.message?.includes('already on this campaign')) throw err;
-      const { added } = importContactsToCampaignDemo({
-        campaignId,
-        campaignName: campaign.campaign_name ?? campaign.name,
-        contacts: [contact],
-        ownerName: user?.full_name,
-      });
-      if (added.length === 0) {
-        throw new Error(`${contact.full_name} is already on this campaign`);
-      }
     }
   }
 
@@ -148,8 +98,8 @@ export function QuickAddModal({ open, onClose, onSaved, defaultCampaignId = '' }
 
       const campaign = campaigns.find((c) => c.id === campaignId);
       setToast(
-        withCampaign && campaign
-          ? `${contact.full_name} saved and added to ${campaign.campaign_name ?? campaign.name}`
+        withCampaign
+          ? `${contact.full_name} added and assigned to ${campaign?.campaign_name ?? 'campaign'}`
           : `${contact.full_name} saved`,
       );
       onSaved?.(contact);
@@ -161,128 +111,71 @@ export function QuickAddModal({ open, onClose, onSaved, defaultCampaignId = '' }
     }
   }
 
+  if (!open) return null;
+
   return (
     <>
       <Modal
         open={open}
-        title="Quick Add"
+        title="Quick add contact"
         onClose={onClose}
         footer={
           <div className="flex flex-wrap justify-end gap-2">
-            <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>
-              Cancel
+            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="button" className="btn-secondary" disabled={!canSave || saving} onClick={() => handleSave(false)}>
+              Save contact
             </button>
-            <button
-              type="button"
-              className="btn-secondary"
-              disabled={!canSave || saving || !campaignId}
-              onClick={() => handleSave(true)}
-            >
-              Save &amp; add to campaign
-            </button>
-            <button
-              type="button"
-              className="btn-primary"
-              disabled={!canSave || saving}
-              onClick={() => handleSave(false)}
-            >
-              {saving ? 'Saving…' : 'Save'}
+            <button type="button" className="btn-primary" disabled={!canSave || saving} onClick={() => handleSave(true)}>
+              Save & assign
             </button>
           </div>
         }
       >
-        <p className="mb-4 text-2xs text-ink-secondary">
-          Capture a creator in under 15 seconds — name and mobile only required.
-        </p>
-
-        <div className="grid gap-3">
+        <div className="space-y-3">
           <label className="block text-2xs text-ink-secondary">
             Full name
-            <input
-              className="input-field mt-1"
-              placeholder="Creator name"
-              value={form.full_name}
-              onChange={(e) => updateField('full_name', e.target.value)}
-              autoFocus
-            />
+            <input className="input-field mt-1" value={form.full_name} onChange={(e) => updateField('full_name', e.target.value)} />
           </label>
-
           <label className="block text-2xs text-ink-secondary">
-            Mobile number
+            Mobile
             <input
               className="input-field mt-1"
-              placeholder="+91…"
               value={form.mobile_number}
               onChange={(e) => updateField('mobile_number', e.target.value)}
-              onBlur={() => checkDuplicate(form.mobile_number)}
+              onBlur={(e) => checkDuplicate(e.target.value)}
             />
           </label>
-
           {duplicate && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-2xs text-amber-900">
-              A contact with this number exists: <strong>{duplicate.full_name}</strong>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="btn-secondary text-2xs"
-                  onClick={() => {
-                    navigate(`/contacts/${duplicate.id}`);
-                    onClose();
-                  }}
-                >
-                  Open existing
-                </button>
-                {!continueAnyway && (
-                  <button
-                    type="button"
-                    className="btn-secondary text-2xs"
-                    onClick={() => setContinueAnyway(true)}
-                  >
-                    Continue anyway
-                  </button>
-                )}
-              </div>
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-2xs text-amber-900">
+              Matches existing contact: <strong>{duplicate.full_name}</strong>
+              <label className="mt-2 flex items-center gap-2">
+                <input type="checkbox" checked={continueAnyway} onChange={(e) => setContinueAnyway(e.target.checked)} />
+                Continue anyway
+              </label>
+              <button type="button" className="mt-2 text-brand hover:underline" onClick={() => navigate(`/contacts/${duplicate.id}`)}>
+                View profile →
+              </button>
             </div>
           )}
-
           <label className="block text-2xs text-ink-secondary">
             Instagram URL
-            <input
-              className="input-field mt-1"
-              placeholder="https://instagram.com/…"
-              value={form.instagram_url}
-              onChange={(e) => updateField('instagram_url', e.target.value)}
-            />
+            <input className="input-field mt-1" value={form.instagram_url} onChange={(e) => updateField('instagram_url', e.target.value)} />
           </label>
-
           <label className="block text-2xs text-ink-secondary">
             City
-            <input
-              className="input-field mt-1"
-              placeholder="Delhi"
-              value={form.city}
-              onChange={(e) => updateField('city', e.target.value)}
-            />
+            <input className="input-field mt-1" value={form.city} onChange={(e) => updateField('city', e.target.value)} />
           </label>
-
           <label className="block text-2xs text-ink-secondary">
-            Add to campaign (optional)
-            <select
-              className="input-field mt-1"
-              value={campaignId}
-              onChange={(e) => setCampaignId(e.target.value)}
-            >
+            Assign to campaign (optional)
+            <select className="input-field mt-1" value={campaignId} onChange={(e) => setCampaignId(e.target.value)}>
               <option value="">— None —</option>
               {campaigns.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.campaign_name ?? c.name}
-                </option>
+                <option key={c.id} value={c.id}>{c.campaign_name}</option>
               ))}
             </select>
           </label>
         </div>
       </Modal>
-
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </>
   );

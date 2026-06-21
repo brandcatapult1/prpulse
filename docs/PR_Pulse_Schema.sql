@@ -136,6 +136,7 @@ CREATE TABLE contacts (
   avg_professionalism     numeric(3,2),
   avg_timeliness          numeric(3,2),
   would_work_again_pct    numeric(5,2),
+  notes                   text,                    -- internal profile notes
   created_by          uuid REFERENCES users(id) ON DELETE SET NULL,
   created_at          timestamptz NOT NULL DEFAULT now(),
   updated_at          timestamptz NOT NULL DEFAULT now()
@@ -233,6 +234,10 @@ CREATE TABLE engagements (
   visit_time           time,
   visit_outlet         text,
   visit_notes          text,
+  dropped_from         text,                       -- stage slug when dropped; reopen routing
+  no_reply_count       integer NOT NULL DEFAULT 0,
+  last_contact_log_type text,                      -- conversation | no_reply_attempt
+  visit_completed_date date,                       -- IST calendar date visit marked done
   -- Lifecycle stamps
   completed_at         timestamptz,           -- set once when first counted; retained thereafter
   last_status_change_at timestamptz NOT NULL DEFAULT now(),  -- drives "stalled" widgets

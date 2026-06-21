@@ -14,7 +14,7 @@ import {
 } from '../../lib/campaignKanban.js';
 import { resolveDroppedFrom } from '../../lib/engagementTransitions.js';
 import { droppedFromLabel } from '../../lib/dropTransitions.js';
-import { isContactBlacklisted } from '../../lib/demo.js';
+import { isContactBlacklisted } from '../../lib/contactsHelpers.js';
 import { InConversationCardLogging } from './InConversationCardLogging.jsx';
 import { ScheduledCardLogging } from './ScheduledCardLogging.jsx';
 import { AwaitingDeliverablesCardLogging } from './AwaitingDeliverablesCardLogging.jsx';

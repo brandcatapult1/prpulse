@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { DataTable } from '../components/ui/DataKit.jsx';
-import { Drawer, Toast } from '../components/ui/Primitives.jsx';
+import { Drawer, EmptyState, Toast } from '../components/ui/Primitives.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { CampaignKanbanBoard } from '../components/campaign/CampaignKanbanBoard.jsx';
 import { CampaignQuickEditDrawer } from '../components/campaign/CampaignQuickEditDrawer.jsx';
@@ -11,51 +11,48 @@ import { QuickAddModal } from '../components/contacts/QuickAddModal.jsx';
 import { filterCampaignEngagements } from '../lib/campaignBoardFilters.js';
 import { Pill, formatStatus, formatDate, formatFee, statusTone } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
-import { campaignsApi, engagementsApi } from '../lib/api.js';
+import { campaignsApi, contactsApi, engagementsApi } from '../lib/api.js';
 import {
-  getDemoCampaign,
-  getDemoContacts,
-  getDemoDeliverables,
-  getDemoEngagementsForCampaign,
-  getDemoEngagement,
-  getContactIdsInCampaign,
-  importContactsToCampaignDemo,
-  pickList,
-  pickRecord,
-  saveDeliverablesOverride,
-} from '../lib/demo.js';
-import { DemoBanner } from '../components/ui/DemoBanner.jsx';
+  patchEngagement,
+  syncDeliverables,
+  saveFeedback,
+  patchContact,
+  blacklistContact,
+  clearBlacklist,
+  populateCampaign,
+  fetchPopulationContacts,
+  fetchDeliverables,
+} from '../lib/persistence.js';
+import { setDeliverablesCache, updateEngagementDeliverables } from '../lib/deliverablesCache.js';
+import { mergeContactsCache } from '../lib/contactsCache.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import { todayIso } from '../lib/dates.js';
-import {
-  clearBlacklistOverride,
-  getEngagementOverride,
-  getBlacklistOverride,
-  saveBlacklistOverride,
-  saveContactProfileOverride,
-  saveEngagementOverride,
-  saveFeedbackOverride,
-  getContactProfileOverride,
-  getFeedbackOverride,
-} from '../lib/demoStore.js';
-import { getContactProfileExtras } from '../lib/contactProfile.js';
-import { setActivityActor, clearActivityActor } from '../lib/activityActor.js';
-import {
-  recordFeedbackActivity,
-  recordDeliverablesPatchActivity,
-  recordDidntDeliverActivity,
-  recordEngagementPatchActivity,
-  recordReopenActivity,
-} from '../lib/activityLog.js';
+
+async function loadCampaignData(campaignId) {
+  const [camp, engs] = await Promise.all([
+    campaignsApi.get(campaignId),
+    engagementsApi.byCampaign(campaignId),
+  ]);
+
+  const deliverablesMap = {};
+  await Promise.all(
+    (engs ?? []).map(async (eng) => {
+      deliverablesMap[eng.id] = await fetchDeliverables(eng.id);
+    }),
+  );
+
+  setDeliverablesCache(deliverablesMap);
+  return { camp, engs: engs ?? [], deliverablesMap };
+}
 
 export function CampaignViewPage() {
   const { id } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [campaign, setCampaign] = useState(() => getDemoCampaign(id));
-  const [engagements, setEngagements] = useState(() => getDemoEngagementsForCampaign(id));
-  const [demo, setDemo] = useState(true);
+  const [campaign, setCampaign] = useState(null);
+  const [engagements, setEngagements] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
   const [activeFilters, setActiveFilters] = useState(CAMPAIGN_EMPTY_FILTERS);
   const [viewMode, setViewMode] = useState('board');
@@ -63,208 +60,142 @@ export function CampaignViewPage() {
   const [toast, setToast] = useState(null);
   const [boardRevision, setBoardRevision] = useState(0);
 
-  function reloadEngagements() {
-    setEngagements(getDemoEngagementsForCampaign(id));
-  }
-
-  useEffect(() => {
-    if (user) setActivityActor(user);
-    return () => clearActivityActor();
-  }, [user]);
-
-  useEffect(() => {
+  const reload = useCallback(async () => {
     if (!id) return;
-    setCampaign(getDemoCampaign(id));
-    reloadEngagements();
-    setDemo(true);
+    setLoading(true);
+    setError(null);
+    try {
+      const { camp, engs, deliverablesMap } = await loadCampaignData(id);
+      setCampaign(camp);
+      setEngagements(engs);
+      setDeliverablesCache(deliverablesMap);
+      setBoardRevision((r) => r + 1);
+    } catch (err) {
+      setError(err.message ?? 'Could not load campaign');
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
 
-    Promise.all([
-      campaignsApi.get(id).catch(() => null),
-      engagementsApi.byCampaign(id).catch(() => []),
-    ]).then(([camp, engs]) => {
-      const campEmpty = !camp?.campaign_name;
-      const engsEmpty = !Array.isArray(engs) || engs.length === 0;
-      setCampaign(pickRecord(camp, getDemoCampaign(id)));
-      setEngagements(pickList(engs, getDemoEngagementsForCampaign(id)));
-      setDemo(campEmpty || engsEmpty);
-    });
-  }, [id, location.key]);
-
-  const mergedEngagements = useMemo(
-    () =>
-      engagements.map((row) => ({
-        ...getDemoEngagement(row.id),
-        ...row,
-        ...getEngagementOverride(row.id),
-      })),
-    [engagements, boardRevision],
-  );
+  useEffect(() => {
+    reload();
+  }, [id, location.key, reload]);
 
   const filteredEngagements = useMemo(
-    () => filterCampaignEngagements(mergedEngagements, activeFilters),
-    [mergedEngagements, activeFilters],
+    () => filterCampaignEngagements(engagements, activeFilters),
+    [engagements, activeFilters, boardRevision],
   );
-
-  const boardEngagements = filteredEngagements;
-
-  function bumpBoard() {
-    reloadEngagements();
-    setBoardRevision((r) => r + 1);
-  }
 
   function showActionToast(message, onUndo) {
     setToast({ message, onUndo });
     window.setTimeout(() => setToast((t) => (t?.message === message ? null : t)), 8000);
   }
 
-  function applyEngagementLogging(engagementId, patch, message, snapshotKeys) {
-    const base = {
-      ...getDemoEngagement(engagementId),
-      ...getEngagementOverride(engagementId),
-    };
+  async function applyEngagementLogging(engagementId, patch, message, snapshotKeys) {
+    const base = engagements.find((e) => e.id === engagementId);
     const snapshot = {};
-    for (const key of snapshotKeys) {
-      snapshot[key] = base[key];
+    for (const key of snapshotKeys) snapshot[key] = base?.[key];
+
+    try {
+      const updated = await patchEngagement(engagementId, patch);
+      setEngagements((rows) => rows.map((r) => (r.id === engagementId ? { ...r, ...updated } : r)));
+      setBoardRevision((r) => r + 1);
+      showActionToast(message, async () => {
+        const restored = await patchEngagement(engagementId, snapshot);
+        setEngagements((rows) => rows.map((r) => (r.id === engagementId ? { ...r, ...restored } : r)));
+        setBoardRevision((r) => r + 1);
+        setToast(null);
+      });
+    } catch (err) {
+      setToast({ message: err.message ?? 'Save failed', onUndo: null });
     }
-    saveEngagementOverride(engagementId, patch);
-    recordEngagementPatchActivity(engagementId, base, patch);
-    bumpBoard();
-    showActionToast(message, () => {
-      saveEngagementOverride(engagementId, snapshot);
-      bumpBoard();
-      setToast(null);
-    });
   }
 
-  function applyDeliverablesLogging(engagementId, nextList, message) {
-    const baseEngagement = {
-      ...getDemoEngagement(engagementId),
-      ...getEngagementOverride(engagementId),
-    };
-    const snapshot = getDemoDeliverables(engagementId).map((d) => ({ ...d }));
-    saveDeliverablesOverride(engagementId, nextList);
-    recordDeliverablesPatchActivity(
-      engagementId,
-      baseEngagement.campaign_id,
-      snapshot,
-      nextList,
-    );
-    bumpBoard();
-    showActionToast(message, () => {
-      saveDeliverablesOverride(engagementId, snapshot);
-      bumpBoard();
-      setToast(null);
-    });
+  async function applyDeliverablesLogging(engagementId, nextList, message) {
+    const beforeList = await fetchDeliverables(engagementId);
+    try {
+      const saved = await syncDeliverables(engagementId, beforeList, nextList);
+      updateEngagementDeliverables(engagementId, saved);
+      setBoardRevision((r) => r + 1);
+      showActionToast(message, async () => {
+        await syncDeliverables(engagementId, saved, beforeList);
+        updateEngagementDeliverables(engagementId, beforeList);
+        setBoardRevision((r) => r + 1);
+        setToast(null);
+      });
+    } catch (err) {
+      setToast({ message: err.message ?? 'Save failed', onUndo: null });
+    }
   }
 
-  function applyDidntDeliverLogging(engagementId, { engagementPatch, blacklist, message }) {
-    const base = {
-      ...getDemoEngagement(engagementId),
-      ...getEngagementOverride(engagementId),
-    };
+  async function applyDidntDeliverLogging(engagementId, { engagementPatch, blacklist, message }) {
+    const base = engagements.find((e) => e.id === engagementId);
     const engagementSnapshot = {};
     for (const key of Object.keys(engagementPatch)) {
-      engagementSnapshot[key] = base[key];
+      engagementSnapshot[key] = base?.[key];
     }
-    const contactId = base.contact_id;
-    const priorBlacklistOverride = contactId ? getBlacklistOverride(contactId) : null;
-    const wasBlacklistedBefore = Boolean(priorBlacklistOverride);
+    const contactId = base?.contact_id;
 
-    saveEngagementOverride(engagementId, engagementPatch);
-    if (blacklist && contactId) {
-      saveBlacklistOverride(contactId, {
-        reason: "Didn't deliver",
-        blacklisted_at: todayIso(),
-      });
-    }
-    recordEngagementPatchActivity(engagementId, base, engagementPatch);
-    recordDidntDeliverActivity(engagementId, base.campaign_id, {
-      engagementPatch,
-      blacklist,
-      contactId,
-    });
-    bumpBoard();
-    showActionToast(message, () => {
-      saveEngagementOverride(engagementId, engagementSnapshot);
+    try {
+      await patchEngagement(engagementId, engagementPatch);
       if (blacklist && contactId) {
-        if (wasBlacklistedBefore) {
-          saveBlacklistOverride(contactId, priorBlacklistOverride);
-        } else {
-          clearBlacklistOverride(contactId);
+        await blacklistContact(contactId, "Didn't deliver");
+      }
+      await reload();
+      showActionToast(message, async () => {
+        await patchEngagement(engagementId, engagementSnapshot);
+        setToast(null);
+        await reload();
+      });
+    } catch (err) {
+      setToast({ message: err.message ?? 'Save failed', onUndo: null });
+    }
+  }
+
+  async function applyReopenLogging(engagementId, { engagementPatch, clearBlacklist: shouldClear, message }) {
+    const base = engagements.find((e) => e.id === engagementId);
+    const engagementSnapshot = {};
+    for (const key of Object.keys(engagementPatch)) {
+      engagementSnapshot[key] = base?.[key];
+    }
+    engagementSnapshot.dropped_from = base?.dropped_from ?? null;
+    const contactId = base?.contact_id;
+
+    try {
+      await patchEngagement(engagementId, engagementPatch);
+      if (shouldClear && contactId) {
+        try {
+          await clearBlacklist(contactId);
+        } catch {
+          /* no active blacklist */
         }
       }
-      bumpBoard();
-      setToast(null);
-    });
+      await reload();
+      showActionToast(message, async () => {
+        await patchEngagement(engagementId, engagementSnapshot);
+        setToast(null);
+        await reload();
+      });
+    } catch (err) {
+      setToast({ message: err.message ?? 'Save failed', onUndo: null });
+    }
   }
 
-  function applyReopenLogging(engagementId, { engagementPatch, clearBlacklist, message }) {
-    const base = {
-      ...getDemoEngagement(engagementId),
-      ...getEngagementOverride(engagementId),
-    };
-    const engagementSnapshot = {};
-    for (const key of Object.keys(engagementPatch)) {
-      engagementSnapshot[key] = base[key];
-    }
-    engagementSnapshot.dropped_from = base.dropped_from ?? base.drop_failed_at_stage ?? null;
-
-    const contactId = base.contact_id;
-    const priorBlacklistOverride = contactId ? getBlacklistOverride(contactId) : null;
-    const wasBlacklistedBefore = Boolean(priorBlacklistOverride);
-
-    saveEngagementOverride(engagementId, engagementPatch);
-    if (clearBlacklist && contactId) {
-      clearBlacklistOverride(contactId);
-    }
-    recordReopenActivity(engagementId, base.campaign_id, {
-      engagementPatch,
-      clearBlacklist,
-      contactId,
-      before: base,
-    });
-    bumpBoard();
-    showActionToast(message, () => {
-      saveEngagementOverride(engagementId, engagementSnapshot);
-      if (clearBlacklist && contactId && wasBlacklistedBefore) {
-        saveBlacklistOverride(contactId, priorBlacklistOverride);
-      }
-      bumpBoard();
-      setToast(null);
-    });
-  }
-
-  function applyContactFeedbackLogging(
+  async function applyContactFeedbackLogging(
     engagementId,
     { contactId, contactProfilePatch, engagementFeedback, message },
   ) {
-    const priorProfile = {
-      ...getContactProfileExtras(contactId),
-      ...getContactProfileOverride(contactId),
-    };
-    const priorFeedback = getFeedbackOverride(engagementId);
-
-    const baseEngagement = {
-      ...getDemoEngagement(engagementId),
-      ...getEngagementOverride(engagementId),
-    };
-
-    saveContactProfileOverride(contactId, contactProfilePatch);
-    saveFeedbackOverride(engagementId, engagementFeedback);
-    recordFeedbackActivity(engagementId, baseEngagement.campaign_id, { engagementFeedback });
-    bumpBoard();
-    showActionToast(message, () => {
-      const profileSnapshot = {};
-      for (const key of Object.keys(contactProfilePatch)) {
-        profileSnapshot[key] = priorProfile[key];
+    try {
+      if (contactProfilePatch && Object.keys(contactProfilePatch).length) {
+        await patchContact(contactId, contactProfilePatch);
+        mergeContactsCache([{ id: contactId, ...contactProfilePatch }]);
       }
-      saveContactProfileOverride(contactId, profileSnapshot);
-      if (priorFeedback) {
-        saveFeedbackOverride(engagementId, priorFeedback);
-      }
-      bumpBoard();
-      setToast(null);
-    });
+      await saveFeedback(engagementId, engagementFeedback);
+      showActionToast(message, null);
+      setBoardRevision((r) => r + 1);
+    } catch (err) {
+      setToast({ message: err.message ?? 'Save failed', onUndo: null });
+    }
   }
 
   const columns = [
@@ -290,6 +221,22 @@ export function CampaignViewPage() {
     },
   ];
 
+  if (loading && !campaign) {
+    return (
+      <div className="mx-auto max-w-6xl py-12 text-center text-sm text-ink-secondary">
+        Loading campaign…
+      </div>
+    );
+  }
+
+  if (error || !campaign) {
+    return (
+      <div className="mx-auto max-w-6xl">
+        <EmptyState title="Campaign unavailable" description={error ?? 'Not found'} />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-6xl space-y-1.5">
       <PageHeader
@@ -298,13 +245,11 @@ export function CampaignViewPage() {
         actions={<button type="button" className="btn-primary" onClick={() => setAddOpen(true)}>Add Creators</button>}
       />
 
-      <DemoBanner show={demo} />
-
       <CampaignMetricTiles campaign={campaign} />
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <CampaignFilterBar
-          engagements={mergedEngagements}
+          engagements={filteredEngagements}
           filters={activeFilters}
           onChange={setActiveFilters}
         />
@@ -332,7 +277,7 @@ export function CampaignViewPage() {
 
       {viewMode === 'board' ? (
         <CampaignKanbanBoard
-          engagements={boardEngagements}
+          engagements={filteredEngagements}
           userRole={user?.role}
           boardRevision={boardRevision}
           onCardClick={(row) => setQuickEditId(row.id)}
@@ -358,15 +303,16 @@ export function CampaignViewPage() {
         engagementId={quickEditId}
         open={Boolean(quickEditId)}
         onClose={() => setQuickEditId(null)}
-        onUpdated={reloadEngagements}
+        onUpdated={reload}
       />
 
       <AddCreatorsDrawer
         open={addOpen}
         campaignId={id}
         campaignName={campaign.campaign_name}
+        engagementContactIds={engagements.map((e) => e.contact_id)}
         onClose={() => setAddOpen(false)}
-        onAdded={reloadEngagements}
+        onAdded={reload}
       />
 
       {toast && (
@@ -389,40 +335,48 @@ export function CampaignViewPage() {
   );
 }
 
-function AddCreatorsDrawer({ open, onClose, campaignId, campaignName, onAdded }) {
+function AddCreatorsDrawer({
+  open,
+  onClose,
+  campaignId,
+  campaignName,
+  engagementContactIds,
+  onAdded,
+}) {
   const { user } = useAuth();
   const [selected, setSelected] = useState([]);
+  const [contacts, setContacts] = useState([]);
   const [quickOpen, setQuickOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [adding, setAdding] = useState(false);
-  const contacts = getDemoContacts().filter((c) => !c.is_blacklisted && c.status !== 'archived');
 
   const inCampaignIds = useMemo(
-    () => getContactIdsInCampaign(campaignId),
-    [campaignId, open],
+    () => new Set(engagementContactIds.map(String)),
+    [engagementContactIds],
   );
+
+  useEffect(() => {
+    if (!open || !campaignId) return;
+    setSelected([]);
+    fetchPopulationContacts(campaignId)
+      .then((rows) => {
+        setContacts(rows ?? []);
+        mergeContactsCache(rows);
+      })
+      .catch(() => setContacts([]));
+  }, [open, campaignId]);
 
   const toggle = (rowId) => {
     if (inCampaignIds.has(String(rowId))) return;
     setSelected((s) => (s.includes(rowId) ? s.filter((x) => x !== rowId) : [...s, rowId]));
   };
 
-  useEffect(() => {
-    if (!open) {
-      setSelected([]);
-    }
-  }, [open]);
-
   async function handleAddToCampaign() {
     const picked = contacts.filter(
       (c) => selected.includes(c.id) && !inCampaignIds.has(String(c.id)),
     );
     if (picked.length === 0) {
-      if (selected.length > 0) {
-        setToast('Selected creators are already on this campaign');
-      } else {
-        setToast('Select at least one creator');
-      }
+      setToast(selected.length > 0 ? 'Selected creators are already on this campaign' : 'Select at least one creator');
       return;
     }
 
@@ -430,32 +384,24 @@ function AddCreatorsDrawer({ open, onClose, campaignId, campaignName, onAdded })
     const skippedCount = selected.length - picked.length;
 
     try {
-      const result = await campaignsApi.populate(campaignId, {
-        contact_ids: picked.map((c) => c.id),
-      });
-      const created = Array.isArray(result) ? result : result?.created ?? [];
-      if (created.length === 0 && picked.length > 0) {
-        importContactsToCampaignDemo({
-          campaignId,
-          campaignName,
-          contacts: picked,
-          ownerName: user?.full_name,
-        });
-      }
-    } catch {
-      importContactsToCampaignDemo({
+      const result = await populateCampaign(
         campaignId,
-        campaignName,
-        contacts: picked,
-        ownerName: user?.full_name,
-      });
+        picked.map((c) => c.id),
+        user?.id,
+      );
+      const created = result?.created ?? [];
+      if (created.length === 0 && picked.length > 0) {
+        throw new Error('No new engagements created');
+      }
+    } catch (err) {
+      setToast(err.message ?? 'Could not add creators');
+      setAdding(false);
+      return;
     }
 
     setAdding(false);
     let message = `Added ${picked.length} creator${picked.length === 1 ? '' : 's'} to campaign`;
-    if (skippedCount > 0) {
-      message += ` · ${skippedCount} already on campaign`;
-    }
+    if (skippedCount > 0) message += ` · ${skippedCount} already on campaign`;
     setToast(message);
     onAdded?.();
     setSelected([]);
@@ -490,31 +436,35 @@ function AddCreatorsDrawer({ open, onClose, campaignId, campaignName, onAdded })
         }
       >
         <div className="mt-4">
-        <DataTable
-          selectable
-          selected={selected}
-          onSelect={toggle}
-          isRowDisabled={(row) => inCampaignIds.has(String(row.id))}
-          columns={[
-            {
-              key: 'full_name',
-              label: 'Name',
-              render: (r, { disabled }) => (
-                <div>
-                  <span className={disabled ? 'text-ink-tertiary' : 'font-medium text-ink'}>
-                    {r.full_name}
-                  </span>
-                  {disabled && (
-                    <span className="mt-0.5 block text-2xs text-ink-tertiary">Already on campaign</span>
-                  )}
-                </div>
-              ),
-            },
-            { key: 'city', label: 'City' },
-            { key: 'classification', label: 'Class', render: (r) => r.classification?.replace('_', ' ') ?? '—' },
-          ]}
-          rows={contacts}
-        />
+          {contacts.length === 0 ? (
+            <p className="text-2xs text-ink-tertiary">No eligible contacts — try Quick Add.</p>
+          ) : (
+            <DataTable
+              selectable
+              selected={selected}
+              onSelect={toggle}
+              isRowDisabled={(row) => inCampaignIds.has(String(row.id))}
+              columns={[
+                {
+                  key: 'full_name',
+                  label: 'Name',
+                  render: (r, { disabled }) => (
+                    <div>
+                      <span className={disabled ? 'text-ink-tertiary' : 'font-medium text-ink'}>
+                        {r.full_name}
+                      </span>
+                      {disabled && (
+                        <span className="mt-0.5 block text-2xs text-ink-tertiary">Already on campaign</span>
+                      )}
+                    </div>
+                  ),
+                },
+                { key: 'city', label: 'City' },
+                { key: 'classification', label: 'Class', render: (r) => r.classification?.replace('_', ' ') ?? '—' },
+              ]}
+              rows={contacts}
+            />
+          )}
         </div>
       </Drawer>
 
@@ -523,7 +473,7 @@ function AddCreatorsDrawer({ open, onClose, campaignId, campaignName, onAdded })
         defaultCampaignId={campaignId}
         onClose={() => setQuickOpen(false)}
         onSaved={() => {
-          onAdded?.();
+          fetchPopulationContacts(campaignId).then(setContacts).catch(() => {});
           setToast('Contact saved — select them above to add to campaign');
         }}
       />

@@ -10,7 +10,7 @@ export function SidebarBrand({ logoUrl, loading = false }) {
         <img
           src={logoUrl}
           alt=""
-          className="block h-9 w-auto max-w-[172px] object-contain object-left"
+          className="block h-12 w-full max-w-[188px] object-contain object-left"
           decoding="async"
         />
       )}

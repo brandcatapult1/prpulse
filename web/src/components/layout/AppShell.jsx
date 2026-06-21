@@ -3,18 +3,18 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { roleLabel } from '../../lib/format.jsx';
 import { NAV_ITEMS } from '../../lib/modules.js';
 import { canAccessAdmin } from '../../lib/adminPermissions.js';
+import { SidebarBrand } from './SidebarBrand.jsx';
+import { useOrgLogo } from '../../hooks/useOrgLogo.js';
 
 export function AppShell({ onQuickAdd }) {
   const { user, logout, devMode } = useAuth();
   const navigate = useNavigate();
+  const { logoUrl, loading } = useOrgLogo({ demoMode: devMode });
 
   return (
     <div className="bg-canvas">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[220px] flex-col overflow-y-auto border-r border-line bg-white md:flex">
-        <div className="px-4 py-5">
-          <div className="text-sm font-semibold tracking-tight text-ink">PR Pulse</div>
-          <div className="text-2xs text-ink-tertiary">Brand Catapult</div>
-        </div>
+        <SidebarBrand logoUrl={logoUrl} loading={loading} />
         <nav className="flex-1 space-y-0.5 px-2">
           {NAV_ITEMS.filter((item) => item.to !== '/admin' || canAccessAdmin(user?.role)).map((item) => (
             <NavLink

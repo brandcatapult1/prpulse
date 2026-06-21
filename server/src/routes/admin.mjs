@@ -75,3 +75,43 @@ adminRouter.get('/audit-log', async (req, res) => {
     res.json([]);
   }
 });
+
+adminRouter.get('/org-branding', async (_req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT logo_url, updated_at FROM org_settings WHERE id = 1');
+    res.json({ logo_url: rows[0]?.logo_url ?? null, updated_at: rows[0]?.updated_at ?? null });
+  } catch (err) {
+    if (err.code === '42P01') return res.json({ logo_url: null });
+    res.status(503).json({ error: 'Could not load branding' });
+  }
+});
+
+adminRouter.patch('/org-branding', async (req, res) => {
+  const { logo_url: logoUrl } = req.body ?? {};
+
+  if (logoUrl != null && typeof logoUrl !== 'string') {
+    return res.status(400).json({ error: 'logo_url must be a string or null' });
+  }
+  if (logoUrl && logoUrl.length > 750_000) {
+    return res.status(400).json({ error: 'Logo file is too large' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO org_settings (id, logo_url, updated_by)
+       VALUES (1, $1, $2)
+       ON CONFLICT (id) DO UPDATE
+         SET logo_url = EXCLUDED.logo_url,
+             updated_by = EXCLUDED.updated_by,
+             updated_at = now()
+       RETURNING logo_url, updated_at`,
+      [logoUrl ?? null, req.user.id],
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    if (err.code === '42P01') {
+      return res.status(503).json({ error: 'Run migration 004_org_settings first' });
+    }
+    res.status(503).json({ error: 'Could not save branding' });
+  }
+});

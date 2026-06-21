@@ -15,9 +15,11 @@ import {
   mergeUsers,
   saveUserOverride,
 } from '../lib/demo.js';
+import { OrgBrandingSettings } from '../components/admin/OrgBrandingSettings.jsx';
 
 const TABS = [
   { id: 'users', label: 'Users & roles' },
+  { id: 'settings', label: 'Settings' },
   { id: 'audit', label: 'Audit log' },
 ];
 
@@ -192,6 +194,15 @@ export function AdminPage() {
             Assign roles and deactivate accounts. Changes are audit-logged in production.
           </p>
           <DataTable columns={userColumns} rows={users} />
+        </>
+      )}
+
+      {tab === 'settings' && (
+        <>
+          <p className="text-2xs text-ink-secondary">
+            Organization branding shown in the app shell.
+          </p>
+          <OrgBrandingSettings />
         </>
       )}
 

@@ -70,4 +70,12 @@ export const adminApi = {
     const q = entityType ? `?entity_type=${encodeURIComponent(entityType)}` : '';
     return api(`/admin/audit-log${q}`);
   },
+  orgBranding: () => api('/admin/org-branding'),
+  updateOrgBranding: (body) =>
+    api('/admin/org-branding', { method: 'PATCH', body: JSON.stringify(body) }),
+};
+
+export const orgBrandingApi = {
+  get: () => api('/org/branding'),
+  update: (body) => api('/admin/org-branding', { method: 'PATCH', body: JSON.stringify(body) }),
 };

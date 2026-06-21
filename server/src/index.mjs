@@ -16,6 +16,7 @@ import { registrationsRouter } from './routes/registrations.mjs';
 import { brandsRouter } from './routes/brands.mjs';
 import { importRouter } from './routes/import.mjs';
 import { adminRouter } from './routes/admin.mjs';
+import { orgRouter } from './routes/org.mjs';
 import { attachUser } from './middleware/auth.mjs';
 import { devAuthMiddleware } from './middleware/devAuth.mjs';
 
@@ -68,6 +69,7 @@ app.use('/api/registrations', registrationsRouter);
 app.use('/api/brands', brandsRouter);
 app.use('/api/import', importRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/org', orgRouter);
 
 const webDist = path.join(rootDir, 'web/dist');
 app.use(express.static(webDist));

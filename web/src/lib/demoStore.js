@@ -26,7 +26,7 @@ const PERSISTED_ENGAGEMENT_FIELDS = [
 function loadStore() {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [], brands: {}, contactAdds: [], campaignAdds: [], engagementAdds: [], contactProfiles: {}, users: {}, activityEvents: [] };
+    if (!raw) return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [], brands: {}, contactAdds: [], campaignAdds: [], engagementAdds: [], contactProfiles: {}, users: {}, activityEvents: [], orgSettings: null };
     const parsed = JSON.parse(raw);
     return {
       engagements: parsed.engagements ?? {},
@@ -42,9 +42,10 @@ function loadStore() {
       contactProfiles: parsed.contactProfiles ?? {},
       users: parsed.users ?? {},
       activityEvents: Array.isArray(parsed.activityEvents) ? parsed.activityEvents : [],
+      orgSettings: parsed.orgSettings ?? null,
     };
   } catch {
-    return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [], brands: {}, contactAdds: [], campaignAdds: [], engagementAdds: [], contactProfiles: {}, users: {}, activityEvents: [] };
+    return { engagements: {}, deliverables: {}, feedback: {}, blacklist: {}, registrations: {}, registrationAdds: [], brands: {}, contactAdds: [], campaignAdds: [], engagementAdds: [], contactProfiles: {}, users: {}, activityEvents: [], orgSettings: null };
   }
 }
 
@@ -263,4 +264,14 @@ export function appendActivityEvent(event) {
   store.activityEvents = [...(store.activityEvents ?? []), event];
   saveStore(store);
   return event;
+}
+
+export function getOrgSettingsOverride() {
+  return loadStore().orgSettings ?? null;
+}
+
+export function saveOrgSettingsOverride(patch) {
+  const store = loadStore();
+  store.orgSettings = { ...(store.orgSettings ?? {}), ...patch };
+  saveStore(store);
 }

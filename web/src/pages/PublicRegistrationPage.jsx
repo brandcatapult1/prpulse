@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { registrationsApi } from '../lib/api.js';
-import { addRegistrationSubmission } from '../lib/demoStore.js';
 import { CREATOR_CATEGORIES } from '../lib/creatorCategories.js';
 
 const COUNTRY_OPTIONS = [
@@ -120,14 +119,10 @@ export function PublicRegistrationPage() {
 
     try {
       await registrationsApi.submit(payload);
-    } catch {
-      addRegistrationSubmission({
-        id: `r-${Date.now()}`,
-        ...payload,
-        status: 'new',
-        linked_contact_id: null,
-        created_at: new Date().toISOString(),
-      });
+    } catch (err) {
+      setError(err.message ?? 'Registration failed — please try again.');
+      setSubmitting(false);
+      return;
     }
 
     setSubmitting(false);

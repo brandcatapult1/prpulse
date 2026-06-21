@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { pool } from '../db.mjs';
-import { requireAuth } from '../middleware/auth.mjs';
+import { requireAuth, requireRole } from '../middleware/auth.mjs';
 
 export const brandsRouter = Router();
 
@@ -11,6 +11,19 @@ const SELECT_FIELDS = `
   u.full_name AS account_manager_name,
   (SELECT count(*)::int FROM campaigns c WHERE c.brand_id = b.id AND c.status <> 'archived') AS campaign_count
 `;
+
+brandsRouter.get('/account-managers/list', requireAuth, requireRole('senior_manager', 'admin'), async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, full_name FROM users
+       WHERE role IN ('senior_manager', 'admin', 'campaign_manager') AND is_active
+       ORDER BY full_name`,
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(503).json({ error: err.message });
+  }
+});
 
 brandsRouter.get('/', requireAuth, async (_req, res) => {
   try {

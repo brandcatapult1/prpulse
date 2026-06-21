@@ -22,18 +22,17 @@ import { MODULES } from '../lib/modules.js';
 import { addDaysIso, toDateInputValue } from '../lib/dates.js';
 import { engagementsApi } from '../lib/api.js';
 import {
-  getDemoDeliverables,
-  getDemoEngagement,
-  getDemoFeedback,
-  getDemoTimeline,
-  isContactBlacklisted,
-  getDemoContact,
-  pickList,
-  pickRecord,
-  saveDeliverablesOverride,
-  saveEngagementOverride,
-} from '../lib/demo.js';
-import { DemoBanner } from '../components/ui/DemoBanner.jsx';
+  patchEngagement,
+  syncDeliverables,
+  fetchDeliverables,
+  fetchFeedback,
+  fetchEngagementTimeline,
+} from '../lib/persistence.js';
+import { updateEngagementDeliverables } from '../lib/deliverablesCache.js';
+import { getCachedContact, mergeContactsCache } from '../lib/contactsCache.js';
+import { isContactBlacklisted } from '../lib/contactsHelpers.js';
+import { contactsApi } from '../lib/api.js';
+import { getContactProfileExtras } from '../lib/contactProfile.js';
 import {
   agreedFeeRules,
   canSetDeliverableStatus,
@@ -52,7 +51,6 @@ import {
   terminalBanner,
   visitRules,
 } from '../lib/engagementRules.js';
-import { getContactProfileExtras, getEngagementsForContact } from '../lib/contactProfile.js';
 import { formatCollaborationReason } from '../lib/collaborationReasons.js';
 
 const interestOptions = [
@@ -67,40 +65,29 @@ export function EngagementRecordPage() {
   const { id } = useParams();
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState(null);
-  const [demo, setDemo] = useState(true);
   const [followUpSuggestion, setFollowUpSuggestion] = useState(null);
-  const [engagement, setEngagement] = useState(() => getDemoEngagement(id));
-  const [deliverables, setDeliverables] = useState(() => getDemoDeliverables(id));
-  const [timeline, setTimeline] = useState(() => getDemoTimeline(id));
-  const [feedbackRecord, setFeedbackRecord] = useState(() => getDemoFeedback(id));
+  const [engagement, setEngagement] = useState(null);
+  const [deliverables, setDeliverables] = useState([]);
+  const [timeline, setTimeline] = useState([]);
+  const [feedbackRecord, setFeedbackRecord] = useState(null);
+  const [contactEngagements, setContactEngagements] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notesEditing, setNotesEditing] = useState(false);
   const [notesDraft, setNotesDraft] = useState('');
 
   const persistEngagement = async (patch, { silent = false } = {}) => {
-    let next;
-    setEngagement((prev) => {
-      next = { ...prev, ...patch };
-      return next;
-    });
-
-    if (demo) {
-      saveEngagementOverride(id, next);
-      if (!silent) setToast('Saved');
-      return;
-    }
-
     setSaving(true);
     try {
-      const saved = await engagementsApi.update(id, patch);
+      const saved = await patchEngagement(id, patch);
       setEngagement((prev) => ({
         ...prev,
         ...saved,
-        contact_name: prev.contact_name,
-        campaign_name: prev.campaign_name,
-        brand_name: prev.brand_name,
-        owner_name: prev.owner_name,
-        campaign_id: prev.campaign_id,
+        contact_name: prev?.contact_name ?? saved.contact_name,
+        campaign_name: prev?.campaign_name ?? saved.campaign_name,
+        brand_name: prev?.brand_name ?? saved.brand_name,
+        owner_name: prev?.owner_name ?? saved.owner_name,
+        campaign_id: prev?.campaign_id ?? saved.campaign_id,
       }));
       if (!silent) setToast('Saved');
     } catch {
@@ -110,9 +97,14 @@ export function EngagementRecordPage() {
     }
   };
 
-  const persistDeliverables = (list) => {
-    setDeliverables(list);
-    if (demo) saveDeliverablesOverride(id, list);
+  const persistDeliverables = async (list) => {
+    try {
+      const saved = await syncDeliverables(id, deliverables, list);
+      setDeliverables(saved);
+      updateEngagementDeliverables(id, saved);
+    } catch {
+      setToast('Could not save deliverables');
+    }
   };
 
   const updateDeliverable = (delId, patch) => {
@@ -131,34 +123,49 @@ export function EngagementRecordPage() {
 
   useEffect(() => {
     if (!id) return;
-    setEngagement(getDemoEngagement(id));
-    setDeliverables(getDemoDeliverables(id));
-    setTimeline(getDemoTimeline(id));
-    setDemo(true);
+    setLoading(true);
     setFollowUpSuggestion(null);
 
     Promise.all([
-      engagementsApi.get(id).catch(() => null),
-      engagementsApi.deliverables(id).catch(() => []),
-    ]).then(([eng, dels]) => {
-      const engEmpty = !eng?.contact_name;
-      const delsEmpty = !Array.isArray(dels) || dels.length === 0;
-      const usingDemo = engEmpty || delsEmpty;
-      setDemo(usingDemo);
-      setEngagement(
-        usingDemo ? getDemoEngagement(id) : mergeEngagementFromApi(eng, id),
-      );
-      setDeliverables(
-        usingDemo ? getDemoDeliverables(id) : pickList(dels, getDemoDeliverables(id)),
-      );
-      setTimeline(getDemoTimeline(id));
-      setFeedbackRecord(getDemoFeedback(id));
-    });
+      engagementsApi.get(id),
+      fetchDeliverables(id),
+      fetchEngagementTimeline(id),
+      fetchFeedback(id),
+    ])
+      .then(async ([eng, dels, tl, fb]) => {
+        setEngagement(eng);
+        setDeliverables(dels ?? []);
+        updateEngagementDeliverables(id, dels ?? []);
+        setTimeline(Array.isArray(tl) ? tl : []);
+        setFeedbackRecord(fb);
+        if (eng?.contact_id) {
+          mergeContactsCache([{ id: eng.contact_id }]);
+          const contact = await contactsApi.get(eng.contact_id).catch(() => null);
+          if (contact) mergeContactsCache([contact]);
+          const engs = await contactsApi.engagements(eng.contact_id).catch(() => []);
+          setContactEngagements(Array.isArray(engs) ? engs : []);
+        }
+      })
+      .catch(() => {
+        setEngagement(null);
+      })
+      .finally(() => setLoading(false));
   }, [id]);
 
-  function mergeEngagementFromApi(apiRow, engagementId) {
-    const base = pickRecord(apiRow, getDemoEngagement(engagementId));
-    return { ...base, ...apiRow, contact_name: apiRow.contact_name ?? base.contact_name };
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-5xl py-12 text-center text-sm text-ink-secondary">
+        Loading engagement…
+      </div>
+    );
+  }
+
+  if (!engagement) {
+    return (
+      <div className="mx-auto max-w-5xl">
+        <EmptyState title="Engagement not found" description="This record may have been removed." />
+      </div>
+    );
   }
 
   const canComplete =
@@ -231,11 +238,12 @@ export function EngagementRecordPage() {
   };
 
   const postedCount = deliverables.filter((d) => d.status === 'posted').length;
+
   const blacklisted = engagement.contact_id && isContactBlacklisted(engagement.contact_id);
-  const contactRecord = engagement.contact_id ? getDemoContact(engagement.contact_id) : null;
-  const contactExtras = engagement.contact_id ? getContactProfileExtras(engagement.contact_id) : {};
-  const previousBrands = contactRecord
-    ? [...new Set(getEngagementsForContact(contactRecord).map((e) => e.brand_name).filter(Boolean))].join(', ')
+  const contactRecord = engagement.contact_id ? getCachedContact(engagement.contact_id) : null;
+  const contactExtras = getContactProfileExtras(contactRecord);
+  const previousBrands = contactEngagements.length
+    ? [...new Set(contactEngagements.map((e) => e.brand_name).filter(Boolean))].join(', ')
     : '—';
 
   return (
@@ -267,7 +275,6 @@ export function EngagementRecordPage() {
         <span className="text-2xs text-ink-tertiary">{MODULES.engagementRecord.subtitle}</span>
       </div>
 
-      <DemoBanner show={demo} />
       {blacklisted && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-2xs text-red-900">
           <span className="font-semibold">Blacklisted creator.</span> This contact is excluded from new campaign population.

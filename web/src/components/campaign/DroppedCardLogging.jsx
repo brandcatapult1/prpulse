@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Modal } from '../ui/Primitives.jsx';
-import { isContactBlacklisted } from '../../lib/demo.js';
+import { isContactBlacklisted } from '../../lib/contactsHelpers.js';
 import { canReopenDropped, droppedFromLabel } from '../../lib/dropTransitions.js';
 import { reopenToastMessage } from '../../lib/outreachLogging.js';
 import { resolveDroppedFrom, STAGE, transitionStage } from '../../lib/engagementTransitions.js';

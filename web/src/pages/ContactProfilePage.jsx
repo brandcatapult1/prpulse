@@ -5,8 +5,8 @@ import { EmptyState, Toast } from '../components/ui/Primitives.jsx';
 import { Pill, formatDate, formatFee, formatStatus, statusTone } from '../lib/format.jsx';
 import { MODULES, CONTACT_PROFILE_TABS } from '../lib/modules.js';
 import { contactsApi } from '../lib/api.js';
-import { getDemoContact, pickRecord } from '../lib/demo.js';
-import { saveContactProfileOverride } from '../lib/demoStore.js';
+import { patchContact, fetchFeedback } from '../lib/persistence.js';
+import { mergeContactsCache } from '../lib/contactsCache.js';
 import {
   getActiveEngagementsForContact,
   getCollaborationHistory,
@@ -14,14 +14,15 @@ import {
   getFeedbackHistoryForContact,
 } from '../lib/contactProfile.js';
 import { formatCollaborationReason } from '../lib/collaborationReasons.js';
-import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 
 export function ContactProfilePage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [contact, setContact] = useState(() => getDemoContact(id));
-  const [demo, setDemo] = useState(true);
+  const [contact, setContact] = useState(null);
+  const [engagements, setEngagements] = useState([]);
+  const [feedbackByEngagement, setFeedbackByEngagement] = useState({});
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(CONTACT_PROFILE_TABS[0]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({});
@@ -29,40 +30,57 @@ export function ContactProfilePage() {
 
   useEffect(() => {
     if (!id) return;
-    setContact(getDemoContact(id));
-    setDemo(true);
+    setLoading(true);
     setActiveTab(CONTACT_PROFILE_TABS[0]);
     setEditing(false);
 
-    contactsApi
-      .get(id)
-      .then((row) => {
-        setContact(pickRecord(row, getDemoContact(id)));
-        setDemo(!row?.full_name);
+    Promise.all([
+      contactsApi.get(id),
+      contactsApi.engagements(id),
+    ])
+      .then(async ([row, engs]) => {
+        setContact(row);
+        mergeContactsCache([row]);
+        const engagementList = Array.isArray(engs) ? engs : [];
+        setEngagements(engagementList);
+        const feedbackMap = {};
+        await Promise.all(
+          engagementList.map(async (e) => {
+            const fb = await fetchFeedback(e.id).catch(() => null);
+            if (fb) feedbackMap[e.id] = fb;
+          }),
+        );
+        setFeedbackByEngagement(feedbackMap);
       })
-      .catch(() => {
-        setContact(getDemoContact(id));
-        setDemo(true);
-      });
+      .catch(() => setContact(null))
+      .finally(() => setLoading(false));
   }, [id]);
 
   const extras = useMemo(
-    () => (contact ? getContactProfileExtras(contact.id) : {}),
+    () => (contact ? getContactProfileExtras(contact) : {}),
     [contact, editing],
   );
 
   const history = useMemo(
-    () => (contact ? getCollaborationHistory(contact) : []),
-    [contact],
+    () => getCollaborationHistory(engagements, { feedbackByEngagement }),
+    [engagements, feedbackByEngagement],
   );
   const activeEngagements = useMemo(
-    () => (contact ? getActiveEngagementsForContact(contact) : []),
-    [contact],
+    () => getActiveEngagementsForContact(engagements),
+    [engagements],
   );
   const feedbackHistory = useMemo(
-    () => (contact ? getFeedbackHistoryForContact(contact) : []),
-    [contact],
+    () => getFeedbackHistoryForContact(engagements, feedbackByEngagement),
+    [engagements, feedbackByEngagement],
   );
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-4xl py-12 text-center text-sm text-ink-secondary">
+        Loading profile…
+      </div>
+    );
+  }
 
   if (!contact) {
     return (
@@ -84,17 +102,20 @@ export function ContactProfilePage() {
     setEditing(true);
   }
 
-  function saveEdit() {
-    saveContactProfileOverride(contact.id, {
-      city: draft.city.trim() || contact.city,
-      instagram_url: draft.instagram_url.trim() || null,
-      notes: draft.notes.trim() || null,
-    });
-    if (draft.city.trim()) {
-      setContact((c) => ({ ...c, city: draft.city.trim() }));
+  async function saveEdit() {
+    try {
+      const updated = await patchContact(contact.id, {
+        city: draft.city.trim() || contact.city,
+        instagram_url: draft.instagram_url.trim() || null,
+        notes: draft.notes.trim() || null,
+      });
+      setContact(updated);
+      mergeContactsCache([updated]);
+      setEditing(false);
+      setToast('Profile updated');
+    } catch (err) {
+      setToast(err.message ?? 'Could not save profile');
     }
-    setEditing(false);
-    setToast('Profile updated');
   }
 
   const tags = contact.tags ?? [];
@@ -119,8 +140,6 @@ export function ContactProfilePage() {
           </>
         }
       />
-
-      <DemoBanner show={demo} />
 
       <div className="panel p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">

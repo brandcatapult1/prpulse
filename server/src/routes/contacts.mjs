@@ -8,7 +8,8 @@ contactsRouter.get('/', requireAuth, async (req, res) => {
   const includeArchived = req.query.include_archived === 'true';
   const { rows } = await pool.query(
     `SELECT c.id, c.full_name, c.city, c.classification, c.status,
-            c.is_blacklisted, c.mobile_number, c.contact_type
+            c.is_blacklisted, c.mobile_number, c.contact_type,
+            c.open_to_paid, c.open_to_barter
      FROM contacts c
      WHERE 1=1 ${scopeArchived(includeArchived)}
      ORDER BY c.full_name

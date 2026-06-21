@@ -28,6 +28,7 @@ export const dashboardApi = {
 export const contactsApi = {
   list: () => api('/contacts'),
   get: (id) => api(`/contacts/${id}`),
+  engagements: (id) => api(`/contacts/${id}/engagements`),
   update: (id, body) => api(`/contacts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   quickAdd: (body) => api('/contacts/quick-add', { method: 'POST', body: JSON.stringify(body) }),
   lookupMobile: (mobile) =>
@@ -78,6 +79,7 @@ export const registrationsApi = {
 export const brandsApi = {
   list: () => api('/brands'),
   get: (id) => api(`/brands/${id}`),
+  accountManagers: () => api('/brands/account-managers/list'),
   update: (id, body) => api(`/brands/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 };
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ConfirmDialog, Modal, Toast } from '../ui/Primitives.jsx';
 import { todayIso } from '../../lib/dates.js';
-import { saveBlacklistOverride, saveFeedbackOverride } from '../../lib/demoStore.js';
+import { saveFeedback as putEngagementFeedback, blacklistContact } from '../../lib/persistence.js';
 
 const EMPTY = {
   content_quality: 0,
@@ -38,14 +38,19 @@ export function FeedbackModal({
 
   const setRating = (field, value) => setForm((f) => ({ ...f, [field]: value }));
 
-  const saveFeedback = () => {
+  const saveFeedback = async () => {
     if (!form.content_quality || !form.professionalism || !form.timeliness) {
       setToast('Rate all three categories before saving');
       return;
     }
 
     const record = { ...form, saved_at: todayIso() };
-    saveFeedbackOverride(engagementId, record);
+    try {
+      await putEngagementFeedback(engagementId, record);
+    } catch (err) {
+      setToast(err.message ?? 'Could not save feedback');
+      return;
+    }
 
     const needsBlacklistPrompt = !form.adherence_to_terms || !form.would_work_again;
     if (needsBlacklistPrompt && contactId) {
@@ -62,15 +67,17 @@ export function FeedbackModal({
     onClose();
   };
 
-  const confirmBlacklist = () => {
+  const confirmBlacklist = async () => {
     if (!blacklistReason.trim()) {
       setToast('Reason is required to blacklist');
       return;
     }
-    saveBlacklistOverride(contactId, {
-      reason: blacklistReason.trim(),
-      blacklisted_at: todayIso(),
-    });
+    try {
+      await blacklistContact(contactId, blacklistReason.trim());
+    } catch (err) {
+      setToast(err.message ?? 'Could not blacklist');
+      return;
+    }
     setBlacklistOpen(false);
     setBlacklistPrompt(false);
     onSaved?.(form);

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ConfirmDialog, Modal } from '../ui/Primitives.jsx';
-import { getDemoDeliverables } from '../../lib/demo.js';
+import { getDeliverablesForEngagement } from '../../lib/deliverablesCache.js';
 import { canMarkDidntDeliver } from '../../lib/campaignPermissions.js';
 import { deliverableProgress } from '../../lib/campaignKanban.js';
 import {
@@ -36,7 +36,7 @@ export function AwaitingDeliverablesCardLogging({
   const [blacklistOnDrop, setBlacklistOnDrop] = useState(false);
 
   const deliverables = useMemo(
-    () => getDemoDeliverables(engagement.id),
+    () => getDeliverablesForEngagement(engagement.id),
     [engagement.id, boardRevision],
   );
 

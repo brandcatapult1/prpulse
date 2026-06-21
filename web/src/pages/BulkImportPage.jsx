@@ -1,8 +1,7 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { DataTable } from '../components/ui/DataKit.jsx';
 import { Card, Toast } from '../components/ui/Primitives.jsx';
-import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { Pill } from '../lib/format.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -16,13 +15,7 @@ import {
   validateCampaignRows,
   validateContactRows,
 } from '../lib/csvImport.js';
-import {
-  addCampaignImports,
-  addContactImports,
-  getDemoBrands,
-  getDemoContacts,
-} from '../lib/demo.js';
-import { importApi } from '../lib/api.js';
+import { brandsApi, contactsApi, importApi } from '../lib/api.js';
 
 const TABS = [
   { id: 'contacts', label: 'Contacts' },
@@ -38,10 +31,30 @@ export function BulkImportPage() {
   const [fileName, setFileName] = useState(null);
   const [skipDuplicates, setSkipDuplicates] = useState(true);
   const [toast, setToast] = useState(null);
-  const [demo, setDemo] = useState(true);
+  const [existingContacts, setExistingContacts] = useState([]);
+  const [existingBrands, setExistingBrands] = useState([]);
+  const [referenceLoading, setReferenceLoading] = useState(true);
 
   const summary = useMemo(() => importSummary(validated), [validated]);
   const ready = useMemo(() => rowsReadyToImport(validated), [validated]);
+
+  const loadReferenceData = useCallback(async () => {
+    setReferenceLoading(true);
+    try {
+      const [contacts, brands] = await Promise.all([contactsApi.list(), brandsApi.list()]);
+      setExistingContacts(Array.isArray(contacts) ? contacts : []);
+      setExistingBrands(Array.isArray(brands) ? brands : []);
+    } catch {
+      setExistingContacts([]);
+      setExistingBrands([]);
+    } finally {
+      setReferenceLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadReferenceData();
+  }, [loadReferenceData]);
 
   const parseFile = async (file) => {
     if (!file) return;
@@ -51,10 +64,10 @@ export function BulkImportPage() {
 
     if (tab === 'contacts') {
       setValidated(
-        validateContactRows(rows, getDemoContacts(), { skipDuplicates }),
+        validateContactRows(rows, existingContacts, { skipDuplicates }),
       );
     } else {
-      setValidated(validateCampaignRows(rows, getDemoBrands()));
+      setValidated(validateCampaignRows(rows, existingBrands));
     }
   };
 
@@ -71,9 +84,9 @@ export function BulkImportPage() {
       ({ status, message, existing_contact_id, existing_contact_name, brand_id, campaign_status, ...rest }) => rest,
     );
     if (tab === 'contacts') {
-      setValidated(validateContactRows(rawRows, getDemoContacts(), { skipDuplicates: nextSkip }));
+      setValidated(validateContactRows(rawRows, existingContacts, { skipDuplicates: nextSkip }));
     } else {
-      setValidated(validateCampaignRows(rawRows, getDemoBrands()));
+      setValidated(validateCampaignRows(rawRows, existingBrands));
     }
   };
 
@@ -113,45 +126,14 @@ export function BulkImportPage() {
         }));
         await importApi.campaigns(payload);
       }
-      setDemo(false);
-    } catch {
-      if (tab === 'contacts') {
-        addContactImports(
-          ready.map((r, i) => ({
-            id: `imp-c-${Date.now()}-${i}`,
-            full_name: r.full_name,
-            mobile_number: r.mobile_number,
-            city: r.city,
-            instagram_url: r.instagram_url,
-            classification: 'micro',
-            status: 'active',
-            tags: ['Imported'],
-            source: 'bulk_upload',
-          })),
-        );
-      } else {
-        addCampaignImports(
-          ready.map((r, i) => ({
-            id: `imp-camp-${Date.now()}-${i}`,
-            brand_id: r.brand_id,
-            campaign_name: r.campaign_name,
-            brand_name: r.brand_name,
-            status: r.campaign_status,
-            target_collaborations: r.target_collaborations,
-            completed_collaborations: 0,
-            remaining_collaborations: r.target_collaborations,
-            achievement_pct: r.target_collaborations ? 0 : null,
-            campaign_health: r.target_collaborations ? 'red' : 'not_set',
-          })),
-        );
-      }
-      setDemo(true);
+      await loadReferenceData();
+      setToast(`Imported ${ready.length} ${tab === 'contacts' ? 'contact' : 'campaign'}${ready.length === 1 ? '' : 's'}`);
+      setValidated([]);
+      setFileName(null);
+      if (fileRef.current) fileRef.current.value = '';
+    } catch (err) {
+      setToast(err.message ?? 'Import failed — check your connection and try again');
     }
-
-    setToast(`Imported ${ready.length} ${tab === 'contacts' ? 'contact' : 'campaign'}${ready.length === 1 ? '' : 's'}`);
-    setValidated([]);
-    setFileName(null);
-    if (fileRef.current) fileRef.current.value = '';
   };
 
   const previewColumns =
@@ -160,44 +142,24 @@ export function BulkImportPage() {
           { key: 'full_name', label: 'Name', render: (r) => r.full_name || '—' },
           { key: 'mobile_number', label: 'Mobile', render: (r) => r.mobile_number || '—' },
           { key: 'city', label: 'City', render: (r) => r.city || '—' },
-          {
-            key: 'status',
-            label: 'Status',
-            render: (r) => (
-              <div className="space-y-0.5">
-                <Pill tone={statusTone(r.status)}>{r.status}</Pill>
-                {r.existing_contact_id && (
-                  <Link to={`/contacts/${r.existing_contact_id}`} className="block text-2xs text-brand hover:underline">
-                    Review existing
-                  </Link>
-                )}
-              </div>
-            ),
-          },
-          { key: 'message', label: 'Notes', render: (r) => <span className="text-2xs text-ink-secondary">{r.message}</span> },
+          { key: 'status', label: 'Status', render: (r) => <Pill tone={statusTone(r.status)}>{r.status}</Pill> },
+          { key: 'message', label: 'Message', render: (r) => r.message || '—' },
         ]
       : [
           { key: 'campaign_name', label: 'Campaign', render: (r) => r.campaign_name || '—' },
           { key: 'brand_name', label: 'Brand', render: (r) => r.brand_name || '—' },
           { key: 'target_collaborations', label: 'Target', render: (r) => r.target_collaborations ?? '—' },
-          {
-            key: 'status',
-            label: 'Status',
-            render: (r) => <Pill tone={statusTone(r.status)}>{r.status}</Pill>,
-          },
-          { key: 'message', label: 'Notes', render: (r) => <span className="text-2xs text-ink-secondary">{r.message}</span> },
+          { key: 'status', label: 'Status', render: (r) => <Pill tone={statusTone(r.status)}>{r.status}</Pill> },
+          { key: 'message', label: 'Message', render: (r) => r.message || '—' },
         ];
 
   if (!allowed) {
     return (
-      <div className="mx-auto max-w-lg space-y-4">
-        <PageHeader title="Bulk Import" subtitle="Import contacts or campaigns from CSV" />
-        <Card className="!p-6 text-center">
-          <p className="text-sm text-ink-secondary">
-            Bulk import requires Senior Manager or Admin access.
-          </p>
-          <Link to="/contacts" className="btn-secondary mt-4 inline-flex">Back to Contacts</Link>
-        </Card>
+      <div className="mx-auto max-w-2xl py-12 text-center">
+        <p className="text-sm text-ink-secondary">You do not have permission to bulk import.</p>
+        <Link to="/" className="mt-4 inline-block text-sm text-brand hover:underline">
+          Back to dashboard
+        </Link>
       </div>
     );
   }
@@ -214,7 +176,9 @@ export function BulkImportPage() {
         }
       />
 
-      <DemoBanner show={demo} />
+      {referenceLoading && (
+        <p className="text-2xs text-ink-secondary">Loading existing records for duplicate check…</p>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {TABS.map((t) => (

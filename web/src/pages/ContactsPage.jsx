@@ -6,18 +6,16 @@ import { QuickAddModal } from '../components/contacts/QuickAddModal.jsx';
 import { Pill, statusTone } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
 import { contactsApi } from '../lib/api.js';
-import { getDemoContacts, mergeContacts } from '../lib/demo.js';
-import { getContactProfileExtras } from '../lib/contactProfile.js';
+import { setContactsCache } from '../lib/contactsCache.js';
 import { canBulkImport } from '../lib/csvImport.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 
 export function ContactsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const canImport = canBulkImport(user?.role);
-  const [rows, setRows] = useState(() => getDemoContacts());
-  const [demo, setDemo] = useState(true);
+  const [rows, setRows] = useState([]);
+  const [loadError, setLoadError] = useState(null);
   const [quickOpen, setQuickOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState([]);
@@ -30,13 +28,14 @@ export function ContactsPage() {
     contactsApi
       .list()
       .then((data) => {
-        const { rows: resolved, _demo } = mergeContacts(data);
-        setRows(resolved);
-        setDemo(_demo);
+        const list = Array.isArray(data) ? data : [];
+        setRows(list);
+        setContactsCache(list);
+        setLoadError(null);
       })
-      .catch(() => {
-        setRows(getDemoContacts());
-        setDemo(true);
+      .catch((err) => {
+        setRows([]);
+        setLoadError(err.message ?? 'Could not load contacts');
       });
   }
 
@@ -65,10 +64,10 @@ export function ContactsPage() {
       result = result.filter((r) => r.classification);
     }
     if (activeFilters.includes('Open to Paid')) {
-      result = result.filter((r) => getContactProfileExtras(r.id).open_to_paid);
+      result = result.filter((r) => r.open_to_paid);
     }
     if (activeFilters.includes('Open to Barter')) {
-      result = result.filter((r) => getContactProfileExtras(r.id).open_to_barter);
+      result = result.filter((r) => r.open_to_barter);
     }
     return result;
   }, [rows, query, activeFilters]);
@@ -105,7 +104,9 @@ export function ContactsPage() {
         }
       />
 
-      <DemoBanner show={demo} />
+      {loadError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-2xs text-red-800">{loadError}</div>
+      )}
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <input

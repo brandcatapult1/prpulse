@@ -1,4 +1,4 @@
-import { getDemoDeliverables } from './demo.js';
+import { getDeliverablesForEngagement } from './deliverablesCache.js';
 import { deliverableHasProof } from './deliverableLogging.js';
 import { todayIso } from './dates.js';
 import { canMarkDidntDeliver } from './campaignPermissions.js';
@@ -43,7 +43,7 @@ export { isValidDropReason, resolveDroppedFrom, droppedFromToStatus } from './dr
 export { NOT_CONTACTED_DROP_REASON } from './dropTransitions.js';
 
 export function canCompleteEngagement(engagementId) {
-  const dels = getDemoDeliverables(engagementId);
+  const dels = getDeliverablesForEngagement(engagementId);
   return (
     dels.length > 0
     && dels.every((d) => d.status === 'posted' && deliverableHasProof(d))
@@ -122,7 +122,7 @@ export function transitionStage(engagement, target, payload = {}) {
     if (!payload.visitDate) {
       return { ok: false, needsPrompt: 'visit_date' };
     }
-    if (getDemoDeliverables(engagement.id).length === 0) {
+    if (getDeliverablesForEngagement(engagement.id).length === 0) {
       return {
         ok: false,
         error: SCHEDULED_REQUIRES_DELIVERABLES_MESSAGE,
@@ -149,7 +149,7 @@ export function transitionStage(engagement, target, payload = {}) {
     if (!visitCompletedDate) {
       return { ok: false, error: 'Visit date required' };
     }
-    const dels = getDemoDeliverables(engagement.id);
+    const dels = getDeliverablesForEngagement(engagement.id);
     if (dels.length === 0) {
       return { ok: false, error: 'Add deliverables before logging visit complete' };
     }

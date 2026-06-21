@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Card, Modal, Toast } from '../components/ui/Primitives.jsx';
+import { Card } from '../components/ui/Primitives.jsx';
 import { DemoBanner } from '../components/ui/DemoBanner.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { Pill } from '../lib/format.jsx';
@@ -18,9 +18,7 @@ const PERIODS = [
 export function ReportsPage() {
   const [campaignId, setCampaignId] = useState('c1');
   const [period, setPeriod] = useState('2026-06');
-  const [managerNotes, setManagerNotes] = useState('');
-  const [shareOpen, setShareOpen] = useState(false);
-  const [toast, setToast] = useState(null);
+  const [managerNotes] = useState('');
 
   const campaign = MOCK_CAMPAIGNS.find((c) => c.id === campaignId) ?? MOCK_CAMPAIGNS[0];
   const periodLabel = PERIODS.find((p) => p.value === period)?.label ?? period;
@@ -34,10 +32,10 @@ export function ReportsPage() {
         subtitle={MODULES.reporting.subtitle}
         actions={
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn-secondary" onClick={() => setToast('PDF export — coming soon')}>
+            <button type="button" className="btn-secondary" disabled title="Coming soon">
               Export PDF
             </button>
-            <button type="button" className="btn-primary" onClick={() => setShareOpen(true)}>
+            <button type="button" className="btn-primary" disabled title="Coming soon">
               Shareable link
             </button>
           </div>
@@ -133,23 +131,14 @@ export function ReportsPage() {
 
       <ReportSection title="Campaign Manager Notes">
         <textarea
-          className="input-field min-h-[96px] py-2"
-          placeholder="Add narrative for the client report…"
+          className="input-field min-h-[96px] py-2 opacity-60"
+          placeholder="Manager notes — coming soon"
           value={managerNotes}
-          onChange={(e) => setManagerNotes(e.target.value)}
+          disabled
+          readOnly
         />
       </ReportSection>
 
-      <ShareLinkModal
-        open={shareOpen}
-        onClose={() => setShareOpen(false)}
-        onRevoke={() => {
-          setShareOpen(false);
-          setToast('Share link revoked');
-        }}
-      />
-
-      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </div>
   );
 }
@@ -160,29 +149,6 @@ function ReportSection({ title, children }) {
       <h2 className="text-sm font-semibold text-ink">{title}</h2>
       <div className="mt-3">{children}</div>
     </Card>
-  );
-}
-
-function ShareLinkModal({ open, onClose, onRevoke }) {
-  const link = 'https://prpulse-1.onrender.com/reports/share/demo-token-abc123';
-
-  return (
-    <Modal
-      open={open}
-      title="Shareable report link"
-      onClose={onClose}
-      footer={
-        <div className="flex justify-between">
-          <button type="button" className="btn-secondary text-red-600" onClick={onRevoke}>Revoke link</button>
-          <button type="button" className="btn-primary" onClick={onClose}>Done</button>
-        </div>
-      }
-    >
-      <p className="mb-3 text-2xs text-ink-secondary">
-        Link expires in 30 days by default. Client view strips internal-only fields.
-      </p>
-      <input className="input-field" readOnly value={link} onFocus={(e) => e.target.select()} />
-    </Modal>
   );
 }
 

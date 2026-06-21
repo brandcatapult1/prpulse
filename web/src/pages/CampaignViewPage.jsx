@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { DataTable, FilterBar } from '../components/ui/DataKit.jsx';
+import { DataTable } from '../components/ui/DataKit.jsx';
 import { Drawer, Toast } from '../components/ui/Primitives.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { CampaignKanbanBoard } from '../components/campaign/CampaignKanbanBoard.jsx';
@@ -489,7 +489,6 @@ function AddCreatorsDrawer({ open, onClose, campaignId, campaignName, onAdded })
           </div>
         }
       >
-        <FilterBar filters={['Category', 'City', 'Classification', 'Tags', 'Saved list']} />
         <div className="mt-4">
         <DataTable
           selectable

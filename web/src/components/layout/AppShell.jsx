@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { roleLabel } from '../../lib/format.jsx';
 import { NAV_ITEMS } from '../../lib/modules.js';
@@ -8,7 +8,6 @@ import { useOrgLogo } from '../../hooks/useOrgLogo.js';
 
 export function AppShell({ onQuickAdd }) {
   const { user, logout, devMode } = useAuth();
-  const navigate = useNavigate();
   const { logoUrl, loading } = useOrgLogo();
 
   return (
@@ -51,15 +50,7 @@ export function AppShell({ onQuickAdd }) {
 
       <div className="flex flex-col md:pl-[220px]">
         <header className="sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-line bg-white px-4 md:px-5">
-          <div className="md:hidden text-sm font-semibold text-ink">PR Pulse</div>
-          <button
-            type="button"
-            className="hidden flex-1 items-center gap-2 rounded-md border border-line bg-canvas px-3 py-1.5 text-left text-2xs text-ink-tertiary md:flex md:max-w-sm"
-            onClick={() => navigate('/contacts')}
-          >
-            <span>Search contacts, campaigns…</span>
-            <span className="ml-auto rounded border border-line bg-white px-1.5 py-0.5 text-[10px]">⌘K</span>
-          </button>
+          <div className="text-sm font-semibold text-ink md:hidden">PR Pulse</div>
           <div className="ml-auto flex items-center gap-2">
             <button type="button" className="btn-secondary" onClick={onQuickAdd}>
               Quick Add

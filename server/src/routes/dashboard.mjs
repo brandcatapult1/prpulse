@@ -23,7 +23,7 @@ dashboardRouter.get('/', requireAuth, async (req, res) => {
       [userId, today],
     ),
     pool.query(
-      `SELECT d.id, d.due_date, d.deliverable_type, c.full_name, cam.campaign_name
+      `SELECT d.id, d.engagement_id, d.due_date, d.deliverable_type, c.full_name, cam.campaign_name
        FROM v_deliverables d
        JOIN engagements e ON e.id = d.engagement_id
        JOIN contacts c ON c.id = e.contact_id

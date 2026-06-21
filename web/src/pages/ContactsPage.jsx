@@ -115,7 +115,7 @@ export function ContactsPage() {
           onChange={(e) => setQuery(e.target.value)}
         />
         <FilterBar
-          filters={['Name', 'Mobile', 'City', 'Category', 'Tags', 'Open to Paid', 'Open to Barter', 'Classification', 'Status']}
+          filters={['Status', 'Classification', 'Open to Paid', 'Open to Barter']}
           active={activeFilters}
           onToggle={toggleFilter}
           onClear={() => setActiveFilters([])}

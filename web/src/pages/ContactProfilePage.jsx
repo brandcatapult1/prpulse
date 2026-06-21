@@ -15,6 +15,7 @@ import {
 } from '../lib/contactProfile.js';
 import { formatCollaborationReason } from '../lib/collaborationReasons.js';
 import { DemoBanner } from '../components/ui/DemoBanner.jsx';
+import { PageHeader } from '../components/ui/PageHeader.jsx';
 
 export function ContactProfilePage() {
   const { id } = useParams();

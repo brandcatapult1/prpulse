@@ -1,8 +1,14 @@
 import { orgBrandingApi } from './api.js';
 import { getOrgSettingsOverride, saveOrgSettingsOverride } from './demoStore.js';
 
-/** Bundled demo default — replace via Admin → Settings upload in production. */
-export const DEFAULT_DEMO_ORG_LOGO = '/branding/brand-catapult-logo.png';
+/** Bundled transparent wordmark for the light sidebar. */
+export const DEFAULT_DEMO_ORG_LOGO = '/branding/brand-catapult-wordmark.svg';
+
+/** Legacy PNG is mostly black padding; map to the wordmark instead. */
+export const LEGACY_ORG_LOGO = '/branding/brand-catapult-logo.png';
+
+/** Stored when an admin explicitly clears the logo (wordmark-only sidebar). */
+export const LOGO_CLEARED = '__cleared__';
 
 export const ORG_LOGO_CHANGED = 'prpulse-org-logo-changed';
 
@@ -13,47 +19,54 @@ export function notifyOrgLogoChanged() {
   window.dispatchEvent(new Event(ORG_LOGO_CHANGED));
 }
 
-/** Resolve logo for display: session override → API value → demo default → none. */
-export function resolveOrgLogoUrl({ override, apiLogo, demoMode }) {
-  if (override && Object.prototype.hasOwnProperty.call(override, 'logoUrl')) {
-    return override.logoUrl || null;
-  }
-  if (apiLogo) return apiLogo;
-  if (demoMode) return DEFAULT_DEMO_ORG_LOGO;
-  return null;
-}
-
-export function readOrgLogoOverride() {
-  return getOrgSettingsOverride()?.logoUrl ?? undefined;
+export function normalizeOrgLogoUrl(url) {
+  if (!url || url === LOGO_CLEARED) return null;
+  if (url === LEGACY_ORG_LOGO) return DEFAULT_DEMO_ORG_LOGO;
+  return url;
 }
 
 export function persistOrgLogoOverride(logoUrl) {
-  saveOrgSettingsOverride({ logoUrl: logoUrl ?? null });
+  saveOrgSettingsOverride({
+    logoUrl: logoUrl === null ? LOGO_CLEARED : logoUrl,
+  });
   notifyOrgLogoChanged();
 }
 
-export async function loadOrgLogoUrl({ demoMode = true } = {}) {
+export async function loadOrgLogoUrl() {
   const override = getOrgSettingsOverride();
   if (override && Object.prototype.hasOwnProperty.call(override, 'logoUrl')) {
-    return override.logoUrl || null;
+    if (override.logoUrl === LOGO_CLEARED) return null;
+    return normalizeOrgLogoUrl(override.logoUrl) ?? DEFAULT_DEMO_ORG_LOGO;
   }
 
   try {
     const data = await orgBrandingApi.get();
-    return data?.logo_url ?? null;
+    if (data?.logo_url === LOGO_CLEARED) return null;
+    if (data?.logo_url) return normalizeOrgLogoUrl(data.logo_url);
+    return DEFAULT_DEMO_ORG_LOGO;
   } catch {
-    if (demoMode) return DEFAULT_DEMO_ORG_LOGO;
-    return null;
+    return DEFAULT_DEMO_ORG_LOGO;
   }
 }
 
 export async function saveOrgLogoUrl(logoUrl) {
+  const apiValue = logoUrl === null ? LOGO_CLEARED : logoUrl;
   persistOrgLogoOverride(logoUrl);
+
   try {
-    await orgBrandingApi.update({ logo_url: logoUrl });
-  } catch {
-    /* demo session override is enough */
+    await orgBrandingApi.update({ logo_url: apiValue });
+    return { ok: true, persisted: true };
+  } catch (err) {
+    return {
+      ok: true,
+      persisted: false,
+      warning: err.message ?? 'Saved for this browser session only — set DATABASE_URL and run migration 004 on the server to persist for everyone.',
+    };
   }
+}
+
+export async function applyDefaultOrgLogo() {
+  return saveOrgLogoUrl(DEFAULT_DEMO_ORG_LOGO);
 }
 
 export function validateLogoFile(file) {

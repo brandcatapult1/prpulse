@@ -9,7 +9,7 @@ import { useOrgLogo } from '../../hooks/useOrgLogo.js';
 export function AppShell({ onQuickAdd }) {
   const { user, logout, devMode } = useAuth();
   const navigate = useNavigate();
-  const { logoUrl, loading } = useOrgLogo({ demoMode: devMode });
+  const { logoUrl, loading } = useOrgLogo();
 
   return (
     <div className="bg-canvas">

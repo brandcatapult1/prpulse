@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card, Toast } from '../ui/Primitives.jsx';
 import {
+  applyDefaultOrgLogo,
+  DEFAULT_DEMO_ORG_LOGO,
   loadOrgLogoUrl,
   readLogoFileAsDataUrl,
   saveOrgLogoUrl,
@@ -15,10 +17,17 @@ export function OrgBrandingSettings() {
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
-    loadOrgLogoUrl({ demoMode: true })
-      .then(setLogoUrl)
-      .finally(() => setLoading(false));
+    loadOrgLogoUrl().then(setLogoUrl).finally(() => setLoading(false));
   }, []);
+
+  async function handleSaveResult(result, nextUrl, successMessage) {
+    setLogoUrl(nextUrl);
+    if (result.warning) {
+      setToast(`${successMessage} — ${result.warning}`);
+      return;
+    }
+    setToast(successMessage);
+  }
 
   async function handleFileChange(event) {
     const file = event.target.files?.[0];
@@ -32,11 +41,22 @@ export function OrgBrandingSettings() {
     setSaving(true);
     try {
       const dataUrl = await readLogoFileAsDataUrl(file);
-      await saveOrgLogoUrl(dataUrl);
-      setLogoUrl(dataUrl);
-      setToast('Logo updated');
+      const result = await saveOrgLogoUrl(dataUrl);
+      await handleSaveResult(result, dataUrl, 'Logo updated');
     } catch {
       setToast('Could not save logo');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleUseDefault() {
+    setSaving(true);
+    try {
+      const result = await applyDefaultOrgLogo();
+      await handleSaveResult(result, DEFAULT_DEMO_ORG_LOGO, 'Default wordmark applied');
+    } catch {
+      setToast('Could not apply default logo');
     } finally {
       setSaving(false);
     }
@@ -45,9 +65,8 @@ export function OrgBrandingSettings() {
   async function handleRemove() {
     setSaving(true);
     try {
-      await saveOrgLogoUrl(null);
-      setLogoUrl(null);
-      setToast('Logo removed');
+      const result = await saveOrgLogoUrl(null);
+      await handleSaveResult(result, null, 'Logo removed — sidebar shows PR Pulse only');
     } catch {
       setToast('Could not remove logo');
     } finally {
@@ -55,12 +74,14 @@ export function OrgBrandingSettings() {
     }
   }
 
+  const usingDefault = logoUrl === DEFAULT_DEMO_ORG_LOGO;
+
   return (
     <>
       <Card elevated className="!p-5">
         <h2 className="text-sm font-semibold text-ink">Agency logo</h2>
         <p className="mt-1 text-2xs text-ink-secondary">
-          Shown at the top of the sidebar above PR Pulse. PNG or SVG on a transparent background works best.
+          Shown at the top of the sidebar above PR Pulse. Use a transparent PNG or SVG — solid backgrounds look like a pasted box on the white sidebar.
         </p>
 
         <div className="mt-4 flex flex-wrap items-center gap-4">
@@ -74,7 +95,7 @@ export function OrgBrandingSettings() {
                 className="max-h-10 max-w-[140px] object-contain object-left"
               />
             ) : (
-              <span className="text-2xs text-ink-tertiary">No logo set</span>
+              <span className="text-2xs text-ink-tertiary">PR Pulse wordmark only</span>
             )}
           </div>
 
@@ -85,8 +106,18 @@ export function OrgBrandingSettings() {
               disabled={saving}
               onClick={() => inputRef.current?.click()}
             >
-              {logoUrl ? 'Replace logo' : 'Upload logo'}
+              Upload logo
             </button>
+            {!usingDefault && (
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={saving}
+                onClick={handleUseDefault}
+              >
+                Use default wordmark
+              </button>
+            )}
             {logoUrl && (
               <button
                 type="button"
@@ -94,7 +125,7 @@ export function OrgBrandingSettings() {
                 disabled={saving}
                 onClick={handleRemove}
               >
-                Remove
+                Remove logo
               </button>
             )}
           </div>

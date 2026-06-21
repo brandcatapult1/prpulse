@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 136 36" role="img" aria-label="Brand Catapult">
+  <text
+    x="0"
+    y="28"
+    font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+    font-size="26"
+    font-weight="700"
+    letter-spacing="-0.03em"
+    fill="#E52726"
+  >Brand</text>
+  <circle cx="122" cy="11" r="5" fill="#E52726"/>
+</svg>

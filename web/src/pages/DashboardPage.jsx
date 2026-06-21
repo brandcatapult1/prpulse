@@ -232,7 +232,7 @@ export function DashboardPage() {
           <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
             <DashboardModule
               icon={IconTasks}
-              iconTint="bg-brand-soft text-brand"
+              iconTint="bg-indigo-50 text-indigo-600"
               title="Today's tasks"
               count={dashboard.todaysTasks.length}
               viewAllHref="/campaigns"
@@ -251,7 +251,7 @@ export function DashboardPage() {
 
             <DashboardModule
               icon={IconVisits}
-              iconTint="bg-sky-50 text-sky-600"
+              iconTint="bg-sky-100 text-sky-600"
               title="Today's visits"
               count={dashboard.todaysVisits.length}
               viewAllHref="/campaigns"
@@ -269,7 +269,7 @@ export function DashboardPage() {
 
             <DashboardModule
               icon={IconDeliverables}
-              iconTint="bg-violet-50 text-violet-600"
+              iconTint="bg-violet-100 text-violet-600"
               title="Pending deliverables"
               count={dashboard.pendingDeliverables.length}
               viewAllHref="/campaigns"
@@ -286,7 +286,7 @@ export function DashboardPage() {
 
             <DashboardModule
               icon={IconAtRisk}
-              iconTint="bg-amber-50 text-amber-600"
+              iconTint="bg-amber-100 text-amber-700"
               title="At risk"
               count={dashboard.atRisk.length}
               viewAllHref="/campaigns"
@@ -298,7 +298,6 @@ export function DashboardPage() {
                   row={row}
                   onLogContact={() => handleLogContact(row.engagementId)}
                   onVisitDone={() => handleVisitDone(row.engagementId)}
-                  onLogDeliverable={() => handleLogDeliverableClick(row.engagementId)}
                 />
               ))}
             </DashboardModule>
@@ -323,10 +322,11 @@ export function DashboardPage() {
 function AuroraBackground() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-      <div className="absolute inset-0 bg-gradient-to-br from-[#f8f7fc] via-[#f4f5f8] to-[#f2f8f6]" />
-      <div className="absolute -left-24 -top-24 h-[420px] w-[420px] rounded-full bg-violet-200/35 blur-3xl" />
-      <div className="absolute -right-16 top-1/4 h-[360px] w-[360px] rounded-full bg-orange-200/30 blur-3xl" />
-      <div className="absolute bottom-0 left-1/3 h-[320px] w-[320px] rounded-full bg-teal-200/25 blur-3xl" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[#f3f0fa] via-[#eef1f6] to-[#e8f5f1]" />
+      <div className="absolute -left-20 -top-28 h-[480px] w-[480px] rounded-full bg-violet-300/50 blur-[88px]" />
+      <div className="absolute -right-12 top-[18%] h-[420px] w-[420px] rounded-full bg-orange-200/55 blur-[88px]" />
+      <div className="absolute bottom-[-8%] left-[28%] h-[400px] w-[400px] rounded-full bg-teal-200/50 blur-[88px]" />
+      <div className="absolute left-[55%] top-[8%] h-[280px] w-[280px] rounded-full bg-violet-200/35 blur-[72px]" />
     </div>
   );
 }
@@ -334,7 +334,7 @@ function AuroraBackground() {
 function GlassCard({ children, className = '' }) {
   return (
     <div
-      className={`rounded-[22px] border border-white/70 bg-white/88 shadow-[0_4px_24px_rgba(26,29,38,0.06),0_1px_3px_rgba(26,29,38,0.04)] backdrop-blur-xl ${className}`}
+      className={`rounded-[22px] border border-white/90 bg-white/[0.94] shadow-[0_12px_40px_rgba(26,29,38,0.09),0_4px_12px_rgba(26,29,38,0.05),0_0_0_1px_rgba(255,255,255,0.65)_inset] backdrop-blur-xl ${className}`}
     >
       {children}
     </div>
@@ -395,7 +395,7 @@ function DashboardModule({
   return (
     <GlassCard className="flex flex-col">
       <div className="flex items-center gap-2.5 border-b border-line/50 px-4 py-3.5">
-        <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${iconTint}`}>
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] ${iconTint}`}>
           <Icon />
         </span>
         <h2 className="text-sm font-medium text-ink">{title}</h2>
@@ -518,18 +518,16 @@ function DeliverableRow({ row, onLog }) {
           <span className={urgencyTextClass(row.urgency)}>{row.situation}</span>
         </div>
       </div>
-      <ActionButton label="Log" onClick={onLog} />
+      <ActionButton label="Log deliverable" onClick={onLog} />
     </li>
   );
 }
 
-function AtRiskRow({ row, onLogContact, onVisitDone, onLogDeliverable }) {
+function AtRiskRow({ row, onLogContact, onVisitDone }) {
   const flagText = row.flagDetail ? `${row.flag} · ${row.flagDetail}` : row.flag;
   const action =
     row.action === 'visit_done' ? (
       <ActionButton label="Visit done" onClick={onVisitDone} />
-    ) : row.action === 'log_deliverable' ? (
-      <ActionButton label="Log deliverable" onClick={onLogDeliverable} />
     ) : (
       <ActionButton label="Log contact" onClick={onLogContact} />
     );
@@ -556,7 +554,7 @@ function CampaignTargetsSection({ campaigns }) {
   return (
     <GlassCard className="px-4 py-4 sm:px-5">
       <div className="mb-4 flex items-center gap-2.5">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-50 text-health-green">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-emerald-50 text-emerald-600">
           <IconTarget />
         </span>
         <h2 className="text-sm font-medium text-ink">Campaign targets</h2>
@@ -598,15 +596,14 @@ function CampaignTargetColumn({ campaign }) {
       <div className="truncate text-sm font-medium text-ink group-hover:text-brand">
         {campaign.campaignName}
       </div>
-      <div className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 text-2xs">
+      <div className="mt-1.5 flex flex-wrap items-baseline text-2xs">
         <span className="text-base font-medium tabular-nums text-ink">{campaign.pct}%</span>
-        <span className="text-ink-tertiary">
-          ·
-          {campaign.completed}
-          /
-          {campaign.target ?? '—'}
+        <span className="px-1.5 text-ink-tertiary">·</span>
+        <span className="tabular-nums text-ink-tertiary">
+          {campaign.completed}/{campaign.target ?? '—'}
         </span>
-        <span className={`font-medium ${healthTextClass}`}>· {healthLabel(campaign.health)}</span>
+        <span className="px-1.5 text-ink-tertiary">·</span>
+        <span className={`font-medium ${healthTextClass}`}>{healthLabel(campaign.health)}</span>
       </div>
       <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-line/80">
         <div

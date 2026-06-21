@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Toast } from '../components/ui/Primitives.jsx';
 import { DemoBanner } from '../components/ui/DemoBanner.jsx';
@@ -13,13 +13,6 @@ import {
 import { STAGE, transitionStage } from '../lib/engagementTransitions.js';
 import { markDeliverablePostedToastMessage } from '../lib/deliverableLogging.js';
 import {
-  getAllDemoEngagements,
-  getDemoCampaigns,
-  getDemoContact,
-  getDemoDeliverables,
-  getDemoEngagement,
-} from '../lib/demo.js';
-import {
   buildDashboardFromEngagements,
   dashboardDateLabel,
   dashboardGreeting,
@@ -28,34 +21,85 @@ import {
 } from '../lib/dashboardData.js';
 import { healthDotClass, healthLabel } from '../lib/format.jsx';
 import {
+  patchEngagement,
+  syncDeliverables,
+  fetchDeliverables,
+  fetchDashboardWorkspace,
+  logVisitReminder,
+} from '../lib/persistence.js';
+import { setDeliverablesCache, getDeliverablesForEngagement, updateEngagementDeliverables } from '../lib/deliverablesCache.js';
+import { getCachedContact, setContactsCache } from '../lib/contactsCache.js';
+import {
+  getDemoContacts,
+  getDemoDeliverables,
+  getDemoEngagement,
+  mergeDashboardWorkspace,
+} from '../lib/demo.js';
+import {
   getEngagementOverride,
   saveDeliverablesOverride,
   saveEngagementOverride,
 } from '../lib/demoStore.js';
-import {
-  recordDeliverablesPatchActivity,
-  recordEngagementPatchActivity,
-  recordActivityEvent,
-} from '../lib/activityLog.js';
-import { ACTIVITY_ACTION } from '../lib/activityEvents.js';
 
 export function DashboardPage() {
-  const { user, devMode } = useAuth();
-  const [revision, setRevision] = useState(0);
+  const { user } = useAuth();
+  const [workspace, setWorkspace] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [loggingDeliverable, setLoggingDeliverable] = useState(null);
+  const [revision, setRevision] = useState(0);
 
-  const bump = useCallback(() => setRevision((r) => r + 1), []);
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await fetchDashboardWorkspace();
+      const merged = mergeDashboardWorkspace(data);
+      if (merged._demo) {
+        setContactsCache(getDemoContacts());
+      }
+      setDeliverablesCache(merged.deliverablesByEngagement ?? {});
+      setWorkspace(merged);
+      setRevision((r) => r + 1);
+    } catch {
+      const merged = mergeDashboardWorkspace(null);
+      setContactsCache(getDemoContacts());
+      setDeliverablesCache(merged.deliverablesByEngagement ?? {});
+      setWorkspace(merged);
+      setRevision((r) => r + 1);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const refreshDemoWorkspace = useCallback(() => {
+    const merged = mergeDashboardWorkspace({ engagements: [] });
+    setDeliverablesCache(merged.deliverablesByEngagement ?? {});
+    setWorkspace(merged);
+    setRevision((r) => r + 1);
+  }, []);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
 
   const dashboard = useMemo(() => {
+    if (!workspace || !user?.id) {
+      return buildDashboardFromEngagements({
+        userId: user?.id ?? '',
+        engagements: [],
+        campaigns: [],
+        getDeliverables: getDeliverablesForEngagement,
+      });
+    }
     void revision;
+    const managerId = workspace._demo ? workspace.previewManagerId : user.id;
     return buildDashboardFromEngagements({
-      userId: user?.id ?? '1',
-      engagements: getAllDemoEngagements(),
-      campaigns: getDemoCampaigns(),
-      getDeliverables: getDemoDeliverables,
+      userId: managerId,
+      engagements: workspace.engagements,
+      campaigns: workspace.campaigns,
+      getDeliverables: getDeliverablesForEngagement,
     });
-  }, [user?.id, revision]);
+  }, [workspace, user?.id, revision]);
 
   const firstName = user?.full_name?.split(/\s+/)[0] ?? 'there';
 
@@ -65,47 +109,74 @@ export function DashboardPage() {
   }, []);
 
   const applyEngagementLogging = useCallback(
-    (engagementId, patch, message, snapshotKeys) => {
-      const base = {
-        ...getDemoEngagement(engagementId),
-        ...getEngagementOverride(engagementId),
-      };
+    async (engagementId, patch, message, snapshotKeys) => {
+      if (workspace?._demo) {
+        const base = {
+          ...getDemoEngagement(engagementId),
+          ...getEngagementOverride(engagementId),
+        };
+        const snapshot = {};
+        for (const key of snapshotKeys) snapshot[key] = base[key];
+        saveEngagementOverride(engagementId, patch);
+        refreshDemoWorkspace();
+        showActionToast(message, () => {
+          saveEngagementOverride(engagementId, snapshot);
+          refreshDemoWorkspace();
+          setToast(null);
+        });
+        return;
+      }
+
+      const base = workspace?.engagements?.find((e) => e.id === engagementId);
       const snapshot = {};
-      for (const key of snapshotKeys) snapshot[key] = base[key];
-      saveEngagementOverride(engagementId, patch);
-      recordEngagementPatchActivity(engagementId, base, patch);
-      bump();
-      showActionToast(message, () => {
-        saveEngagementOverride(engagementId, snapshot);
-        bump();
-        setToast(null);
-      });
+      for (const key of snapshotKeys) snapshot[key] = base?.[key];
+      try {
+        await patchEngagement(engagementId, patch);
+        await reload();
+        showActionToast(message, async () => {
+          await patchEngagement(engagementId, snapshot);
+          await reload();
+          setToast(null);
+        });
+      } catch (err) {
+        showActionToast(err.message ?? 'Save failed', null);
+      }
     },
-    [bump, showActionToast],
+    [workspace, reload, refreshDemoWorkspace, showActionToast],
   );
 
   const applyDeliverablesLogging = useCallback(
-    (engagementId, nextList, message) => {
-      const baseEngagement = {
-        ...getDemoEngagement(engagementId),
-        ...getEngagementOverride(engagementId),
-      };
-      const snapshot = getDemoDeliverables(engagementId).map((d) => ({ ...d }));
-      saveDeliverablesOverride(engagementId, nextList);
-      recordDeliverablesPatchActivity(
-        engagementId,
-        baseEngagement.campaign_id,
-        snapshot,
-        nextList,
-      );
-      bump();
-      showActionToast(message, () => {
-        saveDeliverablesOverride(engagementId, snapshot);
-        bump();
-        setToast(null);
-      });
+    async (engagementId, nextList, message) => {
+      if (workspace?._demo) {
+        const snapshot = getDemoDeliverables(engagementId).map((d) => ({ ...d }));
+        saveDeliverablesOverride(engagementId, nextList);
+        updateEngagementDeliverables(engagementId, nextList);
+        refreshDemoWorkspace();
+        showActionToast(message, () => {
+          saveDeliverablesOverride(engagementId, snapshot);
+          updateEngagementDeliverables(engagementId, snapshot);
+          refreshDemoWorkspace();
+          setToast(null);
+        });
+        return;
+      }
+
+      const beforeList = await fetchDeliverables(engagementId);
+      try {
+        const saved = await syncDeliverables(engagementId, beforeList, nextList);
+        updateEngagementDeliverables(engagementId, saved);
+        await reload();
+        showActionToast(message, async () => {
+          await syncDeliverables(engagementId, saved, beforeList);
+          updateEngagementDeliverables(engagementId, beforeList);
+          await reload();
+          setToast(null);
+        });
+      } catch (err) {
+        showActionToast(err.message ?? 'Save failed', null);
+      }
     },
-    [bump, showActionToast],
+    [workspace, reload, refreshDemoWorkspace, showActionToast],
   );
 
   const handleLogContact = useCallback(
@@ -118,10 +189,8 @@ export function DashboardPage() {
 
   const handleVisitDone = useCallback(
     (engagementId) => {
-      const engagement = {
-        ...getDemoEngagement(engagementId),
-        ...getEngagementOverride(engagementId),
-      };
+      const engagement = workspace?.engagements?.find((e) => e.id === engagementId);
+      if (!engagement) return;
       const result = buildVisitDoneTransition(engagement, transitionStage, STAGE);
       if (!result.ok) {
         showActionToast(result.error ?? 'Could not log visit');
@@ -134,11 +203,11 @@ export function DashboardPage() {
         Object.keys(result.patch),
       );
     },
-    [applyEngagementLogging, showActionToast],
+    [applyEngagementLogging, showActionToast, workspace?.engagements],
   );
 
   const handleLogDeliverableClick = useCallback((engagementId) => {
-    const deliverable = firstPendingDeliverable(engagementId, getDemoDeliverables);
+    const deliverable = firstPendingDeliverable(engagementId, getDeliverablesForEngagement);
     if (!deliverable) return;
     setLoggingDeliverable({ ...deliverable, engagementId });
   }, []);
@@ -147,7 +216,7 @@ export function DashboardPage() {
     (nextDeliverable) => {
       const engagementId = loggingDeliverable?.engagementId;
       if (!engagementId) return;
-      const deliverables = getDemoDeliverables(engagementId);
+      const deliverables = getDeliverablesForEngagement(engagementId);
       const nextList = deliverables.map((d) =>
         d.id === nextDeliverable.id ? nextDeliverable : d,
       );
@@ -162,9 +231,9 @@ export function DashboardPage() {
   );
 
   const handleRemindCreator = useCallback(
-    (visitRow) => {
+    async (visitRow) => {
       const engagement = visitRow.engagement;
-      const contact = getDemoContact(visitRow.contactId);
+      const contact = getCachedContact(visitRow.contactId);
       const url = buildVisitReminderUrl(contact?.mobile_number, {
         creatorName: visitRow.fullName,
         visitDate: visitRow.visitDate,
@@ -177,28 +246,35 @@ export function DashboardPage() {
         return;
       }
       window.open(url, '_blank', 'noopener,noreferrer');
-      recordActivityEvent({
-        campaignId: engagement.campaign_id,
-        engagementId: engagement.id,
-        action: ACTIVITY_ACTION.VISIT_REMINDED,
-        details: {
+      try {
+        await logVisitReminder(engagement.id, {
           visitDate: visitRow.visitDate,
           visitTime: visitRow.visitTime,
           venue: visitRow.venue,
           creatorName: visitRow.fullName,
-        },
-      });
+        });
+      } catch {
+        /* activity is best-effort */
+      }
       showActionToast(`Reminder opened for ${visitRow.fullName}`);
     },
     [showActionToast],
   );
+
+  if (loading && !workspace) {
+    return (
+      <div className="relative -m-4 flex min-h-[calc(100vh-3rem)] items-center justify-center md:-m-5">
+        <p className="text-sm text-ink-secondary">Loading dashboard…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="relative -m-4 min-h-[calc(100vh-3rem)] overflow-hidden md:-m-5">
       <AuroraBackground />
 
       <div className="relative mx-auto w-full max-w-[1400px] space-y-5 px-4 py-5 md:px-5 md:py-6">
-        <DemoBanner show={devMode} />
+        <DemoBanner show={workspace?._demo} />
 
         <DashboardHero
           greeting={dashboardGreeting(firstName)}
@@ -471,9 +547,8 @@ function TaskRow({ row, onLogContact, onVisitDone, onLogDeliverable }) {
 }
 
 function VisitRow({ row, onRemind, onVisitDone }) {
-  const timeLabel = formatVisitTime(row.visitTime);
-  const timeVenue = timeLabel
-    ? `${timeLabel} · ${row.venue}`
+  const timeVenue = row.visitTime
+    ? `${row.visitTime} · ${row.venue}`
     : row.venue;
 
   return (
@@ -609,18 +684,6 @@ function CampaignTargetColumn({ campaign }) {
 
 function iconClass() {
   return 'h-4 w-4';
-}
-
-function formatVisitTime(time) {
-  if (!time) return null;
-  const [hRaw, mRaw] = String(time).split(':');
-  const h = Number(hRaw);
-  const m = Number(mRaw);
-  if (Number.isNaN(h)) return time;
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const hour12 = h % 12 || 12;
-  const mins = Number.isNaN(m) ? '00' : String(m).padStart(2, '0');
-  return `${hour12}:${mins} ${ampm}`;
 }
 
 function IconTasks() {

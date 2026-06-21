@@ -5,6 +5,7 @@ import {
   MOCK_BRANDS,
   MOCK_TEAM,
   MOCK_USERS,
+  MOCK_USER,
   MOCK_AUDIT_LOG,
   MOCK_DELIVERABLES_BY_ENGAGEMENT,
   MOCK_ENGAGEMENTS_BY_CAMPAIGN,
@@ -258,6 +259,30 @@ export function mergeDashboard(apiData) {
     !apiData.active_campaigns?.length;
 
   return { ...merged, _demo: usingDemo };
+}
+
+/** AM dashboard workspace — fall back to Priya's sample engagements when the API returns none. */
+export function mergeDashboardWorkspace(apiData) {
+  const hasEngagements = Array.isArray(apiData?.engagements) && apiData.engagements.length > 0;
+  if (hasEngagements) {
+    return { ...apiData, _demo: false };
+  }
+
+  const engagements = getAllDemoEngagements();
+  const campaigns = getDemoCampaigns().filter((c) => c.status === 'active');
+  const deliverablesByEngagement = {};
+  for (const eng of engagements) {
+    deliverablesByEngagement[eng.id] = getDemoDeliverables(eng.id);
+  }
+
+  return {
+    engagements,
+    campaigns,
+    deliverablesByEngagement,
+    _demo: true,
+    /** Mock engagements are owned by campaign_manager Priya (id 1). */
+    previewManagerId: MOCK_USER.id,
+  };
 }
 
 export function isDemoList(apiRows) {

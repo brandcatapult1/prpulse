@@ -42,6 +42,7 @@ export const contactsApi = {
 
 export const campaignsApi = {
   list: () => api('/campaigns'),
+  create: (body) => api('/campaigns', { method: 'POST', body: JSON.stringify(body) }),
   get: (id) => api(`/campaigns/${id}`),
   populate: (id, body) =>
     api(`/campaigns/${id}/populate`, { method: 'POST', body: JSON.stringify(body) }),

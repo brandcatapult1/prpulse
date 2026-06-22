@@ -27,6 +27,50 @@ campaignsRouter.get('/', requireAuth, async (req, res) => {
   res.json(rows);
 });
 
+campaignsRouter.post('/', requireAuth, async (req, res) => {
+  const { campaign_name, brand_id, target_collaborations, status } = req.body ?? {};
+  if (!campaign_name?.trim() || !brand_id) {
+    return res.status(400).json({ error: 'Campaign name and brand are required' });
+  }
+
+  const allowedStatuses = new Set(['draft', 'active', 'paused', 'completed', 'archived']);
+  const campaignStatus = allowedStatuses.has(status) ? status : 'draft';
+  const target =
+    target_collaborations === '' || target_collaborations == null
+      ? null
+      : Number(target_collaborations);
+
+  if (target != null && (Number.isNaN(target) || target < 0)) {
+    return res.status(400).json({ error: 'Target collaborations must be a non-negative number' });
+  }
+
+  try {
+    const row = await withUserTransaction(req.user.id, async (client) => {
+      const brand = await client.query('SELECT id, brand_name FROM brands WHERE id = $1', [brand_id]);
+      if (!brand.rows[0]) throw Object.assign(new Error('Brand not found'), { status: 404 });
+
+      const { rows } = await client.query(
+        `INSERT INTO campaigns (campaign_name, brand_id, target_collaborations, status, created_by)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [campaign_name.trim(), brand_id, target, campaignStatus, req.user.id],
+      );
+
+      await client.query(
+        `INSERT INTO campaign_managers (campaign_id, user_id) VALUES ($1, $2)
+         ON CONFLICT DO NOTHING`,
+        [rows[0].id, req.user.id],
+      );
+
+      return { ...rows[0], brand_name: brand.rows[0].brand_name };
+    });
+
+    res.status(201).json(row);
+  } catch (err) {
+    res.status(err.status ?? 503).json({ error: err.message ?? 'Could not create campaign' });
+  }
+});
+
 campaignsRouter.get('/:id', requireAuth, async (req, res) => {
   const { rows } = await pool.query(
     `SELECT cam.*, b.brand_name

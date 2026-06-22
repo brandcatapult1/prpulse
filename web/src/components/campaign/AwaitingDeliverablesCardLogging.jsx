@@ -100,70 +100,74 @@ export function AwaitingDeliverablesCardLogging({
     <>
       <LoggingPanel>
         <div className="max-md:block md:hidden md:group-hover/card:block">
-          <div className="mb-2 space-y-1">
-            <div className="text-[11px] text-ink-secondary">{posted} / {total} posted</div>
-            <div className="h-1 overflow-hidden rounded-full bg-line">
-              <div
-                className="h-full rounded-full bg-ink/30 transition-[width]"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-          </div>
+          {loggingDeliverable ? (
+            <LogDeliverablePanel
+              inline
+              deliverable={loggingDeliverable}
+              onClose={() => setLoggingDeliverableId(null)}
+              onConfirm={handleLogDeliverable}
+            />
+          ) : (
+            <>
+              <div className="mb-2 space-y-1">
+                <div className="text-[11px] text-ink-secondary">{posted} / {total} posted</div>
+                <div className="h-1 overflow-hidden rounded-full bg-line">
+                  <div
+                    className="h-full rounded-full bg-ink/30 transition-[width]"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
 
-          <ul className="space-y-1">
-            {deliverables.map((d) => {
-              const isPosted = isDeliverableFullyPosted(d);
-              return (
-                <li key={d.id}>
-                  {isPosted ? (
-                    <div className="flex items-center gap-2 rounded-md bg-canvas px-2 py-1.5 text-[11px] text-ink-secondary">
-                      <span className="text-health-green" aria-hidden>✓</span>
-                      <span className="capitalize">{deliverableLabel(d)}</span>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 rounded-md border border-line bg-white px-2 py-1.5 text-left text-[11px] hover:border-brand/40"
-                      onClick={() => setLoggingDeliverableId(d.id)}
-                    >
-                      <span className="text-ink-tertiary" aria-hidden>○</span>
-                      <span className="capitalize text-ink">{deliverableLabel(d)}</span>
-                      <span className="ml-auto text-ink-tertiary">Log →</span>
-                    </button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+              <ul className="space-y-1">
+                {deliverables.map((d) => {
+                  const isPosted = isDeliverableFullyPosted(d);
+                  return (
+                    <li key={d.id}>
+                      {isPosted ? (
+                        <div className="flex items-center gap-2 rounded-md bg-canvas px-2 py-1.5 text-[11px] text-ink-secondary">
+                          <span className="text-health-green" aria-hidden>✓</span>
+                          <span className="capitalize">{deliverableLabel(d)}</span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2 rounded-md border border-line bg-white px-2 py-1.5 text-left text-[11px] hover:border-brand/40"
+                          onClick={() => setLoggingDeliverableId(d.id)}
+                        >
+                          <span className="text-ink-tertiary" aria-hidden>○</span>
+                          <span className="capitalize text-ink">{deliverableLabel(d)}</span>
+                          <span className="ml-auto text-ink-tertiary">Log →</span>
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
 
-          {allPostedWithProof && (
-            <button
-              type="button"
-              className="btn-primary mt-2 w-full !py-1.5 text-[11px]"
-              onClick={() => setCompleteOpen(true)}
-            >
-              Mark Collaboration Complete
-            </button>
-          )}
+              {allPostedWithProof && (
+                <button
+                  type="button"
+                  className="btn-primary mt-2 w-full !py-1.5 text-[11px]"
+                  onClick={() => setCompleteOpen(true)}
+                >
+                  Mark Collaboration Complete
+                </button>
+              )}
 
-          {showDidntDeliver && (
-            <button
-              type="button"
-              className="btn-ghost mt-2 w-full !py-1 text-[11px] text-health-red"
-              onClick={() => setDidntDeliverOpen(true)}
-            >
-              Mark Didn&apos;t Deliver
-            </button>
+              {showDidntDeliver && (
+                <button
+                  type="button"
+                  className="btn-ghost mt-2 w-full !py-1 text-[11px] text-health-red"
+                  onClick={() => setDidntDeliverOpen(true)}
+                >
+                  Mark Didn&apos;t Deliver
+                </button>
+              )}
+            </>
           )}
         </div>
       </LoggingPanel>
-
-      <LogDeliverablePanel
-        deliverable={loggingDeliverable}
-        open={Boolean(loggingDeliverableId)}
-        onClose={() => setLoggingDeliverableId(null)}
-        onConfirm={handleLogDeliverable}
-      />
 
       <ConfirmDialog
         open={completeOpen}

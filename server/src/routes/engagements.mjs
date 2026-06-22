@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth.mjs';
 import {
   ACTIVITY_ACTION,
   activityRowToTimelineEntry,
+  legacyTimelineRowToEntry,
   tryInsertActivityEvent,
   listActivityEventsForCampaign,
   listActivityEventsForEngagement,
@@ -409,7 +410,7 @@ engagementsRouter.get('/:id/timeline', requireAuth, async (req, res) => {
      ORDER BY te.occurred_at DESC`,
     [req.params.id],
   );
-  res.json(rows);
+  res.json(rows.map(legacyTimelineRowToEntry));
 });
 
 /** Log visit reminder (WhatsApp opened — client-side action). */

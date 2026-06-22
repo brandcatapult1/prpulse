@@ -33,6 +33,7 @@ import { getCachedContact, mergeContactsCache } from '../lib/contactsCache.js';
 import { isContactBlacklisted } from '../lib/contactsHelpers.js';
 import { contactsApi } from '../lib/api.js';
 import { getContactProfileExtras } from '../lib/contactProfile.js';
+import { formatTimelineEntry } from '../lib/activityTimelineLabels.js';
 import {
   agreedFeeRules,
   canSetDeliverableStatus,
@@ -885,24 +886,27 @@ function TimelineModal({ open, onClose, contactName, entries }) {
       }
     >
       <div className="space-y-3">
-        {entries.map((entry) => (
+        {entries.map((entry) => {
+          const row = formatTimelineEntry(entry);
+          return (
           <Card key={entry.id} elevated className="!p-3">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
-                <div className="text-sm font-medium text-ink">{entry.action}</div>
+                <div className="text-sm font-medium text-ink">{row.action}</div>
                 <div className="mt-0.5 text-2xs text-ink-tertiary">
-                  {entry.user_name} · {formatDate(entry.occurred_at)}
+                  {row.user_name} · {formatDate(row.occurred_at)}
                 </div>
               </div>
-              {entry.status_change && (
-                <Pill tone="info">{entry.status_change}</Pill>
+              {row.status_change && (
+                <Pill tone="info">{row.status_change}</Pill>
               )}
             </div>
-            {entry.notes && (
-              <p className="mt-2 text-2xs text-ink-secondary">{entry.notes}</p>
+            {row.notes && (
+              <p className="mt-2 text-2xs text-ink-secondary">{row.notes}</p>
             )}
           </Card>
-        ))}
+          );
+        })}
       </div>
     </Modal>
   );

@@ -1,5 +1,7 @@
 /** Client-side activity helpers — persistence is server-side; these are no-ops kept for call-site compatibility. */
 
+import { formatTimelineEntry } from './activityTimelineLabels.js';
+
 export function queueStageTransitionActivity() {}
 
 export function consumePendingStageActivity() {
@@ -39,5 +41,5 @@ export function getActivityEventsForCampaign() {
 }
 
 export function activityEventToTimelineEntry(event) {
-  return event;
+  return formatTimelineEntry(event);
 }

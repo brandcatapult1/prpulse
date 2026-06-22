@@ -1,5 +1,14 @@
 /** Server-side activity event writer — actor always from req.user, never request body. */
 
+import {
+  formatDeliverableType,
+  formatEngagementStatus,
+  formatLegacyAction,
+  formatLegacyStatusChange,
+  formatStageTransition,
+  formatTimelineNotes,
+} from './activityTimelineLabels.mjs';
+
 export const ACTIVITY_ACTION = {
   STAGE_CHANGED: 'stage_changed',
   FIRST_OUTREACH: 'first_outreach',
@@ -50,13 +59,6 @@ export async function tryInsertActivityEvent(client, user, payload) {
   }
 }
 
-function formatStatusLabel(status) {
-  return (status ?? '')
-    .split('_')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
-}
-
 const ACTION_LABELS = {
   [ACTIVITY_ACTION.STAGE_CHANGED]: 'Status changed',
   [ACTIVITY_ACTION.FIRST_OUTREACH]: 'First outreach logged',
@@ -72,24 +74,49 @@ const ACTION_LABELS = {
   visit_reminded: 'Visit reminder sent',
 };
 
+function formatStatusChangeForRow(row, details) {
+  if (row.action === ACTIVITY_ACTION.STAGE_CHANGED && details.toStage) {
+    return formatStageTransition(details.fromStage, details.toStage, details);
+  }
+  if (row.action === ACTIVITY_ACTION.FIRST_OUTREACH) {
+    return formatEngagementStatus('in_conversation');
+  }
+  if (row.action === ACTIVITY_ACTION.REOPEN && details.toStage) {
+    return formatEngagementStatus(details.toStage);
+  }
+  if (row.action === ACTIVITY_ACTION.DIDNT_DELIVER) {
+    return formatEngagementStatus('dropped', { dropReason: 'didnt_deliver' });
+  }
+  if (row.action === ACTIVITY_ACTION.DELIVERABLE_POSTED && details.deliverableType) {
+    const label = formatDeliverableType(details.deliverableType);
+    const qty = details.quantity > 1 ? ` ×${details.quantity}` : '';
+    return label ? `${label}${qty}` : null;
+  }
+  return null;
+}
+
 export function activityRowToTimelineEntry(row) {
   const details = row.details ?? {};
-  let statusChange = null;
-  if (row.action === ACTIVITY_ACTION.STAGE_CHANGED && details.toStage) {
-    statusChange = `${formatStatusLabel(details.fromStage)} → ${formatStatusLabel(details.toStage)}`;
-  } else if (row.action === ACTIVITY_ACTION.FIRST_OUTREACH) {
-    statusChange = 'In Conversation';
-  } else if (row.action === ACTIVITY_ACTION.REOPEN && details.toStage) {
-    statusChange = formatStatusLabel(details.toStage);
-  }
+  const statusChange = formatStatusChangeForRow(row, details);
 
   return {
     id: row.id,
     occurred_at: row.occurred_at,
     user_name: row.actor_name,
-    action: ACTION_LABELS[row.action] ?? row.action,
+    action: ACTION_LABELS[row.action] ?? formatLegacyAction(row.action),
     status_change: statusChange,
-    notes: details.note ?? details.reason ?? null,
+    notes: formatTimelineNotes(row, details, { statusChange }),
+  };
+}
+
+export function legacyTimelineRowToEntry(row) {
+  return {
+    id: row.id,
+    occurred_at: row.occurred_at,
+    user_name: row.user_name ?? 'System',
+    action: formatLegacyAction(row.action),
+    status_change: row.status_change ? formatLegacyStatusChange(row.status_change) : null,
+    notes: row.notes ?? null,
   };
 }
 

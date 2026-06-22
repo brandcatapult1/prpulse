@@ -46,11 +46,18 @@ function taskActionForEngagement(engagement) {
   return 'log_contact';
 }
 
-function buildTodaysTasks(engagements, today) {
+function buildTodaysTasks(engagements, today, getDeliverables) {
   return engagements
     .filter((e) => !isTerminalStatus(e.conversation_status))
     .filter((e) => e.next_follow_up_date && e.next_follow_up_date <= today)
     .filter((e) => !(e.conversation_status === 'scheduled' && e.visit_date === today))
+    .filter((e) => {
+      if (e.conversation_status !== 'awaiting_final_deliverables') return true;
+      const pending = getDeliverables(e.id).some(
+        (d) => d.status !== 'posted' || !deliverableHasProof(d),
+      );
+      return !pending;
+    })
     .map((e) => {
       const overdue = e.next_follow_up_date < today;
       const days = daysBetweenIso(e.next_follow_up_date, today);
@@ -132,7 +139,7 @@ function buildPendingDeliverables(engagements, getDeliverables, today) {
   return rows.sort((a, b) => a.sortKey - b.sortKey || a.fullName.localeCompare(b.fullName));
 }
 
-function buildAtRisk(engagements, getDeliverables, today) {
+function buildAtRisk(engagements, _getDeliverables, today) {
   const rows = [];
   for (const e of engagements) {
     if (isTerminalStatus(e.conversation_status)) continue;
@@ -170,27 +177,6 @@ function buildAtRisk(engagements, getDeliverables, today) {
       });
     }
 
-    if (e.visit_completed_date && daysBetweenIso(e.visit_completed_date, today) >= 7) {
-      const pending = getDeliverables(e.id).some(
-        (d) => d.status !== 'posted' || !deliverableHasProof(d),
-      );
-      if (pending) {
-        rows.push({
-          id: `${e.id}-deliverables-at-risk`,
-          engagementId: e.id,
-          contactId: e.contact_id,
-          fullName: e.contact_name,
-          initials: initials(e.contact_name),
-          campaignName: e.campaign_name,
-          flag: 'deliverables at risk',
-          flagDetail: `${daysBetweenIso(e.visit_completed_date, today)}d`,
-          action: 'log_deliverable',
-          engagement: e,
-          sortKey: 2,
-        });
-      }
-    }
-
     const lastActivity = e.last_contact_date ?? e.initial_contact_date;
     const stalledDays = lastActivity ? daysBetweenIso(lastActivity, today) : null;
     const isStalled =
@@ -209,7 +195,7 @@ function buildAtRisk(engagements, getDeliverables, today) {
         flagDetail: `${stalledDays}d`,
         action: 'log_contact',
         engagement: e,
-        sortKey: 3,
+        sortKey: 2,
       });
     }
   }
@@ -225,7 +211,7 @@ function buildCampaignTargets(campaigns, engagements) {
       campaignName: c.campaign_name,
       completed: c.completed_collaborations ?? 0,
       target: c.target_collaborations,
-      pct: c.achievement_pct ?? 0,
+      pct: Math.round(Number(c.achievement_pct) || 0),
       health: c.campaign_health,
     }));
 }
@@ -243,6 +229,14 @@ function countOverdue(engagements, getDeliverables, today) {
   return count;
 }
 
+function countUniqueActionEngagements(todaysTasks, todaysVisits, pendingDeliverables, atRisk) {
+  const ids = new Set();
+  for (const row of [...todaysTasks, ...todaysVisits, ...pendingDeliverables, ...atRisk]) {
+    if (row.engagementId) ids.add(row.engagementId);
+  }
+  return ids.size;
+}
+
 /**
  * Build AM dashboard modules from engagements owned by userId.
  */
@@ -255,14 +249,18 @@ export function buildDashboardFromEngagements({
 }) {
   const owned = engagements.filter((e) => resolveAssignedManagerId(e) === String(userId));
 
-  const todaysTasks = buildTodaysTasks(owned, today);
+  const todaysTasks = buildTodaysTasks(owned, today, getDeliverables);
   const todaysVisits = buildTodaysVisits(owned, today);
   const pendingDeliverables = buildPendingDeliverables(owned, getDeliverables, today);
   const atRisk = buildAtRisk(owned, getDeliverables, today);
   const campaignTargets = buildCampaignTargets(campaigns, owned);
 
-  const actionCount =
-    todaysTasks.length + todaysVisits.length + pendingDeliverables.length + atRisk.length;
+  const actionCount = countUniqueActionEngagements(
+    todaysTasks,
+    todaysVisits,
+    pendingDeliverables,
+    atRisk,
+  );
 
   return {
     today,

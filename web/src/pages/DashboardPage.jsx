@@ -298,7 +298,6 @@ export function DashboardPage() {
                   row={row}
                   onLogContact={() => handleLogContact(row.engagementId)}
                   onVisitDone={() => handleVisitDone(row.engagementId)}
-                  onLogDeliverable={() => handleLogDeliverableClick(row.engagementId)}
                 />
               ))}
             </DashboardModule>
@@ -323,10 +322,11 @@ export function DashboardPage() {
 function AuroraBackground() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-      <div className="absolute inset-0 bg-gradient-to-br from-[#f8f7fc] via-[#f4f5f8] to-[#f2f8f6]" />
-      <div className="absolute -left-24 -top-24 h-[420px] w-[420px] rounded-full bg-violet-200/35 blur-3xl" />
-      <div className="absolute -right-16 top-1/4 h-[360px] w-[360px] rounded-full bg-orange-200/30 blur-3xl" />
-      <div className="absolute bottom-0 left-1/3 h-[320px] w-[320px] rounded-full bg-teal-200/25 blur-3xl" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[#f0ebf8] via-[#e9edf4] to-[#e4f3ee]" />
+      <div className="absolute -left-16 -top-32 h-[520px] w-[520px] rounded-full bg-violet-300/60 blur-[100px]" />
+      <div className="absolute -right-8 top-[15%] h-[460px] w-[460px] rounded-full bg-orange-200/60 blur-[100px]" />
+      <div className="absolute bottom-[-10%] left-[25%] h-[440px] w-[440px] rounded-full bg-teal-200/55 blur-[100px]" />
+      <div className="absolute left-[52%] top-[5%] h-[300px] w-[300px] rounded-full bg-violet-200/45 blur-[80px]" />
     </div>
   );
 }
@@ -334,7 +334,7 @@ function AuroraBackground() {
 function GlassCard({ children, className = '' }) {
   return (
     <div
-      className={`rounded-[22px] border border-white/70 bg-white/88 shadow-[0_4px_24px_rgba(26,29,38,0.06),0_1px_3px_rgba(26,29,38,0.04)] backdrop-blur-xl ${className}`}
+      className={`rounded-[22px] border border-white bg-white/[0.95] shadow-[0_16px_48px_rgba(26,29,38,0.11),0_6px_16px_rgba(26,29,38,0.07),0_0_0_1px_rgba(255,255,255,0.8)_inset] backdrop-blur-xl ${className}`}
     >
       {children}
     </div>
@@ -518,18 +518,16 @@ function DeliverableRow({ row, onLog }) {
           <span className={urgencyTextClass(row.urgency)}>{row.situation}</span>
         </div>
       </div>
-      <ActionButton label="Log" onClick={onLog} />
+      <ActionButton label="Log deliverable" onClick={onLog} />
     </li>
   );
 }
 
-function AtRiskRow({ row, onLogContact, onVisitDone, onLogDeliverable }) {
+function AtRiskRow({ row, onLogContact, onVisitDone }) {
   const flagText = row.flagDetail ? `${row.flag} · ${row.flagDetail}` : row.flag;
   const action =
     row.action === 'visit_done' ? (
       <ActionButton label="Visit done" onClick={onVisitDone} />
-    ) : row.action === 'log_deliverable' ? (
-      <ActionButton label="Log deliverable" onClick={onLogDeliverable} />
     ) : (
       <ActionButton label="Log contact" onClick={onLogContact} />
     );
@@ -598,15 +596,14 @@ function CampaignTargetColumn({ campaign }) {
       <div className="truncate text-sm font-medium text-ink group-hover:text-brand">
         {campaign.campaignName}
       </div>
-      <div className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 text-2xs">
+      <div className="mt-1.5 flex flex-wrap items-baseline text-2xs">
         <span className="text-base font-medium tabular-nums text-ink">{campaign.pct}%</span>
-        <span className="text-ink-tertiary">
-          ·
-          {campaign.completed}
-          /
-          {campaign.target ?? '—'}
+        <span className="px-1.5 text-ink-tertiary">·</span>
+        <span className="tabular-nums text-ink-tertiary">
+          {campaign.completed}/{campaign.target ?? '—'}
         </span>
-        <span className={`font-medium ${healthTextClass}`}>· {healthLabel(campaign.health)}</span>
+        <span className="px-1.5 text-ink-tertiary">·</span>
+        <span className={`font-medium ${healthTextClass}`}>{healthLabel(campaign.health)}</span>
       </div>
       <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-line/80">
         <div

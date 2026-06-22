@@ -2,30 +2,36 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Modal } from '../ui/Primitives.jsx';
 import { brandsApi, campaignsApi } from '../../lib/api.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 import {
   CAMPAIGN_TYPES,
   campaignSchedulePayload,
   validateCampaignSchedule,
 } from '../../lib/campaignTypes.js';
 
-const EMPTY = {
-  campaign_name: '',
-  brand_id: '',
-  campaign_type: 'project',
-  start_date: '',
-  end_date: '',
-  target_collaborations: '',
-  status: 'draft',
-};
+function emptyForm(defaultManagerIds = []) {
+  return {
+    campaign_name: '',
+    brand_id: '',
+    campaign_type: 'project',
+    start_date: '',
+    end_date: '',
+    target_collaborations: '',
+    status: 'draft',
+    manager_ids: defaultManagerIds,
+  };
+}
 
 function FieldLabel({ children }) {
   return <span className="text-2xs font-medium text-ink-secondary">{children}</span>;
 }
 
 export function AddCampaignModal({ open, onClose, onCreated }) {
-  const [form, setForm] = useState(EMPTY);
+  const { user } = useAuth();
+  const [form, setForm] = useState(() => emptyForm());
   const [brands, setBrands] = useState([]);
-  const [loadingBrands, setLoadingBrands] = useState(false);
+  const [managers, setManagers] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -34,20 +40,37 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
   const canSave =
     form.campaign_name.trim()
     && form.brand_id
+    && form.manager_ids.length > 0
     && !scheduleError
     && !saving;
 
   useEffect(() => {
     if (!open) return;
-    setForm(EMPTY);
+    const defaultManagerIds = user?.id ? [user.id] : [];
+    setForm(emptyForm(defaultManagerIds));
     setError(null);
-    setLoadingBrands(true);
-    brandsApi
-      .list()
-      .then((data) => setBrands(Array.isArray(data) ? data : []))
-      .catch(() => setBrands([]))
-      .finally(() => setLoadingBrands(false));
-  }, [open]);
+    setLoading(true);
+
+    Promise.all([
+      brandsApi.list().catch(() => []),
+      campaignsApi.assignableManagers().catch(() => []),
+    ])
+      .then(([brandData, managerData]) => {
+        setBrands(Array.isArray(brandData) ? brandData : []);
+        const list = Array.isArray(managerData) ? managerData : [];
+        setManagers(list);
+        setForm((f) => {
+          const validIds = new Set(list.map((m) => String(m.id)));
+          const kept = f.manager_ids.filter((id) => validIds.has(String(id)));
+          if (kept.length > 0) return { ...f, manager_ids: kept };
+          if (user?.id && validIds.has(String(user.id))) {
+            return { ...f, manager_ids: [user.id] };
+          }
+          return { ...f, manager_ids: list[0] ? [list[0].id] : [] };
+        });
+      })
+      .finally(() => setLoading(false));
+  }, [open, user?.id]);
 
   function setType(nextType) {
     setForm((f) => ({
@@ -55,6 +78,18 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
       campaign_type: nextType,
       end_date: nextType === 'monthly' ? '' : f.end_date,
     }));
+  }
+
+  function toggleManager(managerId) {
+    const id = String(managerId);
+    setForm((f) => {
+      const has = f.manager_ids.some((x) => String(x) === id);
+      if (has) {
+        const next = f.manager_ids.filter((x) => String(x) !== id);
+        return { ...f, manager_ids: next };
+      }
+      return { ...f, manager_ids: [...f.manager_ids, managerId] };
+    });
   }
 
   async function handleSave() {
@@ -69,6 +104,7 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
           ? Number(form.target_collaborations)
           : null,
         status: form.status,
+        manager_ids: form.manager_ids,
         ...campaignSchedulePayload(form),
       });
       onCreated?.(created);
@@ -117,8 +153,8 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
 
         <label className="block">
           <FieldLabel>Brand</FieldLabel>
-          {loadingBrands ? (
-            <p className="mt-1 text-2xs text-ink-tertiary">Loading brands…</p>
+          {loading ? (
+            <p className="mt-1 text-2xs text-ink-tertiary">Loading…</p>
           ) : brands.length === 0 ? (
             <p className="mt-1 text-2xs text-ink-secondary">
               Add a brand first on the{' '}
@@ -184,6 +220,38 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
                 onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))}
               />
             </label>
+          )}
+        </div>
+
+        <div>
+          <FieldLabel>Account managers</FieldLabel>
+          <p className="mt-0.5 text-[10px] text-ink-tertiary">
+            Who can see and run this campaign
+          </p>
+          {loading ? (
+            <p className="mt-1 text-2xs text-ink-tertiary">Loading team…</p>
+          ) : managers.length === 0 ? (
+            <p className="mt-1 text-2xs text-ink-tertiary">No managers available</p>
+          ) : (
+            <div className="mt-1.5 max-h-32 space-y-1 overflow-y-auto rounded-md border border-line/80 p-2">
+              {managers.map((m) => {
+                const checked = form.manager_ids.some((id) => String(id) === String(m.id));
+                return (
+                  <label
+                    key={m.id}
+                    className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-2xs text-ink hover:bg-canvas/80"
+                  >
+                    <input
+                      type="checkbox"
+                      className="rounded border-line text-brand focus:ring-brand/30"
+                      checked={checked}
+                      onChange={() => toggleManager(m.id)}
+                    />
+                    <span>{m.full_name}</span>
+                  </label>
+                );
+              })}
+            </div>
           )}
         </div>
 

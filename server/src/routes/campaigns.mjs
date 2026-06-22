@@ -27,6 +27,19 @@ campaignsRouter.get('/', requireAuth, async (req, res) => {
   res.json(rows);
 });
 
+campaignsRouter.get('/assignable-managers', requireAuth, async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, full_name, role FROM users
+       WHERE is_active AND role IN ('campaign_manager', 'senior_manager', 'admin')
+       ORDER BY full_name`,
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(503).json({ error: err.message ?? 'Could not load managers' });
+  }
+});
+
 campaignsRouter.post('/', requireAuth, async (req, res) => {
   const {
     campaign_name,
@@ -36,6 +49,7 @@ campaignsRouter.post('/', requireAuth, async (req, res) => {
     end_date,
     target_collaborations,
     status,
+    manager_ids,
   } = req.body ?? {};
   if (!campaign_name?.trim() || !brand_id) {
     return res.status(400).json({ error: 'Campaign name and brand are required' });
@@ -70,10 +84,26 @@ campaignsRouter.post('/', requireAuth, async (req, res) => {
 
   const storedEndDate = campaign_type === 'project' ? end_date : null;
 
+  const managerIdSet = new Set(
+    Array.isArray(manager_ids) ? manager_ids.filter(Boolean).map(String) : [],
+  );
+  managerIdSet.add(String(req.user.id));
+
   try {
     const row = await withUserTransaction(req.user.id, async (client) => {
       const brand = await client.query('SELECT id, brand_name FROM brands WHERE id = $1', [brand_id]);
       if (!brand.rows[0]) throw Object.assign(new Error('Brand not found'), { status: 404 });
+
+      const { rows: validManagers } = await client.query(
+        `SELECT id FROM users
+         WHERE id = ANY($1::uuid[])
+           AND is_active
+           AND role IN ('campaign_manager', 'senior_manager', 'admin')`,
+        [[...managerIdSet]],
+      );
+      if (validManagers.length === 0) {
+        throw Object.assign(new Error('Select at least one account manager'), { status: 400 });
+      }
 
       const { rows } = await client.query(
         `INSERT INTO campaigns (
@@ -94,11 +124,13 @@ campaignsRouter.post('/', requireAuth, async (req, res) => {
         ],
       );
 
-      await client.query(
-        `INSERT INTO campaign_managers (campaign_id, user_id) VALUES ($1, $2)
-         ON CONFLICT DO NOTHING`,
-        [rows[0].id, req.user.id],
-      );
+      for (const { id: managerId } of validManagers) {
+        await client.query(
+          `INSERT INTO campaign_managers (campaign_id, user_id) VALUES ($1, $2)
+           ON CONFLICT DO NOTHING`,
+          [rows[0].id, managerId],
+        );
+      }
 
       return { ...rows[0], brand_name: brand.rows[0].brand_name };
     });

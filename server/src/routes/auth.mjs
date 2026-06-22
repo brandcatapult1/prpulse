@@ -72,7 +72,7 @@ authRouter.post('/logout', requireAuth, (req, res) => {
 });
 
 authRouter.get('/me', async (req, res) => {
-  if (!req.session?.user && isDevAuthEnabled()) {
+  if (isDevAuthEnabled()) {
     await ensureDevSession(req);
   }
   if (!req.session?.user) return res.status(401).json({ error: 'Sign in required' });

@@ -97,6 +97,10 @@ adminRouter.patch('/org-branding', async (req, res) => {
   }
 
   try {
+    let updatedBy = req.user.id;
+    const userRow = await pool.query('SELECT id FROM users WHERE id = $1', [req.user.id]);
+    if (!userRow.rows[0]) updatedBy = null;
+
     const { rows } = await pool.query(
       `INSERT INTO org_settings (id, logo_url, updated_by)
        VALUES (1, $1, $2)
@@ -105,13 +109,14 @@ adminRouter.patch('/org-branding', async (req, res) => {
              updated_by = EXCLUDED.updated_by,
              updated_at = now()
        RETURNING logo_url, updated_at`,
-      [logoUrl ?? null, req.user.id],
+      [logoUrl ?? null, updatedBy],
     );
     res.json(rows[0]);
   } catch (err) {
     if (err.code === '42P01') {
       return res.status(503).json({ error: 'Run migration 004_org_settings first' });
     }
-    res.status(503).json({ error: 'Could not save branding' });
+    console.warn('Org branding save failed:', err.message ?? err);
+    res.status(503).json({ error: err.message ?? 'Could not save branding' });
   }
 });

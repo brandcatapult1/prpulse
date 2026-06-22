@@ -43,8 +43,8 @@ export function OrgBrandingSettings() {
       const dataUrl = await readLogoFileAsDataUrl(file);
       const result = await saveOrgLogoUrl(dataUrl);
       await handleSaveResult(result, dataUrl, 'Logo updated');
-    } catch {
-      setToast('Could not save logo');
+    } catch (err) {
+      setToast(err.message ?? 'Could not save logo');
     } finally {
       setSaving(false);
     }
@@ -55,8 +55,8 @@ export function OrgBrandingSettings() {
     try {
       const result = await applyDefaultOrgLogo();
       await handleSaveResult(result, DEFAULT_DEMO_ORG_LOGO, 'Default wordmark applied');
-    } catch {
-      setToast('Could not apply default logo');
+    } catch (err) {
+      setToast(err.message ?? 'Could not apply default logo');
     } finally {
       setSaving(false);
     }
@@ -67,8 +67,8 @@ export function OrgBrandingSettings() {
     try {
       const result = await saveOrgLogoUrl(null);
       await handleSaveResult(result, null, 'Logo removed — sidebar shows PR Pulse only');
-    } catch {
-      setToast('Could not remove logo');
+    } catch (err) {
+      setToast(err.message ?? 'Could not remove logo');
     } finally {
       setSaving(false);
     }

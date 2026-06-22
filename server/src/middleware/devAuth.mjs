@@ -2,6 +2,11 @@ import { pool, isDatabaseConfigured } from '../db.mjs';
 import { isDevAuthEnabled, sessionUser } from '../lib/authConfig.mjs';
 
 const DEV_EMAIL = 'dev@brandcatapult.local';
+export const DEV_PLACEHOLDER_USER_ID = '00000000-0000-0000-0000-000000000001';
+
+function isPlaceholderDevUser(user) {
+  return user?.id === DEV_PLACEHOLDER_USER_ID;
+}
 
 export async function getOrCreateDevUser() {
   if (!pool) {
@@ -18,7 +23,26 @@ export async function getOrCreateDevUser() {
 }
 
 export async function ensureDevSession(req) {
-  if (!isDevAuthEnabled() || req.session?.user) return req.session?.user ?? null;
+  if (!isDevAuthEnabled()) return req.session?.user ?? null;
+
+  const needsRealUser =
+    !req.session?.user
+    || (isDatabaseConfigured() && isPlaceholderDevUser(req.session.user));
+
+  if (!needsRealUser) return req.session.user;
+
+  if (!isDatabaseConfigured()) {
+    if (!req.session?.user) {
+      req.session.user = sessionUser({
+        id: DEV_PLACEHOLDER_USER_ID,
+        email: DEV_EMAIL,
+        full_name: 'Dev User',
+        role: 'admin',
+      });
+      req.user = req.session.user;
+    }
+    return req.session.user;
+  }
 
   const user = await getOrCreateDevUser();
   req.session.user = sessionUser(user);
@@ -27,18 +51,20 @@ export async function ensureDevSession(req) {
 }
 
 export async function devAuthMiddleware(req, _res, next) {
-  if (!isDevAuthEnabled() || req.session?.user) return next();
+  if (!isDevAuthEnabled()) return next();
   try {
     await ensureDevSession(req);
   } catch (err) {
     console.warn('Dev auth fallback — database unavailable:', err.message ?? err);
-    req.session.user = sessionUser({
-      id: '00000000-0000-0000-0000-000000000001',
-      email: DEV_EMAIL,
-      full_name: 'Dev User',
-      role: 'admin',
-    });
-    req.user = req.session.user;
+    if (!req.session?.user) {
+      req.session.user = sessionUser({
+        id: DEV_PLACEHOLDER_USER_ID,
+        email: DEV_EMAIL,
+        full_name: 'Dev User',
+        role: 'admin',
+      });
+      req.user = req.session.user;
+    }
   }
   next();
 }

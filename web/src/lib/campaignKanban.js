@@ -1,6 +1,6 @@
 import { collaborationReasonLabel } from './collaborationReasons.js';
 import { deliverableHasProof } from './deliverableLogging.js';
-import { getCachedContact } from './contactsCache.js';
+import { contactFromEngagement } from './contactSocialLinks.js';
 import { getDeliverablesForEngagement } from './deliverablesCache.js';
 import { addDaysToIsoDate, todayIso } from './dates.js';
 
@@ -77,7 +77,7 @@ export function contactInitials(name) {
 }
 
 export function contactHandle(engagement) {
-  const contact = engagement.contact_id ? getCachedContact(engagement.contact_id) : null;
+  const contact = contactFromEngagement(engagement);
   const ig = contact?.instagram_url ?? null;
   if (ig) {
     const match = ig.match(/instagram\.com\/([^/?]+)/i);
@@ -132,8 +132,8 @@ export function isVisitOverdue(engagement) {
 }
 
 export function regionLabel(engagement) {
-  const contact = engagement.contact_id ? getCachedContact(engagement.contact_id) : null;
-  return contact?.city ?? engagement.city ?? null;
+  const contact = contactFromEngagement(engagement);
+  return contact?.city ?? engagement.contact_city ?? engagement.city ?? null;
 }
 
 /** Display-only commercial tag for board cards — not operationally gated. */

@@ -1,7 +1,32 @@
 import { getCachedContact } from './contactsCache.js';
 
+/** Prefer contact fields joined on the engagement row; cache is legacy fallback only. */
+export function contactFromEngagement(engagement) {
+  if (!engagement?.contact_id) return null;
+
+  const hasEmbedded =
+    Object.prototype.hasOwnProperty.call(engagement, 'contact_mobile_number')
+    || Object.prototype.hasOwnProperty.call(engagement, 'contact_instagram_url')
+    || Object.prototype.hasOwnProperty.call(engagement, 'contact_youtube_url')
+    || Object.prototype.hasOwnProperty.call(engagement, 'contact_email')
+    || Object.prototype.hasOwnProperty.call(engagement, 'contact_city');
+
+  if (hasEmbedded) {
+    return {
+      id: engagement.contact_id,
+      mobile_number: engagement.contact_mobile_number ?? null,
+      instagram_url: engagement.contact_instagram_url ?? null,
+      youtube_url: engagement.contact_youtube_url ?? null,
+      email: engagement.contact_email ?? null,
+      city: engagement.contact_city ?? null,
+    };
+  }
+
+  return getCachedContact(engagement.contact_id);
+}
+
 function fallbackHandleLabel(engagement) {
-  const contact = engagement?.contact_id ? getCachedContact(engagement.contact_id) : null;
+  const contact = contactFromEngagement(engagement);
   const ig = contact?.instagram_url ?? null;
   if (ig) {
     const match = ig.match(/instagram\.com\/([^/?]+)/i);
@@ -72,7 +97,7 @@ function youtubeProfileFromUrl(url) {
  * profileUrl null → handle renders as plain text.
  */
 export function getCreatorCardIdentity(engagement) {
-  const contact = engagement?.contact_id ? getCachedContact(engagement.contact_id) : null;
+  const contact = contactFromEngagement(engagement);
   const instagramUrl = contact?.instagram_url ?? null;
   const youtubeUrl = contact?.youtube_url ?? null;
 
@@ -107,12 +132,12 @@ export function telUrl(mobile) {
 
 /** Contact identity for the campaign quick-edit drawer. */
 export function getDrawerContactIdentity(engagement) {
-  const contact = engagement?.contact_id ? getCachedContact(engagement.contact_id) : null;
+  const contact = contactFromEngagement(engagement);
   const social = getCreatorCardIdentity(engagement);
   const mobile = contact?.mobile_number ?? null;
 
   return {
-    contactId: contact?.id ?? null,
+    contactId: engagement?.contact_id ?? contact?.id ?? null,
     handleLabel: social.handleLabel,
     profileUrl: social.profileUrl,
     whatsAppUrl: social.whatsAppUrl,

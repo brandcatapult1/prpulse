@@ -23,6 +23,15 @@ import {
 
 export const engagementsRouter = Router();
 
+/** Contact fields joined onto engagement rows for board/drawer identity (no separate contacts fetch). */
+const ENGAGEMENT_CONTACT_COLS = `
+  c.full_name AS contact_name,
+  c.mobile_number AS contact_mobile_number,
+  c.email AS contact_email,
+  c.instagram_url AS contact_instagram_url,
+  c.youtube_url AS contact_youtube_url,
+  c.city AS contact_city`;
+
 const ENGAGEMENT_PATCH_FIELDS = [
   'conversation_status',
   'interest_level',
@@ -46,7 +55,7 @@ const ENGAGEMENT_PATCH_FIELDS = [
 
 engagementsRouter.get('/campaign/:campaignId', requireAuth, async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT e.*, c.full_name AS contact_name, u.full_name AS owner_name,
+    `SELECT e.*, ${ENGAGEMENT_CONTACT_COLS}, u.full_name AS owner_name,
             cam.campaign_name
      FROM engagements e
      JOIN contacts c ON c.id = e.contact_id
@@ -77,7 +86,7 @@ engagementsRouter.get('/assigned/me', requireAuth, async (req, res) => {
 
 engagementsRouter.get('/:id', requireAuth, async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT e.*, c.full_name AS contact_name, cam.campaign_name, b.brand_name,
+    `SELECT e.*, ${ENGAGEMENT_CONTACT_COLS}, cam.campaign_name, b.brand_name,
             u.full_name AS owner_name
      FROM engagements e
      JOIN contacts c ON c.id = e.contact_id

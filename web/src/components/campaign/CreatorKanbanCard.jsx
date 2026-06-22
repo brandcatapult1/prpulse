@@ -13,7 +13,7 @@ import {
 } from '../../lib/campaignKanban.js';
 import { droppedFromLabel, isDidntDeliverDrop, resolveDroppedFrom } from '../../lib/dropTransitions.js';
 import { isContactBlacklisted } from '../../lib/contactsHelpers.js';
-import { InConversationCardLogging } from './InConversationCardLogging.jsx';
+import { InConversationLoggingTrigger } from './ContactLoggingPanel.jsx';
 import { ScheduledCardLogging } from './ScheduledCardLogging.jsx';
 import { AwaitingDeliverablesCardLogging } from './AwaitingDeliverablesCardLogging.jsx';
 import { NotContactedCardLogging } from './NotContactedCardLogging.jsx';
@@ -269,7 +269,7 @@ function CreatorCardHeader({ engagement }) {
 
 /**
  * Glanceable creator summary for the campaign Kanban board.
- * Card body opens quick-edit drawer; In conversation cards add inline logging on hover.
+ * Card body opens quick-edit drawer; in-conversation cards open ContactLoggingPanel on action.
  */
 export function CreatorKanbanCard({
   engagement,
@@ -340,7 +340,7 @@ export function CreatorKanbanCard({
       )}
 
       {showInConversationLogging && onApplyLogging && (
-        <InConversationCardLogging
+        <InConversationLoggingTrigger
           engagement={engagement}
           onApply={onApplyLogging}
           onError={onLoggingError}

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Toast } from '../components/ui/Primitives.jsx';
 import { LogDeliverablePanel } from '../components/campaign/LogDeliverablePanel.jsx';
-import { ContactLoggingDrawer } from '../components/campaign/ContactLoggingDrawer.jsx';
+import { ContactLoggingPanel } from '../components/campaign/ContactLoggingPanel.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
   buildVisitDoneTransition,
@@ -321,11 +321,19 @@ export function DashboardPage() {
         <CampaignTargetsSection campaigns={dashboard.campaignTargets} />
       </div>
 
-      <ContactLoggingDrawer
+      <ContactLoggingPanel
         engagement={contactLoggingEngagement}
         open={Boolean(contactLoggingEngagement)}
         onClose={handleCloseContactLogging}
-        onApply={applyEngagementLogging}
+        onApply={(patch, message, snapshotKeys) => {
+          if (!contactLoggingEngagement) return;
+          applyEngagementLogging(
+            contactLoggingEngagement.id,
+            patch,
+            message,
+            snapshotKeys,
+          );
+        }}
         onError={(message) => showActionToast(message ?? 'Could not save', null)}
       />
 

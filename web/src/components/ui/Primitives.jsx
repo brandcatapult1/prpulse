@@ -82,31 +82,36 @@ export function ConfirmDialog({ open, title, body, confirmLabel = 'Confirm', onC
   );
 }
 
-export function Modal({ open, title, children, onClose, footer, mobileSheet = false }) {
+export function Modal({ open, title, children, onClose, footer, mobileSheet = false, compact = false }) {
   if (!open) return null;
+  const sizeClass = compact
+    ? 'max-w-sm'
+    : mobileSheet
+      ? 'max-w-lg max-md:fixed max-md:inset-0 max-md:max-h-none max-md:max-w-none max-md:rounded-none'
+      : 'max-w-lg';
   return (
     <OverlayPortal>
       <div
-        className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/30 p-4 backdrop-blur-[1px] max-md:items-stretch max-md:p-0"
+        className={`fixed inset-0 z-[70] flex items-center justify-center bg-ink/30 p-4 backdrop-blur-[1px] ${
+          compact ? '' : 'max-md:items-stretch max-md:p-0'
+        }`}
         onClick={onClose}
         role="presentation"
       >
         <div
-          className={`panel flex w-full flex-col overflow-hidden ${
-            mobileSheet
-              ? 'max-w-lg max-md:fixed max-md:inset-0 max-md:max-h-none max-md:max-w-none max-md:rounded-none'
-              : 'max-w-lg'
+          className={`panel flex w-full flex-col overflow-hidden ${sizeClass} ${
+            mobileSheet ? '' : ''
           }`}
           role="dialog"
           aria-modal="true"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-            <h3 className="text-sm font-semibold text-ink">{title}</h3>
+          <div className={`flex items-center justify-between border-b border-line ${compact ? 'px-4 py-3' : 'px-5 py-3.5'}`}>
+            <h3 className={`font-semibold text-ink ${compact ? 'text-xs' : 'text-sm'}`}>{title}</h3>
             <button type="button" onClick={onClose} className="text-ink-tertiary hover:text-ink">×</button>
           </div>
-          <div className="px-5 py-4">{children}</div>
-          {footer && <div className="border-t border-line px-5 py-4">{footer}</div>}
+          <div className={compact ? 'px-4 py-3' : 'px-5 py-4'}>{children}</div>
+          {footer && <div className={`border-t border-line ${compact ? 'px-4 py-3' : 'px-5 py-4'}`}>{footer}</div>}
         </div>
       </div>
     </OverlayPortal>

@@ -8,8 +8,8 @@ import {
 } from '../../lib/engagementTransitions.js';
 
 /**
- * Inline logging for the In conversation column — in_conversation and no_response
- * share the same outreach actions; sub-state must not suppress Replied / No reply.
+ * In-conversation contact log flow (Replied / No reply → stage transitions).
+ * Always render inside ContactLoggingPanel so dashboard and board stay aligned.
  */
 export function InConversationCardLogging({
   engagement,

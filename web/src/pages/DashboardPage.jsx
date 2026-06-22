@@ -363,6 +363,15 @@ function GlassCard({ children, className = '' }) {
   );
 }
 
+const ATTENTION_HEADLINE_TOOLTIP =
+  'Unique engagements needing your attention (follow-up due today or overdue, pending deliverable, or at-risk flag). Each creator counts once. Today\'s visits are excluded.';
+
+const ATTENTION_BREAKDOWN_TOOLTIP =
+  'Open items by type — these are a breakdown of the headline, not addends. One engagement can appear in multiple categories, so these numbers do not sum to the headline. Visits are excluded.';
+
+const VISITS_REMINDER_TOOLTIP =
+  'Scheduled visits today — reminders only, not counted in engagements needing attention.';
+
 function DashboardHero({ greeting, dateLabel, actionCount, glance }) {
   return (
     <GlassCard className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
@@ -370,7 +379,7 @@ function DashboardHero({ greeting, dateLabel, actionCount, glance }) {
         <h1 className="text-xl font-medium text-ink sm:text-2xl">{greeting}</h1>
         <p
           className="mt-1 text-sm text-ink-secondary"
-          title="Unique engagements across Today's tasks, Today's visits, Pending deliverables, and At risk"
+          title={ATTENTION_HEADLINE_TOOLTIP}
         >
           {dateLabel}
           <span className="text-ink-tertiary"> · </span>
@@ -381,11 +390,20 @@ function DashboardHero({ greeting, dateLabel, actionCount, glance }) {
           attention
         </p>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <GlancePill label="Tasks" value={glance.tasks} tone="default" />
-        <GlancePill label="Visits" value={glance.visits} tone="info" />
-        <GlancePill label="Deliverables" value={glance.pending} tone="warning" />
-        <GlancePill label="At risk" value={glance.atRisk} tone="danger" />
+      <div className="flex flex-col items-start gap-3 sm:items-end">
+        <div title={ATTENTION_BREAKDOWN_TOOLTIP}>
+          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-ink-tertiary">
+            By type
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <GlancePill label="Tasks" value={glance.tasks} tone="default" />
+            <GlancePill label="Deliverables" value={glance.deliverables} tone="warning" />
+            <GlancePill label="At risk" value={glance.atRisk} tone="danger" />
+          </div>
+        </div>
+        <div title={VISITS_REMINDER_TOOLTIP}>
+          <GlancePill label="Visits today" value={glance.visits} tone="info" />
+        </div>
       </div>
     </GlassCard>
   );

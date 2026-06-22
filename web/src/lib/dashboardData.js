@@ -244,25 +244,30 @@ function buildCampaignTargets(campaigns, engagements) {
     }));
 }
 
-function countUniqueActionEngagements(todaysTasks, todaysVisits, pendingDeliverables, atRisk) {
+function uniqueEngagementIds(rows) {
   const ids = new Set();
-  for (const row of [...todaysTasks, ...todaysVisits, ...pendingDeliverables, ...atRisk]) {
+  for (const row of rows) {
     if (row.engagementId) ids.add(row.engagementId);
   }
-  return ids.size;
+  return ids;
 }
 
 /**
- * Unique engagements appearing in any dashboard action module.
- * The same engagement in multiple modules (e.g. a task + a pending deliverable) counts once.
+ * Unique engagements with at least one open action: follow-up due today/overdue,
+ * pending deliverable, or at-risk flag. Today's scheduled visits are excluded.
  */
+export function countEngagementsNeedingAttention({ todaysTasks, pendingDeliverables, atRisk }) {
+  const ids = new Set([
+    ...uniqueEngagementIds(todaysTasks ?? []),
+    ...uniqueEngagementIds(pendingDeliverables ?? []),
+    ...uniqueEngagementIds(atRisk ?? []),
+  ]);
+  return ids.size;
+}
+
+/** @deprecated Use countEngagementsNeedingAttention — visits are not part of attention count. */
 export function countDashboardActionEngagements(modules) {
-  return countUniqueActionEngagements(
-    modules.todaysTasks ?? [],
-    modules.todaysVisits ?? [],
-    modules.pendingDeliverables ?? [],
-    modules.atRisk ?? [],
-  );
+  return countEngagementsNeedingAttention(modules);
 }
 
 /**
@@ -283,9 +288,8 @@ export function buildDashboardFromEngagements({
   const atRisk = buildAtRisk(scoped, getDeliverables, today);
   const campaignTargets = buildCampaignTargets(campaigns, scoped);
 
-  const actionCount = countDashboardActionEngagements({
+  const actionCount = countEngagementsNeedingAttention({
     todaysTasks,
-    todaysVisits,
     pendingDeliverables,
     atRisk,
   });
@@ -298,17 +302,19 @@ export function buildDashboardFromEngagements({
     atRisk,
     campaignTargets,
     glance: {
+      /** Open follow-ups (due today or overdue), one row per engagement. */
       tasks: todaysTasks.length,
-      visits: todaysVisits.length,
-      pending: pendingDeliverables.length,
+      /** Open deliverable rows awaiting proof/post. */
+      deliverables: pendingDeliverables.length,
+      /** Open at-risk flags (no-response, visit-overdue, stalled). */
       atRisk: atRisk.length,
+      /** Today's scheduled visits — reminders only, excluded from attention count. */
+      visits: todaysVisits.length,
     },
     actionCount,
     allClear:
-      todaysTasks.length === 0
-      && todaysVisits.length === 0
-      && pendingDeliverables.length === 0
-      && atRisk.length === 0,
+      actionCount === 0
+      && todaysVisits.length === 0,
   };
 }
 

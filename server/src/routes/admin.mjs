@@ -92,8 +92,8 @@ adminRouter.patch('/org-branding', async (req, res) => {
   if (logoUrl != null && typeof logoUrl !== 'string') {
     return res.status(400).json({ error: 'logo_url must be a string or null' });
   }
-  if (logoUrl && logoUrl.length > 750_000) {
-    return res.status(400).json({ error: 'Logo file is too large' });
+  if (logoUrl && logoUrl.length > 1_200_000) {
+    return res.status(400).json({ error: 'Logo file is too large (max ~900 KB image)' });
   }
 
   try {
@@ -114,7 +114,9 @@ adminRouter.patch('/org-branding', async (req, res) => {
     res.json(rows[0]);
   } catch (err) {
     if (err.code === '42P01') {
-      return res.status(503).json({ error: 'Run migration 004_org_settings first' });
+      return res.status(503).json({
+        error: 'Org settings table is missing — redeploy the app or contact support.',
+      });
     }
     console.warn('Org branding save failed:', err.message ?? err);
     res.status(503).json({ error: err.message ?? 'Could not save branding' });

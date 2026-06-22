@@ -6,6 +6,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { migrateUp } from '../../scripts/migrate.mjs';
+import { pool } from './db.mjs';
+import { ensureCriticalSchema } from './lib/ensureSchema.mjs';
 import { healthRouter } from './routes/health.mjs';
 import { authRouter } from './routes/auth.mjs';
 import { contactsRouter } from './routes/contacts.mjs';
@@ -85,7 +87,12 @@ app.listen(port, () => {
       ? 'Database: DATABASE_URL is set — running migrations'
       : 'Database: DATABASE_URL is NOT set — add it under Render → pr-pulse → Environment, then redeploy',
   );
-  migrateUp().catch((err) => {
-    console.error('Migration failed — app will still run:', err.message ?? err);
-  });
+  migrateUp()
+    .then(() => ensureCriticalSchema(pool))
+    .catch((err) => {
+      console.error('Migration failed — running schema repair:', err.message ?? err);
+      return ensureCriticalSchema(pool).catch((repairErr) => {
+        console.error('Schema repair failed:', repairErr.message ?? repairErr);
+      });
+    });
 });

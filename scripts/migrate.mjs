@@ -53,6 +53,42 @@ async function getApplied(client) {
   return new Set(rows.map((r) => r.name));
 }
 
+/** Neon was often seeded manually — baseline recorded migrations when objects already exist. */
+async function baselineMigrationsIfPresent(client) {
+  const applied = await getApplied(client);
+  const baselines = [
+    { name: '001_initial_schema', check: 'public.contacts' },
+    { name: '003_activity_events', check: 'public.activity_events' },
+  ];
+
+  for (const { name, check } of baselines) {
+    if (applied.has(name)) continue;
+    const { rows } = await client.query('SELECT to_regclass($1) AS present', [check]);
+    if (!rows[0]?.present) continue;
+    await client.query(
+      'INSERT INTO schema_migrations (name) VALUES ($1) ON CONFLICT (name) DO NOTHING',
+      [name],
+    );
+    console.log(`baseline ${name} (schema already present)`);
+  }
+
+  if (!applied.has('002_collaboration_reason')) {
+    const { rows } = await client.query(
+      `SELECT 1 FROM pg_enum e
+       JOIN pg_type t ON t.oid = e.enumtypid
+       WHERE t.typname = 'collaboration_reason' AND e.enumlabel = 'virality'
+       LIMIT 1`,
+    );
+    if (rows[0]) {
+      await client.query(
+        'INSERT INTO schema_migrations (name) VALUES ($1) ON CONFLICT (name) DO NOTHING',
+        ['002_collaboration_reason'],
+      );
+      console.log('baseline 002_collaboration_reason (enum already present)');
+    }
+  }
+}
+
 export async function migrateUp() {
   const url = process.env.DATABASE_URL;
   if (!url) {
@@ -65,6 +101,7 @@ export async function migrateUp() {
 
   try {
     await ensureMigrationsTable(client);
+    await baselineMigrationsIfPresent(client);
     const applied = await getApplied(client);
     const pairs = await listMigrationPairs();
     let count = 0;

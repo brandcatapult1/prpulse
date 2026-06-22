@@ -125,13 +125,17 @@ async function patchEngagement(req, res) {
       let idx = 2;
 
       for (const key of ENGAGEMENT_PATCH_FIELDS) {
+        if (key === 'next_follow_up_date') continue;
         if (!Object.prototype.hasOwnProperty.call(req.body, key)) continue;
         sets.push(`${key} = $${idx}`);
         params.push(patch[key]);
         idx += 1;
       }
 
-      if (Object.prototype.hasOwnProperty.call(req.body, 'next_follow_up_date') || patch.conversation_status) {
+      const followUpExplicit = Object.prototype.hasOwnProperty.call(req.body, 'next_follow_up_date');
+      const statusChanged =
+        patch.conversation_status && patch.conversation_status !== cur.conversation_status;
+      if (followUpExplicit || (statusChanged && followUp !== cur.next_follow_up_date)) {
         sets.push(`next_follow_up_date = $${idx}`);
         params.push(followUp);
         idx += 1;

@@ -7,7 +7,11 @@ import { ACTIVITY_ACTION } from './activityEvents.js';
 import { queueStageTransitionActivity } from './activityLog.js';
 import {
   conversationStatusToDroppedFrom,
+  DIDNT_DELIVER_REASON,
+  DROPPED_STAGE_STATUS,
   droppedFromToStatus,
+  isDidntDeliverDrop,
+  isDroppedStatus,
   isValidDropReason,
   resolveDroppedFrom,
 } from './dropTransitions.js';
@@ -31,7 +35,7 @@ export const DROP_REASON_OPTIONS = [
 ];
 
 export const DIDNT_DELIVER_DROP_REASON = {
-  value: 'dropped_didnt_deliver',
+  value: DIDNT_DELIVER_REASON,
   label: "Didn't Deliver",
 };
 
@@ -83,8 +87,19 @@ function buildDropPatch(engagement, dropReason, payload) {
   const droppedFrom =
     payload.droppedFrom
     ?? conversationStatusToDroppedFrom(fromStatus === 'no_response' ? 'no_response' : fromStatus);
+
+  if (dropReason === DIDNT_DELIVER_REASON) {
+    return {
+      conversation_status: DROPPED_STAGE_STATUS,
+      drop_reason: DIDNT_DELIVER_REASON,
+      dropped_from: droppedFrom,
+      ...sideEffectsOnStatusChange(DROPPED_STAGE_STATUS),
+    };
+  }
+
   return {
     conversation_status: dropReason,
+    drop_reason: null,
     dropped_from: droppedFrom,
     ...sideEffectsOnStatusChange(dropReason),
   };
@@ -101,7 +116,7 @@ function queueStageChange(engagement, patch, payload) {
     details: {
       fromStage,
       toStage,
-      reason: payload.dropReason ?? (toStage.startsWith('dropped_') ? toStage : null),
+      reason: payload.dropReason ?? patch.drop_reason ?? (toStage.startsWith('dropped_') ? toStage : null),
       droppedFrom: patch.dropped_from ?? payload.droppedFrom ?? null,
     },
   });
@@ -122,17 +137,14 @@ export function transitionStage(engagement, target, payload = {}) {
   const normalized = String(target);
 
   if (normalized === STAGE.REOPEN || normalized === 'Reopen') {
-    if (!engagement.conversation_status?.startsWith('dropped_')) {
+    if (!isDroppedStatus(engagement.conversation_status)) {
       return { ok: false, error: 'Engagement is not dropped' };
     }
     const droppedFrom = resolveDroppedFrom(engagement);
     if (!droppedFrom) {
       return { ok: false, error: 'No prior stage recorded' };
     }
-    if (
-      engagement.conversation_status === DIDNT_DELIVER_DROP_REASON.value
-      && !canMarkDidntDeliver(payload.role)
-    ) {
+    if (isDidntDeliverDrop(engagement) && !canMarkDidntDeliver(payload.role)) {
       return { ok: false, error: 'Senior Manager or Admin required to reopen' };
     }
     const targetStatus = droppedFromToStatus(droppedFrom);
@@ -141,6 +153,7 @@ export function transitionStage(engagement, target, payload = {}) {
       patch: {
         conversation_status: targetStatus,
         dropped_from: null,
+        drop_reason: null,
       },
       clearBlacklist: Boolean(payload.clearBlacklist),
     });

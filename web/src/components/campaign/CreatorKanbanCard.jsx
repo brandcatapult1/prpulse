@@ -11,8 +11,7 @@ import {
   isVisitOverdue,
   regionLabel,
 } from '../../lib/campaignKanban.js';
-import { resolveDroppedFrom } from '../../lib/engagementTransitions.js';
-import { droppedFromLabel } from '../../lib/dropTransitions.js';
+import { droppedFromLabel, isDidntDeliverDrop, resolveDroppedFrom } from '../../lib/dropTransitions.js';
 import { isContactBlacklisted } from '../../lib/contactsHelpers.js';
 import { InConversationCardLogging } from './InConversationCardLogging.jsx';
 import { ScheduledCardLogging } from './ScheduledCardLogging.jsx';
@@ -165,10 +164,10 @@ function StatusLine({ engagement, columnId }) {
       <div className="space-y-1">
         <StatusLineRow icon={AlertCircleIcon} tone="danger">
           <span className="inline-flex rounded px-1.5 py-0.5 text-2xs font-medium text-health-red ring-1 ring-red-200">
-            {droppedReasonLabel(status)}
+            {droppedReasonLabel(engagement)}
           </span>
         </StatusLineRow>
-        {status === 'dropped_didnt_deliver' && droppedFrom && (
+        {isDidntDeliverDrop(engagement) && droppedFrom && (
           <p className="text-[11px] text-ink-secondary">
             Failed at: {droppedFromLabel(droppedFrom)}
           </p>

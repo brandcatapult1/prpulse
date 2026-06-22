@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Modal } from '../ui/Primitives.jsx';
 import { isContactBlacklisted } from '../../lib/contactsHelpers.js';
-import { canReopenDropped, droppedFromLabel } from '../../lib/dropTransitions.js';
+import { canReopenDropped, droppedFromLabel, isDidntDeliverDrop } from '../../lib/dropTransitions.js';
 import { reopenToastMessage } from '../../lib/outreachLogging.js';
 import { resolveDroppedFrom, STAGE, transitionStage } from '../../lib/engagementTransitions.js';
 
@@ -11,8 +11,8 @@ export function DroppedCardLogging({ engagement, userRole, onApplyReopen, onErro
 
   const droppedFrom = resolveDroppedFrom(engagement);
   const blacklisted = engagement.contact_id && isContactBlacklisted(engagement.contact_id);
-  const isDidntDeliver = engagement.conversation_status === 'dropped_didnt_deliver';
-  const canReopen = canReopenDropped(userRole, engagement.conversation_status);
+  const isDidntDeliver = isDidntDeliverDrop(engagement);
+  const canReopen = canReopenDropped(userRole, engagement);
   const needsBlacklistPrompt = isDidntDeliver && blacklisted;
 
   function handleReopenConfirm() {

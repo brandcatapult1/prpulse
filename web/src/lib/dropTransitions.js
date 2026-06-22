@@ -1,5 +1,10 @@
 import { canMarkDidntDeliver } from './campaignPermissions.js';
 
+/** Generic Dropped stage status — reason lives in drop_reason. */
+export const DROPPED_STAGE_STATUS = 'dropped';
+
+export const DIDNT_DELIVER_REASON = 'didnt_deliver';
+
 /** Map live status → dropped_from slug stored on the engagement. */
 export function conversationStatusToDroppedFrom(status) {
   if (status === 'no_response') return 'no_response';
@@ -42,19 +47,29 @@ export function droppedFromLabel(droppedFrom) {
   return labels[droppedFrom] ?? (String(droppedFrom ?? '').replace(/_/g, ' ') || '—');
 }
 
-export function canReopenDropped(role, dropStatus) {
-  if (dropStatus === 'dropped_didnt_deliver') {
+export function isDroppedStatus(status) {
+  return status === DROPPED_STAGE_STATUS || status?.startsWith('dropped_');
+}
+
+/** Legacy demo rows may still carry conversation_status = dropped_didnt_deliver. */
+export function isDidntDeliverDrop(engagement) {
+  return engagement?.drop_reason === DIDNT_DELIVER_REASON
+    || engagement?.conversation_status === 'dropped_didnt_deliver';
+}
+
+export function canReopenDropped(role, engagement) {
+  if (isDidntDeliverDrop(engagement)) {
     return canMarkDidntDeliver(role);
   }
   return true;
 }
 
-/** Stage-scoped drop reasons (PRD funnel). */
+/** Stage-scoped drop reasons (PRD funnel). Keys are drop_reason slugs or conversation_status values. */
 export const DROP_REASON_STAGES = {
   dropped_profile_rejected: ['not_contacted', 'in_conversation'],
   dropped_not_interested: ['in_conversation', 'scheduled', 'no_response'],
   dropped_terms_disagreement: ['in_conversation', 'scheduled', 'no_response'],
-  dropped_didnt_deliver: ['awaiting_final_deliverables'],
+  [DIDNT_DELIVER_REASON]: ['awaiting_final_deliverables'],
 };
 
 export function isValidDropReason(dropReason, fromStatus) {

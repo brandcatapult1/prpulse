@@ -11,7 +11,7 @@ function stageChangedEvent(before, patch) {
     details: {
       fromStage,
       toStage,
-      reason: toStage.startsWith('dropped_') ? toStage : null,
+      reason: patch.drop_reason ?? (toStage.startsWith('dropped_') ? toStage : null),
       droppedFrom: patch.dropped_from ?? before.dropped_from ?? null,
     },
   };
@@ -64,10 +64,13 @@ function inferDiscreteEngagementEvents(before, patch) {
     });
   }
 
+  const wasDropped = before.conversation_status?.startsWith('dropped_')
+    || before.conversation_status === 'dropped';
   if (
-    before.conversation_status?.startsWith('dropped_')
+    wasDropped
     && patch.conversation_status
     && !patch.conversation_status.startsWith('dropped_')
+    && patch.conversation_status !== 'dropped'
   ) {
     events.push({
       action: ACTIVITY_ACTION.REOPEN,

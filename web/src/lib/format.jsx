@@ -38,7 +38,7 @@ export function healthDotClass(health) {
 
 export function statusTone(status) {
   if (status === 'collaboration_complete') return 'success';
-  if (status?.startsWith('dropped_')) return 'muted';
+  if (status?.startsWith('dropped_') || status === 'dropped') return 'muted';
   if (status === 'scheduled') return 'info';
   return 'default';
 }

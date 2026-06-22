@@ -17,6 +17,7 @@ import {
 } from '../lib/deliverableRows.mjs';
 import {
   recordDeliverablePostedActivity,
+  recordDidntDeliverActivity,
   recordEngagementPatchActivity,
   recordFeedbackActivity,
 } from '../lib/engagementActivity.mjs';
@@ -49,6 +50,7 @@ const ENGAGEMENT_PATCH_FIELDS = [
   'primary_collaboration_reason',
   'secondary_collaboration_reason',
   'dropped_from',
+  'drop_reason',
   'no_reply_count',
   'last_contact_log_type',
 ];
@@ -125,7 +127,7 @@ async function patchEngagement(req, res) {
         if (newStatus === 'scheduled' && (patch.visit_date ?? cur.visit_date)) {
           followUp = patch.visit_date ?? cur.visit_date;
         }
-        if (newStatus?.startsWith('dropped_') || newStatus === 'collaboration_complete') {
+        if (newStatus?.startsWith('dropped_') || newStatus === 'collaboration_complete' || newStatus === 'dropped') {
           followUp = null;
         }
       }
@@ -166,6 +168,18 @@ async function patchEngagement(req, res) {
 
       const updated = rows[0];
       await recordEngagementPatchActivity(client, req.user, cur, updated, patch);
+      if (
+        patch.drop_reason === 'didnt_deliver'
+        && cur.drop_reason !== 'didnt_deliver'
+      ) {
+        await recordDidntDeliverActivity(client, req.user, {
+          campaignId: cur.campaign_id,
+          engagementId: cur.id,
+          engagementPatch: patch,
+          blacklist: Boolean(req.body.blacklist),
+          contactId: cur.contact_id,
+        });
+      }
       return updated;
     });
     res.json(updated);

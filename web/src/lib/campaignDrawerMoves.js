@@ -1,6 +1,6 @@
 import { columnIdForStatus } from './campaignKanban.js';
 import { canMarkDidntDeliver } from './campaignPermissions.js';
-import { isValidDropReason } from './dropTransitions.js';
+import { isValidDropReason, isDroppedStatus } from './dropTransitions.js';
 import {
   DIDNT_DELIVER_DROP_REASON,
   DROP_REASON_OPTIONS,
@@ -121,7 +121,7 @@ export function getCampaignDrawerMoveTargets(engagement, { canComplete, role }) 
     return targets;
   }
 
-  if (columnId === 'dropped' && status?.startsWith('dropped_')) {
+  if (columnId === 'dropped' && isDroppedStatus(status)) {
     return [
       {
         value: DRAWER_MOVE.REOPEN,

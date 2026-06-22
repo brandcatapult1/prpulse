@@ -1,5 +1,6 @@
 import { collaborationReasonLabel } from './collaborationReasons.js';
 import { deliverableHasProof, deliverablePostedUnits, isDeliverableFullyPosted } from './deliverableLogging.js';
+import { isDidntDeliverDrop } from './dropTransitions.js';
 import { contactFromEngagement } from './contactSocialLinks.js';
 import { getDeliverablesForEngagement } from './deliverablesCache.js';
 import { addDaysToIsoDate, todayIso } from './dates.js';
@@ -28,7 +29,7 @@ export const CAMPAIGN_KANBAN_COLUMNS = [
       'dropped_profile_rejected',
       'dropped_not_interested',
       'dropped_terms_disagreement',
-      'dropped_didnt_deliver',
+      'dropped',
     ],
   },
   {
@@ -50,11 +51,18 @@ export function columnIdForStatus(status) {
   return col?.id ?? 'not_contacted';
 }
 
-export function droppedReasonLabel(status) {
+export function droppedReasonLabel(engagementOrStatus) {
+  if (engagementOrStatus && typeof engagementOrStatus === 'object') {
+    if (isDidntDeliverDrop(engagementOrStatus)) return "Didn't Deliver";
+    return droppedReasonLabel(engagementOrStatus.conversation_status);
+  }
+
+  const status = engagementOrStatus;
   const labels = {
     dropped_profile_rejected: 'Profile rejected',
     dropped_not_interested: 'Not interested',
     dropped_terms_disagreement: 'Terms disagreement',
+    dropped: 'Dropped',
     dropped_didnt_deliver: "Didn't Deliver",
   };
   return labels[status] ?? 'Dropped';

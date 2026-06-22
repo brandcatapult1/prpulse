@@ -10,7 +10,7 @@ export const CONVERSATION_STATUSES = [
   'dropped_profile_rejected',
   'dropped_not_interested',
   'dropped_terms_disagreement',
-  'dropped_didnt_deliver',
+  'dropped',
   'awaiting_final_deliverables',
   'collaboration_complete',
 ];
@@ -20,7 +20,7 @@ export function isComplete(status) {
 }
 
 export function isDropped(status) {
-  return status?.startsWith('dropped_');
+  return status === 'dropped' || status?.startsWith('dropped_');
 }
 
 export function isTerminal(status) {

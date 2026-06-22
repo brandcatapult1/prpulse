@@ -22,7 +22,7 @@ import {
   getCampaignDrawerMoveTargets,
   getDropReasonOptionsForStatus,
 } from '../../lib/campaignDrawerMoves.js';
-import { canReopenDropped, droppedFromLabel, resolveDroppedFrom } from '../../lib/dropTransitions.js';
+import { canReopenDropped, droppedFromLabel, isDroppedStatus, resolveDroppedFrom } from '../../lib/dropTransitions.js';
 import {
   firstOutreachToastMessage,
   rejectProfileToastMessage,
@@ -357,8 +357,7 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
     role: user?.role,
   });
   const dropReasonOptions = getDropReasonOptionsForStatus(status);
-  const canReopen = status?.startsWith('dropped_')
-    && canReopenDropped(user?.role, status);
+  const canReopen = isDroppedStatus(status) && canReopenDropped(user?.role, engagement);
 
   async function persistDeliverables(nextList, message) {
     try {

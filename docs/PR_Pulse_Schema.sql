@@ -54,6 +54,7 @@ CREATE TYPE conversation_status AS ENUM (
   'dropped_profile_rejected',     -- Dropped – Profile Rejected
   'dropped_not_interested',       -- Dropped – Not Interested
   'dropped_terms_disagreement',   -- Dropped – Terms Disagreement
+  'dropped',                      -- Dropped stage; reason in drop_reason (e.g. didnt_deliver)
   'awaiting_final_deliverables',
   'collaboration_complete'
 );
@@ -235,6 +236,7 @@ CREATE TABLE engagements (
   visit_outlet         text,
   visit_notes          text,
   dropped_from         text,                       -- stage slug when dropped; reopen routing
+  drop_reason          text,                       -- reason slug when status = dropped (e.g. didnt_deliver)
   no_reply_count       integer NOT NULL DEFAULT 0,
   last_contact_log_type text,                      -- conversation | no_reply_attempt
   visit_completed_date date,                       -- IST calendar date visit marked done

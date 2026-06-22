@@ -22,7 +22,7 @@ dashboardRouter.get('/', requireAuth, async (req, res) => {
        WHERE e.assigned_manager = $1
          AND e.next_follow_up_date IS NOT NULL
          AND e.next_follow_up_date <= $2
-         AND e.conversation_status NOT IN ('collaboration_complete', 'dropped_profile_rejected', 'dropped_not_interested', 'dropped_terms_disagreement')
+         AND e.conversation_status NOT IN ('collaboration_complete', 'dropped_profile_rejected', 'dropped_not_interested', 'dropped_terms_disagreement', 'dropped')
        ORDER BY e.next_follow_up_date
        LIMIT 20`,
       [userId, today],

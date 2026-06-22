@@ -137,7 +137,7 @@ export function CampaignViewPage() {
     const contactId = base?.contact_id;
 
     try {
-      await patchEngagement(engagementId, engagementPatch);
+      await patchEngagement(engagementId, { ...engagementPatch, blacklist });
       if (blacklist && contactId) {
         await blacklistContact(contactId, "Didn't deliver");
       }
@@ -159,6 +159,7 @@ export function CampaignViewPage() {
       engagementSnapshot[key] = base?.[key];
     }
     engagementSnapshot.dropped_from = base?.dropped_from ?? null;
+    engagementSnapshot.drop_reason = base?.drop_reason ?? null;
     const contactId = base?.contact_id;
 
     try {

@@ -33,7 +33,7 @@ function ActiveFilterChip({ label, valueLabel, onClear }) {
     <button
       type="button"
       onClick={onClear}
-      className="inline-flex items-center gap-1 rounded-md bg-brand-soft px-2 py-1 text-2xs font-medium text-brand"
+      className="campaign-glass-chip campaign-glass-chip-active"
     >
       <span>{label}: {valueLabel}</span>
       <span className="text-brand/60" aria-hidden>×</span>
@@ -46,7 +46,7 @@ function FilterDropdownChip({ label, onOpen }) {
     <button
       type="button"
       onClick={onOpen}
-      className="inline-flex items-center gap-1 rounded-md border border-line/80 bg-white px-2 py-1 text-2xs text-ink-secondary transition-colors hover:border-zinc-300 hover:text-ink"
+      className="campaign-glass-chip"
     >
       {label}
       <ChevronDown />
@@ -69,7 +69,7 @@ function FilterMenu({ options, onSelect, onClose }) {
     return (
       <div
         ref={ref}
-        className="absolute left-0 top-full z-20 mt-1 min-w-[10rem] rounded-md border border-line/80 bg-white px-3 py-2 text-2xs text-ink-tertiary shadow-sm"
+        className="campaign-glass-menu absolute left-0 top-full z-20 mt-1 min-w-[10rem] px-3 py-2 text-2xs text-ink-tertiary"
       >
         No options
       </div>
@@ -79,7 +79,7 @@ function FilterMenu({ options, onSelect, onClose }) {
   return (
     <div
       ref={ref}
-      className="absolute left-0 top-full z-20 mt-1 min-w-[11rem] rounded-md border border-line/80 bg-white py-1 shadow-sm"
+      className="campaign-glass-menu absolute left-0 top-full z-20 mt-1 min-w-[11rem]"
     >
       {options.map((opt) => (
         <button

@@ -21,6 +21,58 @@ import { NotContactedCardLogging } from './NotContactedCardLogging.jsx';
 import { DroppedCardLogging } from './DroppedCardLogging.jsx';
 import { CompleteCardLogging } from './CompleteCardLogging.jsx';
 
+function AlertCircleIcon({ className = 'h-3 w-3' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 8v4M12 16h.01" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CalendarEventIcon({ className = 'h-3 w-3' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" strokeLinecap="round" />
+      <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ClockIcon({ className = 'h-3 w-3' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 6v6l4 2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function FlagIcon({ className = 'h-3 w-3' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M4 22V4" strokeLinecap="round" />
+      <path d="M4 4h12l-2 4 2 4H4" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function StatusLineRow({ icon: Icon, tone = 'muted', children }) {
+  const iconTone =
+    tone === 'danger'
+      ? 'text-health-red'
+      : tone === 'warning'
+        ? 'text-health-amber'
+        : 'text-ink-tertiary';
+  return (
+    <div className="flex items-start gap-1.5">
+      <Icon className={`mt-px h-3 w-3 shrink-0 ${iconTone}`} />
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
+}
+
 function StatusLine({ engagement, columnId }) {
   const status = engagement.conversation_status;
 
@@ -33,15 +85,19 @@ function StatusLine({ engagement, columnId }) {
     const overdue = isFollowUpOverdue(date);
     if (status === 'no_response') {
       return (
-        <p className={`text-2xs ${overdue ? 'font-medium text-health-red' : 'text-ink-secondary'}`}>
-          {date ? `No reply — retry ${formatDate(date)}` : 'No reply yet — set retry date'}
-        </p>
+        <StatusLineRow icon={AlertCircleIcon} tone={overdue ? 'danger' : 'muted'}>
+          <p className={`text-2xs ${overdue ? 'font-medium text-health-red' : 'text-ink-secondary'}`}>
+            {date ? `No reply — retry ${formatDate(date)}` : 'No reply yet — set retry date'}
+          </p>
+        </StatusLineRow>
       );
     }
     return (
-      <p className={`text-2xs ${overdue ? 'font-medium text-health-red' : 'text-ink-secondary'}`}>
-        {date ? `Follow-up ${formatDate(date)}` : 'Set a follow-up date'}
-      </p>
+      <StatusLineRow icon={ClockIcon} tone={overdue ? 'danger' : 'muted'}>
+        <p className={`text-2xs ${overdue ? 'font-medium text-health-red' : 'text-ink-secondary'}`}>
+          {date ? `Follow-up ${formatDate(date)}` : 'Set a follow-up date'}
+        </p>
+      </StatusLineRow>
     );
   }
 
@@ -51,13 +107,17 @@ function StatusLine({ engagement, columnId }) {
     return (
       <div className="space-y-1">
         {overdue && (
-          <span className="inline-flex rounded px-1.5 py-0.5 text-2xs font-medium text-health-red ring-1 ring-red-200">
-            Visit overdue
-          </span>
+          <StatusLineRow icon={FlagIcon} tone="danger">
+            <span className="inline-flex rounded px-1.5 py-0.5 text-2xs font-medium text-health-red ring-1 ring-red-200">
+              Visit overdue
+            </span>
+          </StatusLineRow>
         )}
-        <p className={`text-2xs ${overdue ? 'font-medium text-health-red' : 'text-ink-secondary'}`}>
-          Visit {visitDate ? formatDate(visitDate) : '—'}
-        </p>
+        <StatusLineRow icon={CalendarEventIcon} tone={overdue ? 'danger' : 'muted'}>
+          <p className={`text-2xs ${overdue ? 'font-medium text-health-red' : 'text-ink-secondary'}`}>
+            Visit {visitDate ? formatDate(visitDate) : '—'}
+          </p>
+        </StatusLineRow>
       </div>
     );
   }
@@ -71,9 +131,11 @@ function StatusLine({ engagement, columnId }) {
     return (
       <div className="space-y-1">
         {atRisk && (
-          <span className="inline-flex rounded px-1.5 py-0.5 text-2xs font-medium text-health-amber ring-1 ring-amber-200">
-            At risk
-          </span>
+          <StatusLineRow icon={FlagIcon} tone="warning">
+            <span className="inline-flex rounded px-1.5 py-0.5 text-2xs font-medium text-health-amber ring-1 ring-amber-200">
+              At risk
+            </span>
+          </StatusLineRow>
         )}
         <div className="text-2xs text-ink-secondary">{posted} / {total} posted</div>
         <div className="h-1 overflow-hidden rounded-full bg-line">
@@ -101,9 +163,11 @@ function StatusLine({ engagement, columnId }) {
     const droppedFrom = resolveDroppedFrom(engagement);
     return (
       <div className="space-y-1">
-        <span className="inline-flex rounded px-1.5 py-0.5 text-2xs font-medium text-health-red ring-1 ring-red-200">
-          {droppedReasonLabel(status)}
-        </span>
+        <StatusLineRow icon={AlertCircleIcon} tone="danger">
+          <span className="inline-flex rounded px-1.5 py-0.5 text-2xs font-medium text-health-red ring-1 ring-red-200">
+            {droppedReasonLabel(status)}
+          </span>
+        </StatusLineRow>
         {status === 'dropped_didnt_deliver' && droppedFrom && (
           <p className="text-[11px] text-ink-secondary">
             Failed at: {droppedFromLabel(droppedFrom)}

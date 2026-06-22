@@ -16,7 +16,7 @@ export function CampaignKanbanBoard({
   const grouped = groupEngagementsByColumn(engagements);
 
   return (
-    <div className="campaign-board-wash -mx-1 rounded-2xl px-1 py-2.5">
+    <div className="-mx-1 rounded-2xl px-1 py-2.5">
       <div className="campaign-board overflow-x-auto px-1 pb-1">
         <div className="flex min-w-max gap-3">
           {CAMPAIGN_KANBAN_COLUMNS.map((column) => (
@@ -25,7 +25,7 @@ export function CampaignKanbanBoard({
               className="campaign-glass-lane flex w-[232px] shrink-0 flex-col"
               aria-label={column.label}
             >
-            <header className="flex items-center justify-between border-b border-white/60 px-3 py-2.5">
+            <header className="flex items-center justify-between border-b border-white/70 px-3 py-2.5">
               <h3 className="text-2xs font-medium text-ink-secondary">{column.label}</h3>
               <span className="text-2xs tabular-nums text-ink-tertiary">{grouped[column.id].length}</span>
             </header>

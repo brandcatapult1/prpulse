@@ -238,7 +238,9 @@ export function CampaignViewPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-1.5">
+    <div className="relative -mx-4 min-h-[calc(100vh-8rem)] px-4 pb-6">
+      <CampaignAuroraBackground />
+      <div className="relative z-10 mx-auto max-w-6xl space-y-1.5">
       <PageHeader
         title={campaign.campaign_name}
         subtitle={`${MODULES.campaignView.pageTitle} · ${campaign.brand_name}`}
@@ -253,22 +255,26 @@ export function CampaignViewPage() {
           filters={activeFilters}
           onChange={setActiveFilters}
         />
-        <div className="flex rounded-md border border-line/80 p-0.5">
+        <div className="campaign-glass-segment">
           <button
             type="button"
             onClick={() => setViewMode('board')}
-            className={`rounded px-2.5 py-1 text-2xs font-medium transition-colors ${
-              viewMode === 'board' ? 'bg-ink text-white' : 'text-ink-secondary hover:text-ink'
-            }`}
+            className={
+              viewMode === 'board'
+                ? 'campaign-glass-segment-btn-selected'
+                : 'campaign-glass-segment-btn'
+            }
           >
             Board
           </button>
           <button
             type="button"
             onClick={() => setViewMode('list')}
-            className={`rounded px-2.5 py-1 text-2xs font-medium transition-colors ${
-              viewMode === 'list' ? 'bg-ink text-white' : 'text-ink-secondary hover:text-ink'
-            }`}
+            className={
+              viewMode === 'list'
+                ? 'campaign-glass-segment-btn-selected'
+                : 'campaign-glass-segment-btn'
+            }
           >
             List
           </button>
@@ -331,6 +337,18 @@ export function CampaignViewPage() {
           </div>
         </div>
       )}
+      </div>
+    </div>
+  );
+}
+
+function CampaignAuroraBackground() {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl" aria-hidden>
+      <div className="absolute inset-0 bg-gradient-to-br from-[#f7f5fa]/90 via-[#f3f5f8]/85 to-[#f0f6f4]/90" />
+      <div className="absolute -left-20 -top-24 h-[420px] w-[420px] rounded-full bg-violet-200/30 blur-[120px]" />
+      <div className="absolute -right-12 top-[8%] h-[360px] w-[360px] rounded-full bg-orange-100/25 blur-[120px]" />
+      <div className="absolute bottom-[-8%] left-[20%] h-[340px] w-[340px] rounded-full bg-teal-100/22 blur-[120px]" />
     </div>
   );
 }

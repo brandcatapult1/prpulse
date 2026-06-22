@@ -42,16 +42,31 @@
   .campaign-board {
     @apply rounded-xl;
   }
-  .campaign-board-wash {
-    @apply bg-gradient-to-b from-white/60 via-[#f6f7f9]/80 to-[#f2f4f6]/90;
-  }
   .campaign-glass-tile {
-    @apply rounded-xl border border-white/80 bg-white/90 shadow-sm backdrop-blur-sm;
+    @apply rounded-xl border border-white bg-white/[0.93] shadow-[0_4px_16px_rgba(26,29,38,0.06),0_1px_3px_rgba(26,29,38,0.04),0_0_0_1px_rgba(255,255,255,0.78)_inset] backdrop-blur-md;
   }
   .campaign-glass-lane {
-    @apply rounded-2xl border border-white/70 bg-white/45 shadow-[0_2px_12px_rgba(26,29,38,0.04)] backdrop-blur-sm;
+    @apply rounded-2xl border border-white/80 bg-white/[0.48] shadow-[0_4px_20px_rgba(26,29,38,0.05),0_0_0_1px_rgba(255,255,255,0.55)_inset] backdrop-blur-md;
   }
   .campaign-kanban-card {
-    @apply rounded-[15px] border border-white/90 bg-white/[0.92] p-3 shadow-[0_4px_16px_rgba(26,29,38,0.06),0_1px_3px_rgba(26,29,38,0.04)] backdrop-blur-md transition-[border-color,box-shadow] hover:border-brand/25 hover:shadow-[0_6px_20px_rgba(26,29,38,0.08)];
+    @apply rounded-[16px] border border-white bg-white/[0.95] p-3 shadow-[0_8px_24px_rgba(26,29,38,0.08),0_2px_8px_rgba(26,29,38,0.05),0_0_0_1px_rgba(255,255,255,0.82)_inset] backdrop-blur-xl transition-[border-color,box-shadow] hover:border-white hover:shadow-[0_10px_28px_rgba(26,29,38,0.1),0_3px_10px_rgba(26,29,38,0.06),0_0_0_1px_rgba(255,255,255,0.88)_inset];
+  }
+  .campaign-glass-chip {
+    @apply inline-flex items-center gap-1 rounded-lg border border-white/80 bg-white/[0.9] px-2 py-1 text-2xs text-ink-secondary shadow-[0_2px_8px_rgba(26,29,38,0.04),0_0_0_1px_rgba(255,255,255,0.7)_inset] backdrop-blur-sm transition-colors hover:border-white hover:text-ink;
+  }
+  .campaign-glass-chip-active {
+    @apply border-brand/20 bg-white/[0.94] font-medium text-brand shadow-[0_2px_10px_rgba(26,29,38,0.05),0_0_0_1px_rgba(255,255,255,0.8)_inset];
+  }
+  .campaign-glass-segment {
+    @apply flex rounded-lg border border-white/80 bg-white/[0.88] p-0.5 shadow-[0_2px_8px_rgba(26,29,38,0.04),0_0_0_1px_rgba(255,255,255,0.7)_inset] backdrop-blur-sm;
+  }
+  .campaign-glass-segment-btn {
+    @apply rounded-md px-2.5 py-1 text-2xs font-medium text-ink-secondary transition-colors hover:text-ink;
+  }
+  .campaign-glass-segment-btn-selected {
+    @apply rounded-md bg-white/[0.95] px-2.5 py-1 text-2xs font-medium text-ink shadow-[0_1px_4px_rgba(26,29,38,0.06),0_0_0_1px_rgba(255,255,255,0.85)_inset];
+  }
+  .campaign-glass-menu {
+    @apply rounded-lg border border-white/80 bg-white/[0.95] py-1 shadow-[0_8px_24px_rgba(26,29,38,0.08),0_0_0_1px_rgba(255,255,255,0.8)_inset] backdrop-blur-md;
   }
 }

@@ -27,6 +27,7 @@ dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, '../..');
 const port = Number(process.env.PORT ?? 8080);
+const databaseConfigured = Boolean(process.env.DATABASE_URL?.trim());
 
 const app = express();
 app.set('trust proxy', 1);
@@ -79,6 +80,11 @@ app.use((err, _req, res, _next) => {
 
 app.listen(port, () => {
   console.log(`PR Pulse listening on :${port}`);
+  console.log(
+    databaseConfigured
+      ? 'Database: DATABASE_URL is set — running migrations'
+      : 'Database: DATABASE_URL is NOT set — add it under Render → pr-pulse → Environment, then redeploy',
+  );
   migrateUp().catch((err) => {
     console.error('Migration failed — app will still run:', err.message ?? err);
   });

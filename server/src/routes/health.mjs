@@ -25,6 +25,7 @@ healthRouter.get('/', async (_req, res) => {
     ok: true,
     service: 'pr-pulse',
     db,
+    database_url_set: isDatabaseConfigured(),
     time: new Date().toISOString(),
   });
 });

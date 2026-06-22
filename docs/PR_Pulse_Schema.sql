@@ -263,6 +263,8 @@ CREATE TABLE deliverables (
   status             deliverable_status NOT NULL DEFAULT 'pending',   -- overdue is computed (v_deliverables)
   published_date     date,
   content_link       text,
+  posted_quantity    integer NOT NULL DEFAULT 0,
+  unit_proofs        jsonb NOT NULL DEFAULT '[]',
   brief_compliance   boolean,
   brand_tag_verified boolean,
   internal_rating    integer CHECK (internal_rating IS NULL OR internal_rating BETWEEN 1 AND 5),

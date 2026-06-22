@@ -194,14 +194,17 @@ engagementsRouter.post('/:id/deliverables', requireAuth, async (req, res) => {
       const fields = deliverableInsertFields(req.body);
       const { rows } = await client.query(
         `INSERT INTO deliverables (
-           engagement_id, deliverable_type, quantity, due_date, status,
-           published_date, content_link, brief_compliance, brand_tag_verified, internal_rating
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+           engagement_id, deliverable_type, quantity, posted_quantity, unit_proofs,
+           due_date, status, published_date, content_link,
+           brief_compliance, brand_tag_verified, internal_rating
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
          RETURNING *`,
         [
           req.params.id,
           fields.deliverable_type,
           fields.quantity,
+          fields.posted_quantity,
+          JSON.stringify(fields.unit_proofs),
           fields.due_date,
           fields.status,
           fields.published_date,
@@ -241,13 +244,15 @@ engagementsRouter.patch('/:engagementId/deliverables/:deliverableId', requireAut
         `UPDATE deliverables SET
            deliverable_type = $3,
            quantity = $4,
-           due_date = $5,
-           status = $6,
-           published_date = $7,
-           content_link = $8,
-           brief_compliance = $9,
-           brand_tag_verified = $10,
-           internal_rating = $11,
+           posted_quantity = $5,
+           unit_proofs = $6,
+           due_date = $7,
+           status = $8,
+           published_date = $9,
+           content_link = $10,
+           brief_compliance = $11,
+           brand_tag_verified = $12,
+           internal_rating = $13,
            updated_at = now()
          WHERE id = $1 AND engagement_id = $2
          RETURNING *`,
@@ -256,6 +261,8 @@ engagementsRouter.patch('/:engagementId/deliverables/:deliverableId', requireAut
           req.params.engagementId,
           fields.deliverable_type,
           fields.quantity,
+          fields.posted_quantity,
+          JSON.stringify(fields.unit_proofs),
           fields.due_date,
           fields.status,
           fields.published_date,

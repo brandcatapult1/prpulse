@@ -25,6 +25,8 @@ export function buildNewDeliverable({ type, quantity = 1, dueDate, engagementSta
     id: `d-${Date.now()}`,
     deliverable_type: type,
     quantity: Number(quantity) || 1,
+    posted_quantity: 0,
+    unit_proofs: [],
     due_date: planning ? null : (dueDate || addDaysIso(7)),
     status: 'pending',
     is_overdue: false,

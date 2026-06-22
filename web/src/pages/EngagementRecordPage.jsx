@@ -52,14 +52,13 @@ import {
   visitRules,
 } from '../lib/engagementRules.js';
 import { formatCollaborationReason } from '../lib/collaborationReasons.js';
+import { addDeliverableToList, deliverableListUnitTotals, removeDeliverableFromList } from '../lib/deliverableList.js';
 
 const interestOptions = [
   { value: 'high', label: 'High' },
   { value: 'medium', label: 'Medium' },
   { value: 'low', label: 'Low' },
 ];
-
-import { buildNewDeliverable } from '../lib/deliverableTypes.js';
 
 export function EngagementRecordPage() {
   const { id } = useParams();
@@ -226,19 +225,35 @@ export function EngagementRecordPage() {
 
   const addDeliverable = (type) => {
     if (!deliverablesRule.canAdd) return;
-    const newItem = buildNewDeliverable({ type, engagementStatus: status });
-    persistDeliverables([...deliverables, newItem]);
-    setToast(`Added ${deliverableTypeLabel(type)} ×${newItem.quantity}`);
+    const existing = deliverables.find(
+      (d) => d.deliverable_type === type && d.status !== 'posted',
+    );
+    const nextList = addDeliverableToList(deliverables, type, status);
+    const merged = nextList.find(
+      (d) => d.deliverable_type === type && d.status !== 'posted',
+    );
+    persistDeliverables(nextList);
+    setToast(
+      existing
+        ? `${deliverableTypeLabel(type)} ×${merged?.quantity ?? 1}`
+        : `Added ${deliverableTypeLabel(type)} ×${merged?.quantity ?? 1}`,
+    );
   };
 
   const removeDeliverable = (delId) => {
     const item = deliverables.find((d) => d.id === delId);
     if (!item || !canRemoveDeliverable(status, item)) return;
-    persistDeliverables(deliverables.filter((d) => d.id !== delId));
-    setToast(`Removed ${deliverableTypeLabel(item.deliverable_type)} ×${item.quantity}`);
+    const nextList = removeDeliverableFromList(deliverables, delId);
+    const remaining = nextList.find((d) => d.id === delId);
+    persistDeliverables(nextList);
+    setToast(
+      remaining
+        ? `${deliverableTypeLabel(item.deliverable_type)} ×${remaining.quantity}`
+        : `Removed ${deliverableTypeLabel(item.deliverable_type)}`,
+    );
   };
 
-  const postedCount = deliverables.filter((d) => d.status === 'posted').length;
+  const { posted: postedUnits, total: totalUnits } = deliverableListUnitTotals(deliverables);
 
   const blacklisted = engagement.contact_id && isContactBlacklisted(engagement.contact_id);
   const contactRecord = engagement.contact_id ? getCachedContact(engagement.contact_id) : null;
@@ -394,7 +409,7 @@ export function EngagementRecordPage() {
                 </p>
               </div>
               <Pill tone={deliverables.length ? 'info' : 'muted'}>
-                {postedCount}/{deliverables.length} posted
+                {postedUnits}/{totalUnits} posted
               </Pill>
             </div>
 

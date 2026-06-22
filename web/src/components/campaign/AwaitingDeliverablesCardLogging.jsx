@@ -6,6 +6,9 @@ import { deliverableProgress } from '../../lib/campaignKanban.js';
 import {
   deliverableHasProof,
   markDeliverablePostedToastMessage,
+  deliverablePostedUnits,
+  deliverableTotalUnits,
+  isDeliverableFullyPosted,
 } from '../../lib/deliverableLogging.js';
 import {
   DIDNT_DELIVER_DROP_REASON,
@@ -15,7 +18,13 @@ import {
 import { LogDeliverablePanel } from './LogDeliverablePanel.jsx';
 
 function deliverableLabel(d) {
-  return `${d.deliverable_type} ×${d.quantity}`;
+  const qty = deliverableTotalUnits(d);
+  const posted = deliverablePostedUnits(d);
+  const base = `${d.deliverable_type} ×${qty}`;
+  if (qty > 1 && posted > 0 && !isDeliverableFullyPosted(d)) {
+    return `${base} · ${posted}/${qty} posted`;
+  }
+  return base;
 }
 
 /**
@@ -43,7 +52,7 @@ export function AwaitingDeliverablesCardLogging({
   const { posted, total, pct } = deliverableProgress(engagement.id);
   const allPostedWithProof =
     total > 0
-    && deliverables.every((d) => d.status === 'posted' && deliverableHasProof(d));
+    && deliverables.every((d) => isDeliverableFullyPosted(d) && deliverableHasProof(d));
   const showDidntDeliver = canMarkDidntDeliver(userRole);
   const loggingDeliverable = deliverables.find((d) => d.id === loggingDeliverableId) ?? null;
 
@@ -103,7 +112,7 @@ export function AwaitingDeliverablesCardLogging({
 
           <ul className="space-y-1">
             {deliverables.map((d) => {
-              const isPosted = d.status === 'posted';
+              const isPosted = isDeliverableFullyPosted(d);
               return (
                 <li key={d.id}>
                   {isPosted ? (

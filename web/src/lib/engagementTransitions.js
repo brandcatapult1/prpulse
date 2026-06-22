@@ -1,5 +1,5 @@
 import { getDeliverablesForEngagement } from './deliverablesCache.js';
-import { deliverableHasProof } from './deliverableLogging.js';
+import { deliverableHasProof, isDeliverableFullyPosted } from './deliverableLogging.js';
 import { todayIso } from './dates.js';
 import { canMarkDidntDeliver } from './campaignPermissions.js';
 import { sideEffectsOnStatusChange } from './engagementRules.js';
@@ -74,7 +74,7 @@ export function canCompleteEngagement(engagementId) {
   const dels = getDeliverablesForEngagement(engagementId);
   return (
     dels.length > 0
-    && dels.every((d) => d.status === 'posted' && deliverableHasProof(d))
+    && dels.every((d) => isDeliverableFullyPosted(d) && deliverableHasProof(d))
   );
 }
 

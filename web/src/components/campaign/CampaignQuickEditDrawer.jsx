@@ -4,7 +4,7 @@ import { Drawer, Modal, Toast } from '../ui/Primitives.jsx';
 import { DeliverableTypeButtons, deliverableTypeLabel } from '../deliverables/DeliverableTypeButtons.jsx';
 import { formatDate, formatStatus, Pill } from '../../lib/format.jsx';
 import { COLLABORATION_REASONS } from '../../lib/collaborationReasons.js';
-import { buildNewDeliverable } from '../../lib/deliverableTypes.js';
+import { addDeliverableToList, deliverableListUnitTotals, removeDeliverableFromList } from '../../lib/deliverableList.js';
 import { engagementsApi } from '../../lib/api.js';
 import {
   patchEngagement,
@@ -35,6 +35,7 @@ import {
   canRemoveDeliverable,
   isComplete,
 } from '../../lib/engagementRules.js';
+import { isDeliverableFullyPosted } from '../../lib/deliverableLogging.js';
 
 const REASON_OPTIONS = [
   { value: '', label: 'Select reason…' },
@@ -89,7 +90,7 @@ function drawerCompleteHint(canComplete, status, deliverableCount) {
 }
 
 function DeliverableChip({ deliverable, canRemove, onRemove }) {
-  const posted = deliverable.status === 'posted';
+  const posted = isDeliverableFullyPosted(deliverable);
   return (
     <span
       className={[
@@ -343,10 +344,11 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
   if (!engagementId || !engagement) return null;
 
   const canComplete =
-    deliverables.length > 0 && deliverables.every((d) => d.status === 'posted');
+    deliverables.length > 0
+    && deliverables.every((d) => isDeliverableFullyPosted(d));
   const status = engagement.conversation_status;
   const deliverablesRule = deliverablesRules(status);
-  const postedCount = deliverables.filter((d) => d.status === 'posted').length;
+  const { posted: postedUnits, total: totalUnits } = deliverableListUnitTotals(deliverables);
   const collabType = engagement.collaboration_type === 'paid' ? 'paid' : 'barter';
   const deliverablesNote = drawerDeliverablesNote(status, deliverablesRule, deliverables.length);
   const completeHint = drawerCompleteHint(canComplete, status, deliverables.length);
@@ -373,19 +375,33 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
 
   function addDeliverable(type) {
     if (!deliverablesRule.canAdd) return;
-    const newItem = buildNewDeliverable({ type, engagementStatus: status });
+    const existing = deliverables.find(
+      (d) => d.deliverable_type === type && d.status !== 'posted',
+    );
+    const nextList = addDeliverableToList(deliverables, type, status);
+    const merged = nextList.find(
+      (d) => d.deliverable_type === type && d.status !== 'posted',
+    );
+    const qty = merged?.quantity ?? 1;
     persistDeliverables(
-      [...deliverables, newItem],
-      `Added ${deliverableTypeLabel(type)} ×${newItem.quantity}`,
+      nextList,
+      existing
+        ? `${deliverableTypeLabel(type)} ×${qty}`
+        : `Added ${deliverableTypeLabel(type)} ×${qty}`,
     );
   }
 
   function removeDeliverable(delId) {
     const item = deliverables.find((d) => d.id === delId);
     if (!item || !canRemoveDeliverable(status, item)) return;
+    const nextList = removeDeliverableFromList(deliverables, delId);
+    const remaining = nextList.find((d) => d.id === delId);
+    const label = deliverableTypeLabel(item.deliverable_type);
     persistDeliverables(
-      deliverables.filter((d) => d.id !== delId),
-      `Removed ${deliverableTypeLabel(item.deliverable_type)} ×${item.quantity}`,
+      nextList,
+      remaining
+        ? `${label} ×${remaining.quantity}`
+        : `Removed ${label}`,
     );
   }
 
@@ -685,9 +701,9 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
               <div id="campaign-drawer-deliverables" className="mt-3 border-t border-line/60 pt-3">
                 <div className="flex items-baseline justify-between gap-2">
                   <FieldLabel>Deliverables</FieldLabel>
-                  {deliverables.length > 0 && (
+                  {totalUnits > 0 && (
                     <span className="text-[10px] text-ink-tertiary">
-                      {postedCount}/{deliverables.length} posted
+                      {postedUnits}/{totalUnits} posted
                     </span>
                   )}
                 </div>

@@ -7,6 +7,8 @@ export function mapDeliverableRow(row, screenshots = []) {
     engagement_id: row.engagement_id,
     deliverable_type: deliverableTypeFromDb(row.deliverable_type),
     quantity: row.quantity,
+    posted_quantity: row.posted_quantity ?? 0,
+    unit_proofs: Array.isArray(row.unit_proofs) ? row.unit_proofs : [],
     due_date: row.due_date,
     status: row.status,
     published_date: row.published_date,
@@ -75,6 +77,8 @@ export function deliverableInsertFields(body) {
   return {
     deliverable_type: deliverableTypeToDb(body.deliverable_type),
     quantity: body.quantity ?? 1,
+    posted_quantity: body.posted_quantity ?? 0,
+    unit_proofs: body.unit_proofs ?? [],
     due_date: body.due_date ?? null,
     status: body.status ?? 'pending',
     published_date: body.published_date ?? null,

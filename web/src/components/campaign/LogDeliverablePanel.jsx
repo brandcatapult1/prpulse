@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../ui/Primitives.jsx';
 import {
-  buildPostedDeliverablePatch,
+  buildUnitPostedPatch,
   canMarkDeliverablePosted,
   deliverableProofEmphasis,
+  deliverablePostedUnits,
+  deliverableTotalUnits,
 } from '../../lib/deliverableLogging.js';
 import { todayIso } from '../../lib/dates.js';
 
@@ -48,7 +50,7 @@ export function LogDeliverablePanel({ deliverable, open, onClose, onConfirm }) {
 
   function handleConfirm() {
     if (!canSubmit) return;
-    const next = buildPostedDeliverablePatch(deliverable, {
+    const next = buildUnitPostedPatch(deliverable, {
       contentLink,
       screenshots,
       publishedDate,
@@ -57,13 +59,18 @@ export function LogDeliverablePanel({ deliverable, open, onClose, onConfirm }) {
     resetAndClose();
   }
 
-  const typeLabel = `${deliverable.deliverable_type} ×${deliverable.quantity}`;
+  const typeLabel = `${deliverable.deliverable_type} ×${deliverableTotalUnits(deliverable)}`;
+  const nextUnit = deliverablePostedUnits(deliverable) + 1;
+  const totalUnits = deliverableTotalUnits(deliverable);
+  const modalTitle = totalUnits > 1
+    ? `Log deliverable · ${typeLabel} (${nextUnit} of ${totalUnits})`
+    : `Log deliverable · ${typeLabel}`;
 
   return (
     <Modal
       open={open}
       mobileSheet
-      title={`Log deliverable · ${typeLabel}`}
+      title={modalTitle}
       onClose={resetAndClose}
       footer={
         <div className="flex justify-end gap-2">

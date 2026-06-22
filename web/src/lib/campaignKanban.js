@@ -1,5 +1,5 @@
 import { collaborationReasonLabel } from './collaborationReasons.js';
-import { deliverableHasProof } from './deliverableLogging.js';
+import { deliverableHasProof, deliverablePostedUnits, isDeliverableFullyPosted } from './deliverableLogging.js';
 import { contactFromEngagement } from './contactSocialLinks.js';
 import { getDeliverablesForEngagement } from './deliverablesCache.js';
 import { addDaysToIsoDate, todayIso } from './dates.js';
@@ -99,8 +99,8 @@ export function contentTypeSummary(engagementId) {
 
 export function deliverableProgress(engagementId) {
   const dels = getDeliverablesForEngagement(engagementId);
-  const total = dels.length;
-  const posted = dels.filter((d) => d.status === 'posted').length;
+  const total = dels.reduce((sum, d) => sum + (d.quantity ?? 1), 0);
+  const posted = dels.reduce((sum, d) => sum + deliverablePostedUnits(d), 0);
   return { posted, total, pct: total ? Math.round((posted / total) * 100) : 0 };
 }
 
@@ -150,7 +150,7 @@ export function commercialTypeLabel(engagement) {
 
 export function deliverableProofSummary(engagementId) {
   const dels = getDeliverablesForEngagement(engagementId).filter(
-    (d) => d.status === 'posted' && deliverableHasProof(d),
+    (d) => isDeliverableFullyPosted(d) && deliverableHasProof(d),
   );
   return dels.map((d) => ({
     id: d.id,

@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { migrateUp } from '../../scripts/migrate.mjs';
-import { hasDemoFixtures, runDemoSeed } from '../../scripts/seed-demo.mjs';
+import { hasDemoFixtures, repairDemoHygiene, seedDemoFixtures } from '../../scripts/seed-demo.mjs';
 import { pool } from './db.mjs';
 import { ensureCriticalSchema } from './lib/ensureSchema.mjs';
 import { healthRouter } from './routes/health.mjs';
@@ -92,10 +92,24 @@ app.listen(port, () => {
     .then(() => ensureCriticalSchema(pool))
     .then(async () => {
       if (!databaseConfigured || !pool) return;
-      const exists = await hasDemoFixtures(pool);
-      if (exists) return;
-      const result = await runDemoSeed({ reset: false });
-      console.log('Demo fixtures seeded:', result.message ?? JSON.stringify(result));
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const exists = await hasDemoFixtures(client);
+        const result = exists
+          ? await repairDemoHygiene(client)
+          : await seedDemoFixtures(client, { reset: false });
+        await client.query('COMMIT');
+        console.log(
+          exists ? 'Demo fixture hygiene:' : 'Demo fixtures seeded:',
+          result.message ?? JSON.stringify(result),
+        );
+      } catch (err) {
+        await client.query('ROLLBACK');
+        console.warn('Demo fixture setup skipped:', err.message ?? err);
+      } finally {
+        client.release();
+      }
     })
     .catch((err) => {
       console.error('Migration failed — running schema repair:', err.message ?? err);

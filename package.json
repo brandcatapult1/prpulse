@@ -15,6 +15,7 @@
     "db:test": "node db/tests/integrity.test.mjs",
     "db:seed:demo": "node scripts/seed-demo.mjs",
     "db:seed:demo:reset": "node scripts/seed-demo.mjs --reset",
+    "db:seed:demo:repair": "node scripts/seed-demo.mjs --repair",
     "build": "npm run build --workspace=web",
     "start": "node server/src/index.mjs",
     "dev": "npm run dev --workspace=web",

@@ -398,19 +398,24 @@ function DashboardHero({ greeting, dateLabel, actionCount, glance }) {
           attention
         </p>
       </div>
-      <div className="flex flex-col items-start gap-3 sm:items-end">
-        <div title={ATTENTION_BREAKDOWN_TOOLTIP}>
-          <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-ink-tertiary">
-            By type
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <GlancePill label="Tasks" value={glance.tasks} tone="default" />
-            <GlancePill label="Deliverables" value={glance.deliverables} tone="warning" />
-            <GlancePill label="At risk" value={glance.atRisk} tone="danger" />
+      <div className="w-full sm:w-auto">
+        <div className="flex flex-wrap items-end gap-3 sm:justify-end">
+          <div title={ATTENTION_BREAKDOWN_TOOLTIP}>
+            <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-ink-tertiary">
+              By type
+            </p>
+            <div className="flex gap-2">
+              <GlancePill label="Tasks" value={glance.tasks} tone="default" />
+              <GlancePill label="Deliverables" value={glance.deliverables} tone="warning" />
+              <GlancePill label="At risk" value={glance.atRisk} tone="danger" />
+            </div>
           </div>
-        </div>
-        <div title={VISITS_REMINDER_TOOLTIP}>
-          <GlancePill label="Visits today" value={glance.visits} tone="info" />
+          <div
+            title={VISITS_REMINDER_TOOLTIP}
+            className="flex shrink-0 items-end self-stretch border-l border-line/60 pl-3 sm:pl-4"
+          >
+            <GlancePill label="Visits today" value={glance.visits} tone="info" />
+          </div>
         </div>
       </div>
     </GlassCard>

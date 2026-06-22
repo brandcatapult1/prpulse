@@ -19,6 +19,14 @@ function getDatabaseUrl() {
   return url;
 }
 
+function pgClientConfig(url) {
+  return {
+    connectionString: url,
+    ssl: url.includes('localhost') ? false : { rejectUnauthorized: false },
+    connectionTimeoutMillis: 15_000,
+  };
+}
+
 async function ensureMigrationsTable(client) {
   await client.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -45,8 +53,14 @@ async function getApplied(client) {
   return new Set(rows.map((r) => r.name));
 }
 
-async function migrateUp() {
-  const client = new pg.Client({ connectionString: getDatabaseUrl() });
+export async function migrateUp() {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    console.log('DATABASE_URL not set — skipping migrations');
+    return;
+  }
+
+  const client = new pg.Client(pgClientConfig(url));
   await client.connect();
 
   try {
@@ -87,7 +101,7 @@ async function migrateUp() {
 }
 
 async function migrateDown() {
-  const client = new pg.Client({ connectionString: getDatabaseUrl() });
+  const client = new pg.Client(pgClientConfig(getDatabaseUrl()));
   await client.connect();
 
   try {
@@ -119,7 +133,7 @@ async function migrateDown() {
 }
 
 async function migrateStatus() {
-  const client = new pg.Client({ connectionString: getDatabaseUrl() });
+  const client = new pg.Client(pgClientConfig(getDatabaseUrl()));
   await client.connect();
 
   try {
@@ -136,17 +150,25 @@ async function migrateStatus() {
   }
 }
 
-const command = process.argv[2] ?? 'up';
+const isCli =
+  process.argv[1]
+  && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 
-try {
-  if (command === 'up') await migrateUp();
-  else if (command === 'down') await migrateDown();
-  else if (command === 'status') await migrateStatus();
-  else {
-    console.error('Usage: node scripts/migrate.mjs [up|down|status]');
+if (isCli) {
+  const command = process.argv[2] ?? 'up';
+
+  try {
+    if (command === 'up') {
+      getDatabaseUrl();
+      await migrateUp();
+    } else if (command === 'down') await migrateDown();
+    else if (command === 'status') await migrateStatus();
+    else {
+      console.error('Usage: node scripts/migrate.mjs [up|down|status]');
+      process.exit(1);
+    }
+  } catch (err) {
+    console.error(err.message ?? err);
     process.exit(1);
   }
-} catch (err) {
-  console.error(err.message ?? err);
-  process.exit(1);
 }

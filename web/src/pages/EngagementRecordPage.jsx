@@ -16,6 +16,7 @@ import {
   formatDate,
   formatFee,
   formatStatus,
+  roleLabel,
   statusTone,
 } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
@@ -894,7 +895,10 @@ function TimelineModal({ open, onClose, contactName, entries }) {
               <div>
                 <div className="text-sm font-medium text-ink">{row.action}</div>
                 <div className="mt-0.5 text-2xs text-ink-tertiary">
-                  {row.user_name} · {formatDate(row.occurred_at)}
+                  {row.user_name}
+                  {row.user_role ? ` · ${roleLabel(row.user_role)}` : ''}
+                  {' · '}
+                  {formatDate(row.occurred_at)}
                 </div>
               </div>
               {row.status_change && (

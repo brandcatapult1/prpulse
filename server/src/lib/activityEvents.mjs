@@ -103,6 +103,7 @@ export function activityRowToTimelineEntry(row) {
     id: row.id,
     occurred_at: row.occurred_at,
     user_name: row.actor_name,
+    user_role: row.actor_role ?? null,
     action: ACTION_LABELS[row.action] ?? formatLegacyAction(row.action),
     status_change: statusChange,
     notes: formatTimelineNotes(row, details, { statusChange }),

@@ -223,8 +223,7 @@ export function CreatorKanbanCard({
   const columnId = columnIdForStatus(engagement.conversation_status);
   const showNotContactedLogging =
     columnId === 'not_contacted' && engagement.conversation_status === 'not_contacted';
-  const showInConversationLogging =
-    columnId === 'in_conversation' && engagement.conversation_status === 'in_conversation';
+  const showInConversationLogging = columnId === 'in_conversation';
   const showScheduledLogging =
     columnId === 'scheduled' && engagement.conversation_status === 'scheduled';
   const showAwaitingLogging =

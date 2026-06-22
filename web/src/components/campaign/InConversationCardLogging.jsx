@@ -8,7 +8,8 @@ import {
 } from '../../lib/engagementTransitions.js';
 
 /**
- * Inline logging for In conversation cards only — one disclosure level at a time.
+ * Inline logging for the In conversation column — in_conversation and no_response
+ * share the same outreach actions; sub-state must not suppress Replied / No reply.
  */
 export function InConversationCardLogging({ engagement, onApply, onError }) {
   const [step, setStep] = useState('idle');

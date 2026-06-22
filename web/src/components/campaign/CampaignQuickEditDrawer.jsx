@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { StatusButton } from '../ui/DataKit.jsx';
 import { Drawer, Modal, Toast } from '../ui/Primitives.jsx';
 import { DeliverableTypeButtons, deliverableTypeLabel } from '../deliverables/DeliverableTypeButtons.jsx';
 import { formatDate, formatStatus, Pill } from '../../lib/format.jsx';
 import { COLLABORATION_REASONS } from '../../lib/collaborationReasons.js';
 import { buildNewDeliverable } from '../../lib/deliverableTypes.js';
-import { addDaysIso } from '../../lib/dates.js';
 import { engagementsApi } from '../../lib/api.js';
 import {
   patchEngagement,
@@ -17,14 +15,25 @@ import {
 import { updateEngagementDeliverables } from '../../lib/deliverablesCache.js';
 import { updateCachedContact } from '../../lib/contactsCache.js';
 import { getDrawerContactIdentity } from '../../lib/contactSocialLinks.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import {
+  DRAWER_MOVE,
+  drawerCurrentStageLabel,
+  getCampaignDrawerMoveTargets,
+  getDropReasonOptionsForStatus,
+} from '../../lib/campaignDrawerMoves.js';
+import { canReopenDropped, droppedFromLabel, resolveDroppedFrom } from '../../lib/dropTransitions.js';
+import {
+  firstOutreachToastMessage,
+  rejectProfileToastMessage,
+  reopenToastMessage,
+} from '../../lib/outreachLogging.js';
 import { STAGE, transitionStage } from '../../lib/engagementTransitions.js';
+import { buildVisitDoneTransition, visitDoneToastMessage } from '../../lib/visitLogging.js';
 import {
   deliverablesRules,
   canRemoveDeliverable,
-  followUpSuggestionForStatus,
-  getStatusOptions,
   isComplete,
-  sideEffectsOnStatusChange,
 } from '../../lib/engagementRules.js';
 
 const REASON_OPTIONS = [
@@ -304,9 +313,15 @@ function DrawerIdentityHeader({ engagement, onEmailSaved, onToast }) {
 }
 
 export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated }) {
+  const { user } = useAuth();
   const [engagement, setEngagement] = useState(null);
   const [deliverables, setDeliverables] = useState([]);
   const [visitOpen, setVisitOpen] = useState(false);
+  const [followUpOpen, setFollowUpOpen] = useState(false);
+  const [dropOpen, setDropOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(null);
+  const [pendingMove, setPendingMove] = useState(null);
+  const [moveSelectKey, setMoveSelectKey] = useState(0);
   const [toast, setToast] = useState(null);
   const [identityRevision, setIdentityRevision] = useState(0);
 
@@ -335,6 +350,13 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
   const collabType = engagement.collaboration_type === 'paid' ? 'paid' : 'barter';
   const deliverablesNote = drawerDeliverablesNote(status, deliverablesRule, deliverables.length);
   const completeHint = drawerCompleteHint(canComplete, status, deliverables.length);
+  const moveTargets = getCampaignDrawerMoveTargets(engagement, {
+    canComplete,
+    role: user?.role,
+  });
+  const dropReasonOptions = getDropReasonOptionsForStatus(status);
+  const canReopen = status?.startsWith('dropped_')
+    && canReopenDropped(user?.role, status);
 
   async function persistDeliverables(nextList, message) {
     try {
@@ -378,36 +400,126 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
     }
   }
 
-  function handleStatusChange(next) {
-    if (next === 'scheduled') {
-      setVisitOpen(true);
-      return;
-    }
-    const patch = {
-      conversation_status: next,
-      ...sideEffectsOnStatusChange(next),
-    };
-    const suggestion = followUpSuggestionForStatus(next);
-    if (suggestion) {
-      patch.next_follow_up_date = addDaysIso(suggestion.days);
-    }
-    persist(patch, `Moved to ${formatStatus(next)}`);
-  }
-
-  function handleVisitSave(visitDate) {
-    const result = transitionStage(engagement, STAGE.SCHEDULED, { visitDate });
+  async function applyTransition(result, message) {
     if (!result.ok) {
-      setToast(result.error ?? 'Could not schedule visit');
+      setToast(result.error ?? 'Could not move');
       if (result.focusDeliverables) {
         document.getElementById('campaign-drawer-deliverables')?.scrollIntoView({
           behavior: 'smooth',
           block: 'nearest',
         });
       }
+      return false;
+    }
+    await persist(result.patch, message);
+    return true;
+  }
+
+  function resetMoveUi() {
+    setPendingMove(null);
+    setVisitOpen(false);
+    setFollowUpOpen(false);
+    setDropOpen(false);
+    setConfirmOpen(null);
+    setMoveSelectKey((k) => k + 1);
+  }
+
+  async function handleMoveSelect(moveValue) {
+    const target = moveTargets.find((t) => t.value === moveValue);
+    if (!target) return;
+
+    if (target.needsPrompt === 'follow_up_date') {
+      setPendingMove(target);
+      setFollowUpOpen(true);
       return;
     }
-    persist(result.patch, `Visit set for ${formatDate(visitDate)}`);
-    setVisitOpen(false);
+    if (target.needsPrompt === 'visit_date') {
+      setPendingMove(target);
+      setVisitOpen(true);
+      return;
+    }
+    if (target.needsPrompt === 'drop_reason') {
+      setPendingMove(target);
+      setDropOpen(true);
+      return;
+    }
+    if (target.needsConfirm) {
+      setPendingMove(target);
+      setConfirmOpen(target.needsConfirm);
+      return;
+    }
+    if (target.value === DRAWER_MOVE.VISIT_DONE) {
+      const result = buildVisitDoneTransition(engagement, transitionStage, STAGE);
+      if (await applyTransition(result, visitDoneToastMessage())) resetMoveUi();
+      return;
+    }
+    if (target.dropReason) {
+      const result = transitionStage(engagement, target.target, {
+        dropReason: target.dropReason,
+        droppedFrom: target.droppedFrom,
+      });
+      const message = target.value === DRAWER_MOVE.PROFILE_REJECTED
+        ? rejectProfileToastMessage()
+        : `Moved to Dropped — ${target.label}`;
+      if (await applyTransition(result, message)) resetMoveUi();
+    }
+  }
+
+  async function handleFollowUpSave(followUpDate) {
+    if (!pendingMove || !followUpDate) return;
+    const result = transitionStage(engagement, pendingMove.target, {
+      nextFollowUpDate: followUpDate,
+      logFirstOutreach: pendingMove.logFirstOutreach,
+    });
+    const message = pendingMove.logFirstOutreach
+      ? firstOutreachToastMessage(followUpDate)
+      : `Logged — next follow-up ${formatDate(followUpDate)}`;
+    if (await applyTransition(result, message)) resetMoveUi();
+  }
+
+  async function handleVisitSave(visitDate) {
+    const move = pendingMove ?? { target: STAGE.SCHEDULED };
+    const result = transitionStage(engagement, move.target, { visitDate });
+    if (await applyTransition(result, `Visit set for ${formatDate(visitDate)}`)) resetMoveUi();
+  }
+
+  async function handleDropReason(reason) {
+    if (!pendingMove) return;
+    const result = transitionStage(engagement, STAGE.DROPPED, { dropReason: reason });
+    const label = dropReasonOptions.find((o) => o.value === reason)?.label ?? 'Dropped';
+    if (await applyTransition(result, `Moved to Dropped — ${label}`)) resetMoveUi();
+  }
+
+  async function handleConfirmMove() {
+    if (!pendingMove) return;
+
+    if (pendingMove.needsConfirm === 'complete') {
+      const result = transitionStage(engagement, STAGE.COMPLETE);
+      if (await applyTransition(result, 'Collaboration marked complete')) resetMoveUi();
+      return;
+    }
+
+    if (pendingMove.needsConfirm === 'didnt_deliver') {
+      const result = transitionStage(engagement, STAGE.DROPPED, {
+        dropReason: pendingMove.dropReason,
+        droppedFrom: pendingMove.droppedFrom,
+      });
+      if (await applyTransition(result, "Moved to Dropped — Didn't Deliver")) resetMoveUi();
+      return;
+    }
+
+    if (pendingMove.needsConfirm === 'reopen') {
+      if (!canReopen) {
+        setToast('Senior Manager or Admin required to reopen');
+        resetMoveUi();
+        return;
+      }
+      const droppedFrom = resolveDroppedFrom(engagement);
+      const result = transitionStage(engagement, STAGE.REOPEN, { role: user?.role });
+      if (await applyTransition(result, reopenToastMessage(droppedFromLabel(droppedFrom)))) {
+        resetMoveUi();
+      }
+    }
   }
 
   function makePaid() {
@@ -426,12 +538,6 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
     }
     persist({ agreed_fee: fee }, 'Fee updated');
   }
-
-  const statusOptions = getStatusOptions({
-    current: status,
-    canComplete,
-    formatStatus,
-  });
 
   return (
     <>
@@ -481,17 +587,42 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
           <section className="py-3">
             <SectionLabel>Status &amp; next step</SectionLabel>
             <div className="space-y-2.5">
-              <label className="block">
-                <FieldLabel>Move to</FieldLabel>
-                <div className="mt-1 [&_select]:max-w-none">
-                  <StatusButton
-                    value={status}
-                    options={statusOptions}
-                    onChange={handleStatusChange}
-                    hint={completeHint}
-                  />
-                </div>
-              </label>
+              <div>
+                <FieldLabel>Current stage</FieldLabel>
+                <p className="mt-1 text-2xs font-medium text-ink">
+                  {drawerCurrentStageLabel(engagement, formatStatus)}
+                </p>
+              </div>
+              {moveTargets.length > 0 ? (
+                <label className="block">
+                  <FieldLabel>Move to</FieldLabel>
+                  <select
+                    key={moveSelectKey}
+                    className="input-field mt-1 h-8 max-w-none"
+                    defaultValue=""
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value) handleMoveSelect(value);
+                    }}
+                  >
+                    <option value="" disabled>
+                      Select next step…
+                    </option>
+                    {moveTargets.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  {completeHint && (
+                    <p className="mt-1.5 text-2xs text-ink-tertiary">{completeHint}</p>
+                  )}
+                </label>
+              ) : (
+                <p className="text-2xs text-ink-tertiary">
+                  No stage moves from here — use board quick-actions or the full record.
+                </p>
+              )}
               {!isComplete(status) && !status?.startsWith('dropped_') && (
                 <label className="block">
                   <FieldLabel>Next follow-up</FieldLabel>
@@ -602,9 +733,88 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
       <VisitModal
         open={visitOpen}
         contactName={engagement.contact_name}
-        onClose={() => setVisitOpen(false)}
+        onClose={() => {
+          setVisitOpen(false);
+          setPendingMove(null);
+          setMoveSelectKey((k) => k + 1);
+        }}
         onSave={handleVisitSave}
       />
+
+      <FollowUpModal
+        open={followUpOpen}
+        title={
+          pendingMove?.logFirstOutreach
+            ? `First outreach · ${engagement.contact_name}`
+            : `Next follow-up · ${engagement.contact_name}`
+        }
+        onClose={() => {
+          setFollowUpOpen(false);
+          setPendingMove(null);
+          setMoveSelectKey((k) => k + 1);
+        }}
+        onSave={handleFollowUpSave}
+      />
+
+      <DropReasonModal
+        open={dropOpen}
+        contactName={engagement.contact_name}
+        options={dropReasonOptions}
+        onClose={() => {
+          setDropOpen(false);
+          setPendingMove(null);
+          setMoveSelectKey((k) => k + 1);
+        }}
+        onSelect={handleDropReason}
+      />
+
+      <Modal
+        open={Boolean(confirmOpen)}
+        title={
+          confirmOpen === 'complete'
+            ? 'Mark collaboration complete?'
+            : confirmOpen === 'didnt_deliver'
+              ? "Mark as didn't deliver?"
+              : 'Reopen engagement?'
+        }
+        onClose={() => {
+          setConfirmOpen(null);
+          setPendingMove(null);
+          setMoveSelectKey((k) => k + 1);
+        }}
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => {
+                setConfirmOpen(null);
+                setPendingMove(null);
+                setMoveSelectKey((k) => k + 1);
+              }}
+            >
+              Cancel
+            </button>
+            <button type="button" className="btn-primary" onClick={handleConfirmMove}>
+              Confirm
+            </button>
+          </div>
+        }
+      >
+        <p className="text-2xs text-ink-secondary">
+          {confirmOpen === 'complete' && 'All deliverables are posted with proof.'}
+          {confirmOpen === 'didnt_deliver' && 'This will drop the engagement and can blacklist the creator.'}
+          {confirmOpen === 'reopen' && (
+            <>
+              Return to{' '}
+              <span className="font-medium text-ink">
+                {droppedFromLabel(resolveDroppedFrom(engagement))}
+              </span>
+              ?
+            </>
+          )}
+        </p>
+      </Modal>
 
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </>
@@ -638,7 +848,7 @@ function VisitModal({ open, onClose, contactName, onSave }) {
       }
     >
       <p className="mb-4 text-2xs text-ink-secondary">
-        Pick a visit date — follow-up will auto-set to the same day.
+        Pick a visit date — follow-up will auto-set to the same day. At least one deliverable is required.
       </p>
       <label className="block text-2xs text-ink-secondary">
         Visit date
@@ -650,6 +860,76 @@ function VisitModal({ open, onClose, contactName, onSave }) {
           onChange={(e) => setVisitDate(e.target.value)}
         />
       </label>
+    </Modal>
+  );
+}
+
+function FollowUpModal({ open, title, onClose, onSave }) {
+  const [followUpDate, setFollowUpDate] = useState('');
+
+  useEffect(() => {
+    if (open) setFollowUpDate('');
+  }, [open]);
+
+  return (
+    <Modal
+      open={open}
+      title={title}
+      onClose={onClose}
+      footer={
+        <div className="flex justify-end gap-2">
+          <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={!followUpDate}
+            onClick={() => onSave(followUpDate)}
+          >
+            Save
+          </button>
+        </div>
+      }
+    >
+      <label className="block text-2xs text-ink-secondary">
+        Follow-up date
+        <input
+          type="date"
+          className="input-field mt-1"
+          required
+          value={followUpDate}
+          onChange={(e) => setFollowUpDate(e.target.value)}
+          autoFocus
+        />
+      </label>
+    </Modal>
+  );
+}
+
+function DropReasonModal({ open, contactName, options, onClose, onSelect }) {
+  return (
+    <Modal
+      open={open}
+      title={`Drop · ${contactName}`}
+      onClose={onClose}
+      footer={
+        <button type="button" className="btn-secondary" onClick={onClose}>
+          Cancel
+        </button>
+      }
+    >
+      <p className="mb-3 text-2xs text-ink-secondary">Select a reason</p>
+      <div className="space-y-1">
+        {options.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            className="btn-ghost w-full justify-start text-health-red"
+            onClick={() => onSelect(o.value)}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
     </Modal>
   );
 }

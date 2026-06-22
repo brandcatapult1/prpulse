@@ -74,18 +74,6 @@ export function InConversationCardLogging({ engagement, onApply, onError }) {
     apply(result.patch, `Moved to Dropped — ${label}`);
   }
 
-  function handleNoResponseConfirm() {
-    if (!followUpDate) return;
-    const result = transitionStage(engagement, STAGE.NO_RESPONSE, {
-      nextFollowUpDate: followUpDate,
-    });
-    if (!result.ok) return;
-    apply(
-      result.patch,
-      `Moved to No Response — follow-up ${formatDate(followUpDate)}`,
-    );
-  }
-
   if (step === 'no_reply_date') {
     return (
       <LoggingPanel>
@@ -110,36 +98,6 @@ export function InConversationCardLogging({ engagement, onApply, onError }) {
             onClick={handleNoReplyConfirm}
           >
             Log attempt
-          </button>
-        </div>
-      </LoggingPanel>
-    );
-  }
-
-  if (step === 'suggest_no_response_date') {
-    return (
-      <LoggingPanel>
-        <label className="block text-[11px] text-ink-secondary">
-          Follow-up if still no response
-          <input
-            type="date"
-            className="input-field mt-1 w-full text-2xs"
-            value={followUpDate}
-            onChange={(e) => setFollowUpDate(e.target.value)}
-            autoFocus
-          />
-        </label>
-        <div className="flex gap-1">
-          <button type="button" className="btn-secondary flex-1 !py-1 text-[11px]" onClick={reset}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn-primary flex-1 !py-1 text-[11px]"
-            disabled={!followUpDate}
-            onClick={handleNoResponseConfirm}
-          >
-            Move to No Response
           </button>
         </div>
       </LoggingPanel>
@@ -258,18 +216,9 @@ export function InConversationCardLogging({ engagement, onApply, onError }) {
         <ActionButton label="No reply" variant="secondary" onClick={() => setStep('no_reply_date')} />
       </div>
       {noReplyCount >= 3 && (
-        <div className="mt-2 space-y-1">
-          <p className="text-[11px] text-health-amber">
-            {noReplyCount} unanswered attempts — consider No Response.
-          </p>
-          <button
-            type="button"
-            className="btn-secondary w-full !py-1 text-[11px]"
-            onClick={() => setStep('suggest_no_response_date')}
-          >
-            Move to No Response…
-          </button>
-        </div>
+        <p className="mt-2 text-[11px] text-health-amber">
+          {noReplyCount} unanswered attempts — flagged as no response.
+        </p>
       )}
     </LoggingPanel>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { AnchoredPanel } from '../ui/OverlayPortal.jsx';
 import { Modal } from '../ui/Primitives.jsx';
 import {
   buildUnitPostedPatch,
@@ -113,28 +114,43 @@ function LogDeliverableForm({
   );
 }
 
+function usePrefersAnchoredPanel(anchorEl) {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches,
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const update = () => setIsMobile(mq.matches);
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
+  return Boolean(anchorEl) && !isMobile;
+}
+
 /**
  * One-level panel to log a single deliverable as posted with proof.
- * Use `inline` on kanban cards — backdrop-filter on cards breaks fixed modals.
+ * Pass anchorEl on kanban cards for a portaled popover anchored to the trigger.
  */
-export function LogDeliverablePanel({ deliverable, open, onClose, onConfirm, inline = false }) {
+export function LogDeliverablePanel({ deliverable, open, onClose, onConfirm, anchorEl = null }) {
   const [contentLink, setContentLink] = useState('');
   const [screenshots, setScreenshots] = useState([]);
   const [publishedDate, setPublishedDate] = useState(todayIso());
+  const useAnchored = usePrefersAnchoredPanel(anchorEl);
 
   useEffect(() => {
-    if (!deliverable?.id) return;
-    if (!inline && !open) return;
+    if (!deliverable?.id || !open) return;
     setContentLink('');
     setScreenshots([]);
     setPublishedDate(todayIso());
-  }, [open, inline, deliverable?.id]);
+  }, [open, deliverable?.id]);
 
-  if (!deliverable) return null;
-  if (!inline && !open) return null;
+  if (!deliverable || !open) return null;
 
   const canSubmit = canMarkDeliverablePosted({ contentLink, screenshots });
   const title = deliverablePanelTitle(deliverable);
+  const compact = Boolean(anchorEl);
 
   function resetAndClose() {
     setContentLink('');
@@ -163,29 +179,42 @@ export function LogDeliverablePanel({ deliverable, open, onClose, onConfirm, inl
       setScreenshots={setScreenshots}
       publishedDate={publishedDate}
       setPublishedDate={setPublishedDate}
-      compact={inline}
+      compact={compact}
     />
   );
 
-  if (inline) {
+  const footer = (
+    <div className={compact ? 'mt-2 flex gap-1' : 'flex justify-end gap-2'}>
+      <button
+        type="button"
+        className={compact ? 'btn-secondary flex-1 !py-1 text-[11px]' : 'btn-secondary'}
+        onClick={resetAndClose}
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        className={compact ? 'btn-primary flex-1 !py-1 text-[11px]' : 'btn-primary'}
+        disabled={!canSubmit}
+        onClick={handleConfirm}
+      >
+        Mark posted
+      </button>
+    </div>
+  );
+
+  if (useAnchored) {
     return (
-      <div onClick={(e) => e.stopPropagation()}>
-        <h4 className="mb-2 text-[11px] font-medium text-ink">{title}</h4>
-        {form}
-        <div className="mt-2 flex gap-1">
-          <button type="button" className="btn-secondary flex-1 !py-1 text-[11px]" onClick={resetAndClose}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn-primary flex-1 !py-1 text-[11px]"
-            disabled={!canSubmit}
-            onClick={handleConfirm}
-          >
-            Mark posted
-          </button>
+      <AnchoredPanel open={open} anchorEl={anchorEl} onClose={resetAndClose} width={300}>
+        <div className="p-3">
+          <div className="mb-2 flex items-start justify-between gap-2">
+            <h4 className="text-[11px] font-medium text-ink">{title}</h4>
+            <button type="button" onClick={resetAndClose} className="text-ink-tertiary hover:text-ink">×</button>
+          </div>
+          {form}
+          {footer}
         </div>
-      </div>
+      </AnchoredPanel>
     );
   }
 
@@ -195,21 +224,7 @@ export function LogDeliverablePanel({ deliverable, open, onClose, onConfirm, inl
       mobileSheet
       title={title}
       onClose={resetAndClose}
-      footer={
-        <div className="flex justify-end gap-2">
-          <button type="button" className="btn-secondary" onClick={resetAndClose}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={!canSubmit}
-            onClick={handleConfirm}
-          >
-            Mark posted
-          </button>
-        </div>
-      }
+      footer={footer}
     >
       {form}
     </Modal>

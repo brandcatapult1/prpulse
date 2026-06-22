@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db.mjs';
 import { requireAuth, requireRole } from '../middleware/auth.mjs';
+import { runDemoSeed } from '../../../scripts/seed-demo.mjs';
 
 export const adminRouter = Router();
 
@@ -120,5 +121,16 @@ adminRouter.patch('/org-branding', async (req, res) => {
     }
     console.warn('Org branding save failed:', err.message ?? err);
     res.status(503).json({ error: err.message ?? 'Could not save branding' });
+  }
+});
+
+adminRouter.post('/seed-demo', async (req, res) => {
+  const reset = req.body?.reset === true;
+  try {
+    const result = await runDemoSeed({ reset, actorUserId: req.user.id });
+    res.json(result);
+  } catch (err) {
+    console.warn('Demo seed failed:', err.message ?? err);
+    res.status(503).json({ error: err.message ?? 'Demo seed failed' });
   }
 });

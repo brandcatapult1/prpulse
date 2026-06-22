@@ -100,6 +100,8 @@ export const adminApi = {
   orgBranding: () => api('/admin/org-branding'),
   updateOrgBranding: (body) =>
     api('/admin/org-branding', { method: 'PATCH', body: JSON.stringify(body) }),
+  seedDemo: (reset = false) =>
+    api('/admin/seed-demo', { method: 'POST', body: JSON.stringify({ reset }) }),
 };
 
 export const orgBrandingApi = {

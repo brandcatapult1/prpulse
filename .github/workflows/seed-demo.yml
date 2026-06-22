@@ -1,0 +1,33 @@
+name: Seed Demo Fixtures
+
+on:
+  workflow_dispatch:
+    inputs:
+      reset:
+        description: 'Clear and reload demo fixtures'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm install
+      - name: Load demo fixtures
+        run: |
+          if [ "${{ inputs.reset }}" = "true" ]; then
+            npm run db:seed:demo:reset
+          else
+            npm run db:seed:demo
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

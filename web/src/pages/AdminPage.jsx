@@ -8,6 +8,7 @@ import { AUDIT_ENTITY_TYPES, USER_ROLES, canAccessAdmin } from '../lib/adminPerm
 import { useAuth } from '../context/AuthContext.jsx';
 import { adminApi } from '../lib/api.js';
 import { OrgBrandingSettings } from '../components/admin/OrgBrandingSettings.jsx';
+import { DemoFixturesPanel } from '../components/admin/DemoFixturesPanel.jsx';
 
 const TABS = [
   { id: 'users', label: 'Users & roles' },
@@ -188,9 +189,10 @@ export function AdminPage() {
       {tab === 'settings' && (
         <>
           <p className="text-2xs text-ink-secondary">
-            Organization branding shown in the app shell.
+            Organization branding and demo data for team walkthroughs.
           </p>
           <OrgBrandingSettings />
+          <DemoFixturesPanel />
         </>
       )}
 

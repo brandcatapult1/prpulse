@@ -13,6 +13,8 @@
     "db:migrate:down": "node scripts/migrate.mjs down",
     "db:migrate:status": "node scripts/migrate.mjs status",
     "db:test": "node db/tests/integrity.test.mjs",
+    "db:seed:demo": "node scripts/seed-demo.mjs",
+    "db:seed:demo:reset": "node scripts/seed-demo.mjs --reset",
     "build": "npm run build --workspace=web",
     "start": "node server/src/index.mjs",
     "dev": "npm run dev --workspace=web",

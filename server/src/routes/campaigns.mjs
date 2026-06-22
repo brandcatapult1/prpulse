@@ -28,9 +28,33 @@ campaignsRouter.get('/', requireAuth, async (req, res) => {
 });
 
 campaignsRouter.post('/', requireAuth, async (req, res) => {
-  const { campaign_name, brand_id, target_collaborations, status } = req.body ?? {};
+  const {
+    campaign_name,
+    brand_id,
+    campaign_type,
+    start_date,
+    end_date,
+    target_collaborations,
+    status,
+  } = req.body ?? {};
   if (!campaign_name?.trim() || !brand_id) {
     return res.status(400).json({ error: 'Campaign name and brand are required' });
+  }
+
+  const allowedTypes = new Set(['monthly', 'project']);
+  if (!allowedTypes.has(campaign_type)) {
+    return res.status(400).json({ error: 'Campaign type is required (monthly or project)' });
+  }
+  if (!start_date) {
+    return res.status(400).json({ error: 'Start date is required' });
+  }
+  if (campaign_type === 'project') {
+    if (!end_date) {
+      return res.status(400).json({ error: 'End date is required for one-time projects' });
+    }
+    if (end_date < start_date) {
+      return res.status(400).json({ error: 'End date must be on or after start date' });
+    }
   }
 
   const allowedStatuses = new Set(['draft', 'active', 'paused', 'completed', 'archived']);
@@ -44,16 +68,30 @@ campaignsRouter.post('/', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Target collaborations must be a non-negative number' });
   }
 
+  const storedEndDate = campaign_type === 'project' ? end_date : null;
+
   try {
     const row = await withUserTransaction(req.user.id, async (client) => {
       const brand = await client.query('SELECT id, brand_name FROM brands WHERE id = $1', [brand_id]);
       if (!brand.rows[0]) throw Object.assign(new Error('Brand not found'), { status: 404 });
 
       const { rows } = await client.query(
-        `INSERT INTO campaigns (campaign_name, brand_id, target_collaborations, status, created_by)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO campaigns (
+           campaign_name, brand_id, campaign_type, start_date, end_date,
+           target_collaborations, status, created_by
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
-        [campaign_name.trim(), brand_id, target, campaignStatus, req.user.id],
+        [
+          campaign_name.trim(),
+          brand_id,
+          campaign_type,
+          start_date,
+          storedEndDate,
+          target,
+          campaignStatus,
+          req.user.id,
+        ],
       );
 
       await client.query(

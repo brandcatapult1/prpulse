@@ -58,7 +58,6 @@ export function DashboardPage() {
   const dashboard = useMemo(() => {
     if (!workspace || !user?.id) {
       return buildDashboardFromEngagements({
-        userId: user?.id ?? '',
         engagements: [],
         campaigns: [],
         getDeliverables: getDeliverablesForEngagement,
@@ -66,7 +65,6 @@ export function DashboardPage() {
     }
     void revision;
     return buildDashboardFromEngagements({
-      userId: user.id,
       engagements: workspace.engagements,
       campaigns: workspace.campaigns,
       getDeliverables: getDeliverablesForEngagement,

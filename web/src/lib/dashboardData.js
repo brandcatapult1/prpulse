@@ -1,7 +1,22 @@
-import { todayIstIso, addDaysToIsoDate } from './dates.js';
+import { todayIstIso, addDaysToIsoDate, toDateInputValue } from './dates.js';
 import { deliverableHasProof } from './deliverableLogging.js';
 
 export const MODULE_ROW_LIMIT = 8;
+
+/** Normalize API / DB date values to YYYY-MM-DD (IST calendar for Date objects). */
+function dashboardDate(value) {
+  if (value == null || value === '') return null;
+  if (value instanceof Date) {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(value);
+  }
+  const normalized = toDateInputValue(value);
+  return normalized || null;
+}
+
+/** Scheduled visit day — mirrors campaign board card logic (visit_date, else follow-up). */
+function scheduledVisitDate(engagement) {
+  return dashboardDate(engagement.visit_date ?? engagement.next_follow_up_date);
+}
 
 const TERMINAL_STATUSES = new Set([
   'collaboration_complete',
@@ -27,10 +42,12 @@ export function resolveAssignedManagerId(engagement) {
 }
 
 export function daysBetweenIso(fromIso, toIso) {
-  if (!fromIso || !toIso) return 0;
-  const from = new Date(`${fromIso.slice(0, 10)}T12:00:00`);
-  const to = new Date(`${toIso.slice(0, 10)}T12:00:00`);
-  return Math.round((to - from) / 86400000);
+  const from = dashboardDate(fromIso);
+  const to = dashboardDate(toIso);
+  if (!from || !to) return 0;
+  const fromD = new Date(`${from}T12:00:00`);
+  const toD = new Date(`${to}T12:00:00`);
+  return Math.round((toD - fromD) / 86400000);
 }
 
 function initials(name) {
@@ -49,8 +66,11 @@ function taskActionForEngagement(engagement) {
 function buildTodaysTasks(engagements, today, getDeliverables) {
   return engagements
     .filter((e) => !isTerminalStatus(e.conversation_status))
-    .filter((e) => e.next_follow_up_date && e.next_follow_up_date <= today)
-    .filter((e) => !(e.conversation_status === 'scheduled' && e.visit_date === today))
+    .filter((e) => {
+      const followUp = dashboardDate(e.next_follow_up_date);
+      return followUp && followUp <= today;
+    })
+    .filter((e) => !(e.conversation_status === 'scheduled' && scheduledVisitDate(e) === today))
     .filter((e) => {
       if (e.conversation_status !== 'awaiting_final_deliverables') return true;
       const pending = getDeliverables(e.id).some(
@@ -59,8 +79,9 @@ function buildTodaysTasks(engagements, today, getDeliverables) {
       return !pending;
     })
     .map((e) => {
-      const overdue = e.next_follow_up_date < today;
-      const days = daysBetweenIso(e.next_follow_up_date, today);
+      const followUp = dashboardDate(e.next_follow_up_date);
+      const overdue = followUp < today;
+      const days = daysBetweenIso(followUp, today);
       return {
         id: e.id,
         engagementId: e.id,
@@ -73,7 +94,7 @@ function buildTodaysTasks(engagements, today, getDeliverables) {
         isOverdue: overdue,
         action: taskActionForEngagement(e),
         engagement: e,
-        sortDate: e.next_follow_up_date,
+        sortDate: followUp,
       };
     })
     .sort((a, b) => {
@@ -84,19 +105,22 @@ function buildTodaysTasks(engagements, today, getDeliverables) {
 
 function buildTodaysVisits(engagements, today) {
   return engagements
-    .filter((e) => e.conversation_status === 'scheduled' && e.visit_date === today)
-    .map((e) => ({
+    .filter((e) => e.conversation_status === 'scheduled' && scheduledVisitDate(e) === today)
+    .map((e) => {
+      const visitDate = scheduledVisitDate(e);
+      return {
       id: e.id,
       engagementId: e.id,
       contactId: e.contact_id,
       fullName: e.contact_name,
       initials: initials(e.contact_name),
       campaignName: e.campaign_name,
-      visitDate: e.visit_date,
+      visitDate,
       visitTime: e.visit_time ?? null,
       venue: e.visit_outlet ?? 'Visit',
       engagement: e,
-    }))
+    };
+    })
     .sort((a, b) => String(a.visitTime ?? '').localeCompare(String(b.visitTime ?? '')));
 }
 
@@ -109,7 +133,8 @@ function buildPendingDeliverables(engagements, getDeliverables, today) {
       const daysSinceVisit =
         e.visit_completed_date ? daysBetweenIso(e.visit_completed_date, today) : null;
       const atRisk = daysSinceVisit != null && daysSinceVisit >= 7;
-      const overdue = d.due_date && d.due_date < today;
+      const dueDay = dashboardDate(d.due_date);
+      const overdue = dueDay && dueDay < today;
       let situation = 'pending';
       let urgency = 'default';
       if (atRisk) {
@@ -160,8 +185,10 @@ function buildAtRisk(engagements, _getDeliverables, today) {
       });
     }
 
-    if (e.conversation_status === 'scheduled' && e.visit_date && e.visit_date < today) {
-      const days = daysBetweenIso(e.visit_date, today);
+    if (e.conversation_status === 'scheduled') {
+      const visitDay = scheduledVisitDate(e);
+      if (visitDay && visitDay < today) {
+      const days = daysBetweenIso(visitDay, today);
       rows.push({
         id: `${e.id}-visit-overdue`,
         engagementId: e.id,
@@ -175,9 +202,10 @@ function buildAtRisk(engagements, _getDeliverables, today) {
         engagement: e,
         sortKey: 1,
       });
+      }
     }
 
-    const lastActivity = e.last_contact_date ?? e.initial_contact_date;
+    const lastActivity = dashboardDate(e.last_contact_date ?? e.initial_contact_date);
     const stalledDays = lastActivity ? daysBetweenIso(lastActivity, today) : null;
     const isStalled =
       stalledDays != null
@@ -220,10 +248,15 @@ function countOverdue(engagements, getDeliverables, today) {
   let count = 0;
   for (const e of engagements) {
     if (isTerminalStatus(e.conversation_status)) continue;
-    if (e.next_follow_up_date && e.next_follow_up_date < today) count += 1;
-    if (e.conversation_status === 'scheduled' && e.visit_date && e.visit_date < today) count += 1;
+    const followUp = dashboardDate(e.next_follow_up_date);
+    if (followUp && followUp < today) count += 1;
+    if (e.conversation_status === 'scheduled') {
+      const visitDay = scheduledVisitDate(e);
+      if (visitDay && visitDay < today) count += 1;
+    }
     for (const d of getDeliverables(e.id)) {
-      if (d.status !== 'posted' && d.due_date && d.due_date < today) count += 1;
+      const dueDay = dashboardDate(d.due_date);
+      if (d.status !== 'posted' && dueDay && dueDay < today) count += 1;
     }
   }
   return count;
@@ -238,22 +271,22 @@ function countUniqueActionEngagements(todaysTasks, todaysVisits, pendingDelivera
 }
 
 /**
- * Build AM dashboard modules from engagements owned by userId.
+ * Build AM dashboard modules from engagements in the user's workspace.
+ * API scopes: campaign_manager → assigned_manager only; admin/senior_manager → all.
  */
 export function buildDashboardFromEngagements({
-  userId,
   engagements,
   campaigns,
   getDeliverables,
   today = todayIstIso(),
 }) {
-  const owned = engagements.filter((e) => resolveAssignedManagerId(e) === String(userId));
+  const scoped = engagements ?? [];
 
-  const todaysTasks = buildTodaysTasks(owned, today, getDeliverables);
-  const todaysVisits = buildTodaysVisits(owned, today);
-  const pendingDeliverables = buildPendingDeliverables(owned, getDeliverables, today);
-  const atRisk = buildAtRisk(owned, getDeliverables, today);
-  const campaignTargets = buildCampaignTargets(campaigns, owned);
+  const todaysTasks = buildTodaysTasks(scoped, today, getDeliverables);
+  const todaysVisits = buildTodaysVisits(scoped, today);
+  const pendingDeliverables = buildPendingDeliverables(scoped, getDeliverables, today);
+  const atRisk = buildAtRisk(scoped, getDeliverables, today);
+  const campaignTargets = buildCampaignTargets(campaigns, scoped);
 
   const actionCount = countUniqueActionEngagements(
     todaysTasks,
@@ -270,7 +303,7 @@ export function buildDashboardFromEngagements({
     atRisk,
     campaignTargets,
     glance: {
-      overdue: countOverdue(owned, getDeliverables, today),
+      overdue: countOverdue(scoped, getDeliverables, today),
       visits: todaysVisits.length,
       pending: pendingDeliverables.length,
     },

@@ -54,9 +54,23 @@ dashboardRouter.get('/', requireAuth, async (req, res) => {
   });
 });
 
-/** Full workspace payload for the AM dashboard (engagements + campaigns + deliverables). */
+/** Full workspace payload for the AM dashboard. */
 dashboardRouter.get('/workspace', requireAuth, async (req, res) => {
   const userId = req.user.id;
+  const role = req.user.role;
+  const isBroadRole = role === 'admin' || role === 'senior_manager';
+
+  const campaignScopeSql = isBroadRole
+    ? `cam.status = 'active'`
+    : `cam.status = 'active' AND EXISTS (
+         SELECT 1 FROM campaign_managers cm
+         WHERE cm.campaign_id = cam.id AND cm.user_id = $1
+       )`;
+
+  // AM: only engagements assigned to them. Admin / senior manager: all active work.
+  const engagementScopeSql = isBroadRole
+    ? `cam.status <> 'archived'`
+    : `cam.status <> 'archived' AND e.assigned_manager = $1`;
 
   const [engagementsRes, campaignsRes] = await Promise.all([
     pool.query(
@@ -66,16 +80,17 @@ dashboardRouter.get('/workspace', requireAuth, async (req, res) => {
        JOIN contacts c ON c.id = e.contact_id
        JOIN users u ON u.id = e.assigned_manager
        JOIN campaigns cam ON cam.id = e.campaign_id
-       WHERE e.assigned_manager = $1 AND cam.status <> 'archived'
+       WHERE ${engagementScopeSql}
        ORDER BY e.updated_at DESC`,
-      [userId],
+      isBroadRole ? [] : [userId],
     ),
     pool.query(
       `SELECT cam.*, b.brand_name
        FROM campaigns cam
        JOIN brands b ON b.id = cam.brand_id
-       WHERE cam.status = 'active'
+       WHERE ${campaignScopeSql}
        ORDER BY cam.updated_at DESC`,
+      isBroadRole ? [] : [userId],
     ),
   ]);
 

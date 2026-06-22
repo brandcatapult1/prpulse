@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, Toast } from '../ui/Primitives.jsx';
 import { adminApi } from '../../lib/api.js';
-import { DEMO_BRAND_NAME, DEMO_CAMPAIGN_NAME } from '../../lib/demoFixtures.js';
+import { DEMO_BRAND_NAME } from '../../lib/demoFixtures.js';
 
 export function DemoFixturesPanel() {
   const [loading, setLoading] = useState(false);
@@ -17,7 +17,7 @@ export function DemoFixturesPanel() {
         setToast(result.message);
       } else {
         setToast(
-          `Loaded ${result.contacts} creators on “${result.campaign_name}” — open Dashboard or Campaigns to review.`,
+          `Loaded ${result.contacts} creators across ${result.campaigns ?? 3} campaigns — open Dashboard or Campaigns.`,
         );
       }
     } catch (err) {
@@ -32,10 +32,10 @@ export function DemoFixturesPanel() {
       <Card elevated className="mt-4 !p-5">
         <h2 className="text-sm font-semibold text-ink">Demo fixtures</h2>
         <p className="mt-1 text-2xs text-ink-secondary">
-          Load sample data into the <strong>real database</strong> for team demos — brand{' '}
-          <span className="text-ink">{DEMO_BRAND_NAME}</span>, campaign{' '}
-          <span className="text-ink">{DEMO_CAMPAIGN_NAME}</span>, four creators across kanban stages,
-          follow-ups, a visit today, and a pending deliverable. Assigned to your signed-in user.
+          Sample data loads automatically on first deploy when the database is empty. Use these
+          buttons to reload manually — brand{' '}
+          <span className="text-ink">{DEMO_BRAND_NAME}</span>, three campaigns, ten creators across
+          kanban stages, three fixture managers (Aisha, Rohan, Neha).
         </p>
         <p className="mt-2 text-2xs text-ink-tertiary">
           Safe to re-run: skips if already loaded. Reset replaces demo rows only (not your other data).

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { migrateUp } from '../../scripts/migrate.mjs';
+import { hasDemoFixtures, runDemoSeed } from '../../scripts/seed-demo.mjs';
 import { pool } from './db.mjs';
 import { ensureCriticalSchema } from './lib/ensureSchema.mjs';
 import { healthRouter } from './routes/health.mjs';
@@ -89,6 +90,13 @@ app.listen(port, () => {
   );
   migrateUp()
     .then(() => ensureCriticalSchema(pool))
+    .then(async () => {
+      if (!databaseConfigured || !pool) return;
+      const exists = await hasDemoFixtures(pool);
+      if (exists) return;
+      const result = await runDemoSeed({ reset: false });
+      console.log('Demo fixtures seeded:', result.message ?? JSON.stringify(result));
+    })
     .catch((err) => {
       console.error('Migration failed — running schema repair:', err.message ?? err);
       return ensureCriticalSchema(pool).catch((repairErr) => {

@@ -11,6 +11,7 @@ import {
 import {
   deliverableInsertFields,
   loadDeliverablesForEngagement,
+  loadScreenshotsForDeliverables,
   mapDeliverableRow,
   syncDeliverableScreenshots,
 } from '../lib/deliverableRows.mjs';
@@ -205,8 +206,8 @@ engagementsRouter.post('/:id/deliverables', requireAuth, async (req, res) => {
       if (req.body.screenshots?.length) {
         await syncDeliverableScreenshots(client, inserted.id, req.body.screenshots, req.user.id);
       }
-      const [mapped] = await loadDeliverablesForEngagement(client, req.params.id);
-      return mapped ?? mapDeliverableRow(inserted, req.body.screenshots ?? []);
+      const screenshotsById = await loadScreenshotsForDeliverables(client, [inserted.id]);
+      return mapDeliverableRow(inserted, screenshotsById.get(inserted.id) ?? []);
     });
     res.status(201).json(row);
   } catch (err) {

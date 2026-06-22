@@ -39,6 +39,7 @@ export async function deleteDeliverable(engagementId, deliverableId) {
 export async function syncDeliverables(engagementId, beforeList, afterList) {
   const beforeIds = new Set(beforeList.map((d) => d.id));
   const afterIds = new Set(afterList.map((d) => d.id));
+  const touchedExisting = new Set();
 
   for (const item of beforeList) {
     if (!afterIds.has(item.id)) {
@@ -48,15 +49,21 @@ export async function syncDeliverables(engagementId, beforeList, afterList) {
 
   const results = [];
   for (const item of afterList) {
-    const isNew = !beforeIds.has(item.id) || String(item.id).startsWith('d-');
+    const isTempId = String(item.id ?? '').startsWith('d-');
+    const isNew = isTempId || !beforeIds.has(item.id);
+
     if (isNew) {
       const { id: _omit, ...body } = item;
       const created = await createDeliverable(engagementId, body);
       results.push(created);
-    } else {
-      const updated = await updateDeliverable(engagementId, item.id, item);
-      results.push(updated);
+      continue;
     }
+
+    if (touchedExisting.has(item.id)) continue;
+    touchedExisting.add(item.id);
+
+    const updated = await updateDeliverable(engagementId, item.id, item);
+    results.push(updated);
   }
   return results;
 }

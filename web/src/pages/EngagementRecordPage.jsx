@@ -99,7 +99,8 @@ export function EngagementRecordPage() {
 
   const persistDeliverables = async (list) => {
     try {
-      const saved = await syncDeliverables(id, deliverables, list);
+      const beforeList = await fetchDeliverables(id);
+      const saved = await syncDeliverables(id, beforeList, list);
       setDeliverables(saved);
       updateEngagementDeliverables(id, saved);
     } catch {

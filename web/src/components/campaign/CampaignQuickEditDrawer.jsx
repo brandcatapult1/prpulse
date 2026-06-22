@@ -338,7 +338,8 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
 
   async function persistDeliverables(nextList, message) {
     try {
-      const saved = await syncDeliverables(engagementId, deliverables, nextList);
+      const beforeList = await fetchDeliverables(engagementId);
+      const saved = await syncDeliverables(engagementId, beforeList, nextList);
       setDeliverables(saved);
       updateEngagementDeliverables(engagementId, saved);
       onUpdated?.();

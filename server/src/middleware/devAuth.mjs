@@ -1,9 +1,12 @@
-import { pool } from '../db.mjs';
+import { pool, isDatabaseConfigured } from '../db.mjs';
 import { isDevAuthEnabled, sessionUser } from '../lib/authConfig.mjs';
 
 const DEV_EMAIL = 'dev@brandcatapult.local';
 
 export async function getOrCreateDevUser() {
+  if (!pool) {
+    throw new Error('Database not configured');
+  }
   const { rows } = await pool.query(
     `INSERT INTO users (email, full_name, role, google_sub)
      VALUES ($1, 'Dev User', 'admin', 'dev-local-session')

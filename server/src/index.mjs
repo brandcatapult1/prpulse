@@ -20,6 +20,7 @@ import { orgRouter } from './routes/org.mjs';
 import { reportsRouter } from './routes/reports.mjs';
 import { attachUser } from './middleware/auth.mjs';
 import { devAuthMiddleware } from './middleware/devAuth.mjs';
+import { requireDatabase } from './middleware/database.mjs';
 
 dotenv.config();
 
@@ -47,6 +48,7 @@ app.use(
 );
 app.use(attachUser);
 app.use('/api', devAuthMiddleware);
+app.use('/api', requireDatabase);
 
 app.use('/api/health', healthRouter);
 app.use('/api/auth', authRouter);
@@ -67,6 +69,12 @@ app.get('*', (_req, res) => {
   res.sendFile(path.join(webDist, 'index.html'), (err) => {
     if (err) res.status(200).json({ service: 'pr-pulse-api', docs: '/api/health' });
   });
+});
+
+app.use((err, _req, res, _next) => {
+  console.error('Unhandled error:', err.message ?? err);
+  if (res.headersSent) return;
+  res.status(err.status ?? 503).json({ error: err.message ?? 'Server error' });
 });
 
 app.listen(port, () => {

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { pool } from '../db.mjs';
+import { pool, isDatabaseConfigured } from '../db.mjs';
 
 export const healthRouter = Router();
 
@@ -10,7 +10,7 @@ export const healthRouter = Router();
  */
 healthRouter.get('/', async (_req, res) => {
   let db = 'missing';
-  if (!process.env.DATABASE_URL) {
+  if (!isDatabaseConfigured()) {
     db = 'not_configured';
   } else {
     try {
@@ -31,7 +31,7 @@ healthRouter.get('/', async (_req, res) => {
 
 /** Optional readiness check for ops — returns 503 when the database is required but down. */
 healthRouter.get('/ready', async (_req, res) => {
-  if (!process.env.DATABASE_URL) {
+  if (!isDatabaseConfigured() || !pool) {
     return res.status(503).json({ ok: false, error: 'DATABASE_URL not configured' });
   }
   try {

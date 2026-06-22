@@ -344,20 +344,24 @@ function DashboardHero({ greeting, dateLabel, actionCount, glance }) {
     <GlassCard className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <h1 className="text-xl font-medium text-ink sm:text-2xl">{greeting}</h1>
-        <p className="mt-1 text-sm text-ink-secondary">
+        <p
+          className="mt-1 text-sm text-ink-secondary"
+          title="Unique engagements across Today's tasks, Today's visits, Pending deliverables, and At risk"
+        >
           {dateLabel}
           <span className="text-ink-tertiary"> · </span>
           <span className="font-medium text-ink">{actionCount}</span>
           {' '}
-          {actionCount === 1 ? 'action' : 'actions'}
+          {actionCount === 1 ? 'engagement needs' : 'engagements need'}
           {' '}
-          to clear
+          attention
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
-        <GlancePill label="Overdue" value={glance.overdue} tone="danger" />
-        <GlancePill label="Visit" value={glance.visits} tone="info" />
-        <GlancePill label="Pending" value={glance.pending} tone="warning" />
+        <GlancePill label="Tasks" value={glance.tasks} tone="default" />
+        <GlancePill label="Visits" value={glance.visits} tone="info" />
+        <GlancePill label="Deliverables" value={glance.pending} tone="warning" />
+        <GlancePill label="At risk" value={glance.atRisk} tone="danger" />
       </div>
     </GlassCard>
   );
@@ -368,6 +372,7 @@ function GlancePill({ label, value, tone }) {
     danger: 'text-health-red',
     warning: 'text-health-amber',
     info: 'text-brand',
+    default: 'text-ink',
   };
   return (
     <div className="flex min-w-[88px] items-center justify-between gap-3 rounded-xl border border-white/80 bg-white/90 px-3.5 py-2 shadow-sm">

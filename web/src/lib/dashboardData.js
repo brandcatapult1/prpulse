@@ -244,30 +244,25 @@ function buildCampaignTargets(campaigns, engagements) {
     }));
 }
 
-function countOverdue(engagements, getDeliverables, today) {
-  let count = 0;
-  for (const e of engagements) {
-    if (isTerminalStatus(e.conversation_status)) continue;
-    const followUp = dashboardDate(e.next_follow_up_date);
-    if (followUp && followUp < today) count += 1;
-    if (e.conversation_status === 'scheduled') {
-      const visitDay = scheduledVisitDate(e);
-      if (visitDay && visitDay < today) count += 1;
-    }
-    for (const d of getDeliverables(e.id)) {
-      const dueDay = dashboardDate(d.due_date);
-      if (d.status !== 'posted' && dueDay && dueDay < today) count += 1;
-    }
-  }
-  return count;
-}
-
 function countUniqueActionEngagements(todaysTasks, todaysVisits, pendingDeliverables, atRisk) {
   const ids = new Set();
   for (const row of [...todaysTasks, ...todaysVisits, ...pendingDeliverables, ...atRisk]) {
     if (row.engagementId) ids.add(row.engagementId);
   }
   return ids.size;
+}
+
+/**
+ * Unique engagements appearing in any dashboard action module.
+ * The same engagement in multiple modules (e.g. a task + a pending deliverable) counts once.
+ */
+export function countDashboardActionEngagements(modules) {
+  return countUniqueActionEngagements(
+    modules.todaysTasks ?? [],
+    modules.todaysVisits ?? [],
+    modules.pendingDeliverables ?? [],
+    modules.atRisk ?? [],
+  );
 }
 
 /**
@@ -288,12 +283,12 @@ export function buildDashboardFromEngagements({
   const atRisk = buildAtRisk(scoped, getDeliverables, today);
   const campaignTargets = buildCampaignTargets(campaigns, scoped);
 
-  const actionCount = countUniqueActionEngagements(
+  const actionCount = countDashboardActionEngagements({
     todaysTasks,
     todaysVisits,
     pendingDeliverables,
     atRisk,
-  );
+  });
 
   return {
     today,
@@ -303,9 +298,10 @@ export function buildDashboardFromEngagements({
     atRisk,
     campaignTargets,
     glance: {
-      overdue: countOverdue(scoped, getDeliverables, today),
+      tasks: todaysTasks.length,
       visits: todaysVisits.length,
       pending: pendingDeliverables.length,
+      atRisk: atRisk.length,
     },
     actionCount,
     allClear:

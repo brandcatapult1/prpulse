@@ -7,6 +7,7 @@ import { Pill, healthTone } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
 import { BRAND_CATEGORIES, canManageBrands } from '../lib/brandCategories.js';
 import { brandsApi } from '../lib/api.js';
+import { AddBrandModal } from '../components/brands/AddBrandModal.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export function BrandsPage() {
@@ -17,6 +18,7 @@ export function BrandsPage() {
   const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null);
   const [toast, setToast] = useState(null);
+  const [addOpen, setAddOpen] = useState(false);
 
   const load = useCallback(() => {
     brandsApi
@@ -85,6 +87,13 @@ export function BrandsPage() {
       <PageHeader
         title={MODULES.brands.pageTitle}
         subtitle={MODULES.brands.subtitle}
+        actions={
+          canEdit ? (
+            <button type="button" className="btn-primary" onClick={() => setAddOpen(true)}>
+              + Brand
+            </button>
+          ) : null
+        }
       />
 
       {error && (
@@ -98,7 +107,21 @@ export function BrandsPage() {
       )}
 
       {rows.length === 0 ? (
-        <EmptyState title="No brands yet" description="Client brands appear here once added." />
+        <EmptyState
+          title="No brands yet"
+          description={
+            canEdit
+              ? 'Add your first client brand to create campaigns.'
+              : 'Client brands appear here once added.'
+          }
+          action={
+            canEdit ? (
+              <button type="button" className="btn-primary" onClick={() => setAddOpen(true)}>
+                + Brand
+              </button>
+            ) : null
+          }
+        />
       ) : (
         <DataTable columns={columns} rows={rows} onRowClick={setSelected} />
       )}
@@ -109,6 +132,17 @@ export function BrandsPage() {
         managers={managers}
         onClose={() => setSelected(null)}
         onSave={saveBrand}
+      />
+
+      <AddBrandModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        managers={managers}
+        onCreated={(brand) => {
+          load();
+          setSelected(brand);
+          setToast(`${brand.brand_name} created`);
+        }}
       />
 
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}

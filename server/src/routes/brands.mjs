@@ -41,6 +41,51 @@ brandsRouter.get('/', requireAuth, async (_req, res) => {
   }
 });
 
+brandsRouter.post('/', requireAuth, requireRole('senior_manager', 'admin'), async (req, res) => {
+  const {
+    brand_name,
+    brand_category,
+    primary_contact,
+    contact_email,
+    account_manager_id,
+  } = req.body ?? {};
+
+  if (!brand_name?.trim()) {
+    return res.status(400).json({ error: 'Brand name is required' });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO brands (brand_name, brand_category, primary_contact, contact_email, account_manager)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, brand_name, brand_category, logo_path AS logo_label,
+         primary_contact, contact_email, is_active,
+         account_manager AS account_manager_id`,
+      [
+        brand_name.trim(),
+        brand_category?.trim() || null,
+        primary_contact?.trim() || null,
+        contact_email?.trim() || null,
+        account_manager_id || null,
+      ],
+    );
+
+    let account_manager_name = null;
+    if (rows[0].account_manager_id) {
+      const { rows: mgr } = await pool.query(
+        'SELECT full_name FROM users WHERE id = $1',
+        [rows[0].account_manager_id],
+      );
+      account_manager_name = mgr[0]?.full_name ?? null;
+    }
+
+    res.status(201).json({ ...rows[0], account_manager_name, campaign_count: 0 });
+  } catch (err) {
+    console.warn('Brand create failed:', err.message ?? err);
+    res.status(503).json({ error: err.message ?? 'Could not create brand' });
+  }
+});
+
 brandsRouter.get('/:id', requireAuth, async (req, res) => {
   try {
     const { rows } = await pool.query(

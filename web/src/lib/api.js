@@ -79,6 +79,7 @@ export const registrationsApi = {
 
 export const brandsApi = {
   list: () => api('/brands'),
+  create: (body) => api('/brands', { method: 'POST', body: JSON.stringify(body) }),
   get: (id) => api(`/brands/${id}`),
   accountManagers: () => api('/brands/account-managers/list'),
   update: (id, body) => api(`/brands/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),

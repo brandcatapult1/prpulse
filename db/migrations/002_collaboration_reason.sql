@@ -1,4 +1,7 @@
 -- Align collaboration_reason enum with PRD: Virality, Expert, Positioning
+-- v_engagements (001) selects e.* from engagements; drop it before column type changes.
+
+DROP VIEW IF EXISTS v_engagements;
 
 ALTER TABLE engagements
   ALTER COLUMN primary_collaboration_reason TYPE text
@@ -37,3 +40,9 @@ ALTER TABLE engagements
 ALTER TABLE engagements
   ALTER COLUMN secondary_collaboration_reason TYPE collaboration_reason
   USING secondary_collaboration_reason::collaboration_reason;
+
+CREATE OR REPLACE VIEW v_engagements AS
+SELECT e.*,
+       (e.conversation_status = 'collaboration_complete'
+        AND fn_engagement_deliverables_complete(e.id)) AS is_counted_collaboration
+FROM engagements e;

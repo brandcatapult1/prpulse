@@ -27,7 +27,7 @@ Act as a senior UI designer: **premium, restrained, easy-to-use** for daily powe
 
 ## Mirror the DB guards in the UI (don't duplicate logic — reflect state)
 - Disable **Collaboration Complete** until ≥1 deliverable exists and all are `Posted`; show the blocking reason.
-- Selecting **Scheduled** opens a **required Visit modal** before the status commits; on save, `next_follow_up_date = visit_date`.
+- Selecting **Scheduled** requires visit date, ≥1 deliverable, and **collab reason**; block message names missing prerequisites. Visit modal captures date; on save, `next_follow_up_date = visit_date`.
 - Agreed Fee / Collaboration Type render **read-only while Completed** (lock + "Reopen to amend").
 - **Overdue** is a computed badge from `v_deliverables`, never a status choice.
 

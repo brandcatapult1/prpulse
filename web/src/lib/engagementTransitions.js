@@ -35,9 +35,37 @@ export const DIDNT_DELIVER_DROP_REASON = {
   label: "Didn't Deliver",
 };
 
-/** Shown when → Scheduled is blocked because terms/deliverables are not planned yet. */
+export const SCHEDULED_PREREQUISITE = {
+  visitDate: 'visit date',
+  deliverables: 'at least one deliverable',
+  collabReason: 'collab reason',
+};
+
+/** @deprecated use formatScheduledBlockMessage */
 export const SCHEDULED_REQUIRES_DELIVERABLES_MESSAGE =
   'Add at least one deliverable before scheduling';
+
+export function getScheduledPrerequisitesMissing(engagement, visitDate) {
+  const missing = [];
+  if (!visitDate) missing.push(SCHEDULED_PREREQUISITE.visitDate);
+  if (getDeliverablesForEngagement(engagement.id).length === 0) {
+    missing.push(SCHEDULED_PREREQUISITE.deliverables);
+  }
+  if (!engagement.primary_collaboration_reason) {
+    missing.push(SCHEDULED_PREREQUISITE.collabReason);
+  }
+  return missing;
+}
+
+/** Names whichever Scheduled prerequisites are absent. */
+export function formatScheduledBlockMessage(missing) {
+  if (!missing?.length) return null;
+  if (missing.length === 1) return `Add ${missing[0]} before scheduling`;
+  if (missing.length === 2) {
+    return `Add ${missing[0]} and ${missing[1]} before scheduling`;
+  }
+  return `Add ${missing[0]}, ${missing[1]}, and ${missing[2]} before scheduling`;
+}
 
 export { isValidDropReason, resolveDroppedFrom, droppedFromToStatus } from './dropTransitions.js';
 export { NOT_CONTACTED_DROP_REASON } from './dropTransitions.js';
@@ -122,11 +150,14 @@ export function transitionStage(engagement, target, payload = {}) {
     if (!payload.visitDate) {
       return { ok: false, needsPrompt: 'visit_date' };
     }
-    if (getDeliverablesForEngagement(engagement.id).length === 0) {
+    const missing = getScheduledPrerequisitesMissing(engagement, payload.visitDate);
+    const missingAfterVisit = missing.filter((m) => m !== SCHEDULED_PREREQUISITE.visitDate);
+    if (missingAfterVisit.length > 0) {
       return {
         ok: false,
-        error: SCHEDULED_REQUIRES_DELIVERABLES_MESSAGE,
-        focusDeliverables: true,
+        error: formatScheduledBlockMessage(missingAfterVisit),
+        focusDeliverables: missingAfterVisit.includes(SCHEDULED_PREREQUISITE.deliverables),
+        focusCollabReason: missingAfterVisit.includes(SCHEDULED_PREREQUISITE.collabReason),
       };
     }
     return okTransition(engagement, payload, {

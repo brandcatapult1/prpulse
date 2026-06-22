@@ -409,6 +409,12 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
           block: 'nearest',
         });
       }
+      if (result.focusCollabReason) {
+        document.getElementById('campaign-drawer-collab-reason')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+      }
       return false;
     }
     await persist(result.patch, message);
@@ -561,7 +567,7 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
             onToast={setToast}
           />
 
-          <section className="py-3">
+          <section id="campaign-drawer-collab-reason" className="py-3">
             <SectionBlock tone="accent">
               <SectionLabel className="mb-1 text-brand/70">Collab reason</SectionLabel>
               <select
@@ -579,7 +585,7 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
                 ))}
               </select>
               {!engagement.primary_collaboration_reason && (
-                <p className="mt-1 text-[10px] text-health-amber">Required before complete</p>
+                <p className="mt-1 text-[10px] text-health-amber">Required before scheduling</p>
               )}
             </SectionBlock>
           </section>
@@ -848,7 +854,8 @@ function VisitModal({ open, onClose, contactName, onSave }) {
       }
     >
       <p className="mb-4 text-2xs text-ink-secondary">
-        Pick a visit date — follow-up will auto-set to the same day. At least one deliverable is required.
+        Pick a visit date — follow-up will auto-set to the same day. Requires at least one
+        deliverable and a collab reason.
       </p>
       <label className="block text-2xs text-ink-secondary">
         Visit date

@@ -22,7 +22,7 @@ Run the relevant items before declaring a feature complete. These mirror the sch
 ## UX
 - [ ] No operator screen is a long scrolling form; secondary workflows are one-level-deep drawers.
 - [ ] Quick Add creates a contact in < 15s.
-- [ ] `Scheduled` forces the Visit modal before committing; follow-up = visit date.
+- [ ] `Scheduled` requires visit date (Visit modal), ≥1 deliverable, and collab reason; block message names whichever prerequisite is missing; enforced via shared `transitionStage` (board + drawer).
 - [ ] Archived excluded from search/population; blacklisted excluded from population (force-add warns).
 - [ ] Follow-ups appear on the owner's dashboard; peers still see rows in Campaign View.
 - [ ] Report shareable link has expiry + revoke and strips fee / internal ratings / internal notes.

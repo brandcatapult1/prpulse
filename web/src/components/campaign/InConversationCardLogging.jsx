@@ -11,7 +11,14 @@ import {
  * Inline logging for the In conversation column — in_conversation and no_response
  * share the same outreach actions; sub-state must not suppress Replied / No reply.
  */
-export function InConversationCardLogging({ engagement, onApply, onError }) {
+export function InConversationCardLogging({
+  engagement,
+  onApply,
+  onError,
+  alwaysShowActions = false,
+  embedded = false,
+  onComplete,
+}) {
   const [step, setStep] = useState('idle');
   const [retryDate, setRetryDate] = useState('');
   const [followUpDate, setFollowUpDate] = useState('');
@@ -29,6 +36,7 @@ export function InConversationCardLogging({ engagement, onApply, onError }) {
   function apply(patch, message) {
     onApply(patch, message, Object.keys(patch));
     reset();
+    onComplete?.();
   }
 
   function handleNoReplyConfirm() {
@@ -37,6 +45,7 @@ export function InConversationCardLogging({ engagement, onApply, onError }) {
     onApply(patch, toastMessage, Object.keys(patch));
     setRetryDate('');
     setStep('idle');
+    onComplete?.();
   }
 
   function handleRepliedStart() {
@@ -76,7 +85,7 @@ export function InConversationCardLogging({ engagement, onApply, onError }) {
 
   if (step === 'no_reply_date') {
     return (
-      <LoggingPanel>
+      <LoggingPanel embedded={embedded}>
         <label className="block text-[11px] text-ink-secondary">
           Retry on
           <input
@@ -106,7 +115,7 @@ export function InConversationCardLogging({ engagement, onApply, onError }) {
 
   if (step === 'replied_where') {
     return (
-      <LoggingPanel>
+      <LoggingPanel embedded={embedded}>
         <p className="text-[11px] font-medium text-ink-secondary">Where are they now?</p>
         <button type="button" className="btn-secondary w-full !py-1 text-[11px]" onClick={() => setStep('replied_follow_up')}>
           Still in conversation
@@ -130,7 +139,7 @@ export function InConversationCardLogging({ engagement, onApply, onError }) {
 
   if (step === 'replied_dropped') {
     return (
-      <LoggingPanel>
+      <LoggingPanel embedded={embedded}>
         <p className="text-[11px] font-medium text-ink-secondary">Drop reason</p>
         {DROP_REASON_OPTIONS.map((o) => (
           <button
@@ -151,7 +160,7 @@ export function InConversationCardLogging({ engagement, onApply, onError }) {
 
   if (step === 'replied_follow_up') {
     return (
-      <LoggingPanel>
+      <LoggingPanel embedded={embedded}>
         <label className="block text-[11px] text-ink-secondary">
           Next follow-up
           <input
@@ -181,7 +190,7 @@ export function InConversationCardLogging({ engagement, onApply, onError }) {
 
   if (step === 'replied_scheduled') {
     return (
-      <LoggingPanel>
+      <LoggingPanel embedded={embedded}>
         <label className="block text-[11px] text-ink-secondary">
           Visit date
           <input
@@ -209,9 +218,13 @@ export function InConversationCardLogging({ engagement, onApply, onError }) {
     );
   }
 
+  const actionRowClass = alwaysShowActions
+    ? 'flex gap-1'
+    : 'flex gap-1 max-md:flex md:hidden md:group-hover/card:flex';
+
   return (
-    <LoggingPanel>
-      <div className="flex gap-1 max-md:flex md:hidden md:group-hover/card:flex">
+    <LoggingPanel embedded={embedded}>
+      <div className={actionRowClass}>
         <ActionButton label="Replied" onClick={handleRepliedStart} />
         <ActionButton label="No reply" variant="secondary" onClick={() => setStep('no_reply_date')} />
       </div>
@@ -224,9 +237,12 @@ export function InConversationCardLogging({ engagement, onApply, onError }) {
   );
 }
 
-function LoggingPanel({ children }) {
+function LoggingPanel({ children, embedded = false }) {
   return (
-    <div className="mt-2 border-t border-line/80 pt-2" onClick={(e) => e.stopPropagation()}>
+    <div
+      className={embedded ? '' : 'mt-2 border-t border-line/80 pt-2'}
+      onClick={(e) => e.stopPropagation()}
+    >
       {children}
     </div>
   );

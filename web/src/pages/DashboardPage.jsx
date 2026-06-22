@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Toast } from '../components/ui/Primitives.jsx';
 import { LogDeliverablePanel } from '../components/campaign/LogDeliverablePanel.jsx';
+import { ContactLoggingDrawer } from '../components/campaign/ContactLoggingDrawer.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
-import { logRepliedContact } from '../lib/contactLogging.js';
 import {
   buildVisitDoneTransition,
   buildVisitReminderUrl,
@@ -35,6 +35,7 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const [loggingDeliverable, setLoggingDeliverable] = useState(null);
+  const [contactLoggingEngagementId, setContactLoggingEngagementId] = useState(null);
   const [revision, setRevision] = useState(0);
 
   const reload = useCallback(async () => {
@@ -84,19 +85,42 @@ export function DashboardPage() {
       const snapshot = {};
       for (const key of snapshotKeys) snapshot[key] = base?.[key];
       try {
-        await patchEngagement(engagementId, patch);
-        await reload();
+        const updated = await patchEngagement(engagementId, patch);
+        setWorkspace((ws) => ({
+          ...ws,
+          engagements: (ws?.engagements ?? []).map((r) =>
+            (r.id === engagementId ? { ...r, ...updated } : r)),
+        }));
+        setRevision((r) => r + 1);
         showActionToast(message, async () => {
-          await patchEngagement(engagementId, snapshot);
-          await reload();
+          const restored = await patchEngagement(engagementId, snapshot);
+          setWorkspace((ws) => ({
+            ...ws,
+            engagements: (ws?.engagements ?? []).map((r) =>
+              (r.id === engagementId ? { ...r, ...restored } : r)),
+          }));
+          setRevision((r) => r + 1);
           setToast(null);
         });
       } catch (err) {
         showActionToast(err.message ?? 'Save failed', null);
       }
     },
-    [workspace, reload, showActionToast],
+    [workspace?.engagements, showActionToast],
   );
+
+  const contactLoggingEngagement = useMemo(
+    () => workspace?.engagements?.find((e) => e.id === contactLoggingEngagementId) ?? null,
+    [workspace?.engagements, contactLoggingEngagementId],
+  );
+
+  const handleOpenContactLogging = useCallback((engagementId) => {
+    setContactLoggingEngagementId(engagementId);
+  }, []);
+
+  const handleCloseContactLogging = useCallback(() => {
+    setContactLoggingEngagementId(null);
+  }, []);
 
   const applyDeliverablesLogging = useCallback(
     async (engagementId, nextList, message) => {
@@ -116,14 +140,6 @@ export function DashboardPage() {
       }
     },
     [reload, showActionToast],
-  );
-
-  const handleLogContact = useCallback(
-    (engagementId) => {
-      const { patch, toastMessage } = logRepliedContact();
-      applyEngagementLogging(engagementId, patch, toastMessage, Object.keys(patch));
-    },
-    [applyEngagementLogging],
   );
 
   const handleVisitDone = useCallback(
@@ -240,7 +256,7 @@ export function DashboardPage() {
                 <TaskRow
                   key={row.id}
                   row={row}
-                  onLogContact={() => handleLogContact(row.engagementId)}
+                  onLogContact={() => handleOpenContactLogging(row.engagementId)}
                   onVisitDone={() => handleVisitDone(row.engagementId)}
                   onLogDeliverable={() => handleLogDeliverableClick(row.engagementId)}
                 />
@@ -294,7 +310,7 @@ export function DashboardPage() {
                 <AtRiskRow
                   key={row.id}
                   row={row}
-                  onLogContact={() => handleLogContact(row.engagementId)}
+                  onLogContact={() => handleOpenContactLogging(row.engagementId)}
                   onVisitDone={() => handleVisitDone(row.engagementId)}
                 />
               ))}
@@ -304,6 +320,14 @@ export function DashboardPage() {
 
         <CampaignTargetsSection campaigns={dashboard.campaignTargets} />
       </div>
+
+      <ContactLoggingDrawer
+        engagement={contactLoggingEngagement}
+        open={Boolean(contactLoggingEngagement)}
+        onClose={handleCloseContactLogging}
+        onApply={applyEngagementLogging}
+        onError={(message) => showActionToast(message ?? 'Could not save', null)}
+      />
 
       <LogDeliverablePanel
         deliverable={loggingDeliverable}

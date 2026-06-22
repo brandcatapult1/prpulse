@@ -40,9 +40,18 @@
     @apply text-2xs text-ink-secondary;
   }
   .campaign-board {
-    @apply rounded-lg;
+    @apply rounded-xl;
+  }
+  .campaign-board-wash {
+    @apply bg-gradient-to-b from-white/60 via-[#f6f7f9]/80 to-[#f2f4f6]/90;
+  }
+  .campaign-glass-tile {
+    @apply rounded-xl border border-white/80 bg-white/90 shadow-sm backdrop-blur-sm;
+  }
+  .campaign-glass-lane {
+    @apply rounded-2xl border border-white/70 bg-white/45 shadow-[0_2px_12px_rgba(26,29,38,0.04)] backdrop-blur-sm;
   }
   .campaign-kanban-card {
-    @apply rounded-lg border border-line bg-white p-3 shadow-sm transition-colors hover:border-brand/30 hover:shadow-md;
+    @apply rounded-[15px] border border-white/90 bg-white/[0.92] p-3 shadow-[0_4px_16px_rgba(26,29,38,0.06),0_1px_3px_rgba(26,29,38,0.04)] backdrop-blur-md transition-[border-color,box-shadow] hover:border-brand/25 hover:shadow-[0_6px_20px_rgba(26,29,38,0.08)];
   }
 }

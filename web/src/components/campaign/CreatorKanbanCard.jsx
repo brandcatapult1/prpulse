@@ -1,7 +1,6 @@
 import { formatDate } from '../../lib/format.jsx';
 import { getCreatorCardIdentity } from '../../lib/contactSocialLinks.js';
 import {
-  collaborationReasonLabel,
   columnIdForStatus,
   contactInitials,
   contentTypeSummary,
@@ -10,7 +9,7 @@ import {
   isDeliverablesAtRisk,
   isFollowUpOverdue,
   isVisitOverdue,
-  commercialTypeLabel,
+  regionLabel,
 } from '../../lib/campaignKanban.js';
 import { resolveDroppedFrom } from '../../lib/engagementTransitions.js';
 import { droppedFromLabel } from '../../lib/dropTransitions.js';
@@ -21,29 +20,6 @@ import { AwaitingDeliverablesCardLogging } from './AwaitingDeliverablesCardLoggi
 import { NotContactedCardLogging } from './NotContactedCardLogging.jsx';
 import { DroppedCardLogging } from './DroppedCardLogging.jsx';
 import { CompleteCardLogging } from './CompleteCardLogging.jsx';
-
-function InterestDot({ level }) {
-  const title = level ? `${level} interest` : 'Interest not set';
-  if (level === 'high') {
-    return <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ink" title={title} aria-hidden />;
-  }
-  if (level === 'medium') {
-    return (
-      <span
-        className="h-1.5 w-1.5 shrink-0 rounded-full border border-ink-secondary bg-ink/20"
-        title={title}
-        aria-hidden
-      />
-    );
-  }
-  return (
-    <span
-      className="h-1.5 w-1.5 shrink-0 rounded-full border border-line bg-transparent"
-      title={title}
-      aria-hidden
-    />
-  );
-}
 
 function StatusLine({ engagement, columnId }) {
   const status = engagement.conversation_status;
@@ -192,7 +168,6 @@ function CreatorCardHeader({ engagement }) {
             <span className="truncate text-sm font-medium leading-tight text-ink">
               {engagement.contact_name}
             </span>
-            <InterestDot level={engagement.interest_level} />
           </div>
           <div className="mt-0.5">
             <CreatorHandle
@@ -259,9 +234,8 @@ export function CreatorKanbanCard({
     columnId === 'complete' && engagement.conversation_status === 'collaboration_complete';
   const owner = engagement.owner_name?.split(' ')[0] ?? '—';
   const contentType = contentTypeSummary(engagement.id);
-  const commercial = commercialTypeLabel(engagement);
-  const reason = collaborationReasonLabel(engagement.primary_collaboration_reason);
-  const footerParts = [owner, reason ?? 'Reason not set', contentType, commercial].filter(Boolean);
+  const region = regionLabel(engagement);
+  const footerParts = [owner, contentType, region].filter(Boolean);
 
   function openCard(event) {
     if (event.defaultPrevented) return;

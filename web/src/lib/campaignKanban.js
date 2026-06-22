@@ -33,12 +33,12 @@ export const CAMPAIGN_KANBAN_COLUMNS = [
   },
   {
     id: 'awaiting_final',
-    label: 'Awaited final deliverables',
+    label: 'Awaiting Final Deliverables',
     statuses: ['awaiting_final_deliverables'],
   },
   {
     id: 'complete',
-    label: 'Collaboration complete',
+    label: 'Collaboration Complete',
     statuses: ['collaboration_complete'],
   },
 ];

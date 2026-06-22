@@ -2,7 +2,7 @@ import { HealthBadge } from '../ui/HealthBadge.jsx';
 
 function MetricTile({ label, value, suffix }) {
   return (
-    <div className="flex flex-col rounded-md bg-canvas px-3.5 py-2.5">
+    <div className="campaign-glass-tile flex flex-col px-3.5 py-2.5">
       <p className="text-[10px] font-medium uppercase tracking-wider text-ink-tertiary">{label}</p>
       <div className="mt-0.5 flex h-5 items-center gap-2">
         <span className="tabular-nums text-base font-medium leading-none text-ink">{value}</span>
@@ -14,7 +14,7 @@ function MetricTile({ label, value, suffix }) {
 
 export function CampaignMetricTiles({ campaign }) {
   const health = campaign.campaign_health ?? 'not_set';
-  const pct = campaign.achievement_pct;
+  const pct = Math.round(Number(campaign.achievement_pct) || 0);
   const hasHealth = health !== 'not_set';
 
   return (
@@ -24,7 +24,7 @@ export function CampaignMetricTiles({ campaign }) {
       <MetricTile label="Remaining" value={campaign.remaining_collaborations ?? '—'} />
       <MetricTile
         label="Health"
-        value={hasHealth ? `${pct ?? 0}%` : '—'}
+        value={hasHealth ? `${pct}%` : '—'}
         suffix={hasHealth ? <HealthBadge health={health} variant="pill" /> : null}
       />
     </div>

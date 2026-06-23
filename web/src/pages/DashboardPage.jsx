@@ -80,7 +80,7 @@ export function DashboardPage() {
       `[Dashboard] ${breakdown.total} engagement(s) need attention — breakdown by qualification`,
     );
     console.log('Headline total (unique engagement ids):', breakdown.total);
-    console.log('One module per engagement — dedupe key: engagementId');
+    console.log('Dedupe key: engagementId — multi-module engagements count once in headline');
     if (breakdown.followUpDueToday.length) {
       console.log("Today's tasks — follow-up due today:", breakdown.followUpDueToday);
     }
@@ -98,10 +98,10 @@ export function DashboardPage() {
         engagementId: row.engagementId,
         contact: row.contactName,
         campaign: row.campaignName,
-        module: row.module,
-        reason: row.reason,
-        flags: row.flags?.join(', ') ?? '',
-        deliverableCount: row.deliverableCount ?? '',
+        modules: row.modules,
+        reasons: row.reasons,
+        flags: row.flags,
+        deliverableCount: row.deliverableCount,
       })),
     );
     console.groupEnd();
@@ -407,10 +407,10 @@ function GlassCard({ children, className = '' }) {
 }
 
 const ATTENTION_HEADLINE_TOOLTIP =
-  'Unique engagements across Today\'s tasks, Pending deliverables, and At risk (one module per engagement). Visits are reminders only and excluded.';
+  'Unique engagements across Today\'s tasks, Pending deliverables, and At risk. An engagement in multiple modules counts once. Visits are reminders only and excluded.';
 
 const ATTENTION_BREAKDOWN_TOOLTIP =
-  'Open work by type — pill counts are rows per module; the headline is unique engagements across the three modules. Visits excluded.';
+  'Open work by type — an engagement may appear in more than one module (e.g. at-risk and follow-up task). Pill counts are rows per module; headline is unique engagements.';
 
 const VISITS_REMINDER_TOOLTIP =
   'Scheduled visits today — reminders only, not counted in engagements needing attention.';

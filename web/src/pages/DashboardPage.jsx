@@ -80,23 +80,30 @@ export function DashboardPage() {
       `[Dashboard] ${breakdown.total} engagement(s) need attention — breakdown by qualification`,
     );
     console.log('Headline total (unique engagement ids):', breakdown.total);
-    console.log('Dedupe key: engagementId — same creator in two campaigns counts twice');
+    console.log('One module per engagement — dedupe key: engagementId');
     if (breakdown.followUpDueToday.length) {
-      console.log('Follow-up due today:', breakdown.followUpDueToday);
+      console.log("Today's tasks — follow-up due today:", breakdown.followUpDueToday);
     }
     if (breakdown.followUpOverdue.length) {
-      console.log('Follow-up overdue:', breakdown.followUpOverdue);
-    }
-    if (breakdown.awaitingDeliverables.length) {
-      console.log('Awaiting deliverables (AM tasks):', breakdown.awaitingDeliverables);
+      console.log("Today's tasks — follow-up overdue:", breakdown.followUpOverdue);
     }
     if (breakdown.pendingDeliverableEngagements.length) {
-      console.log('Pending deliverable (unique engagements):', breakdown.pendingDeliverableEngagements);
+      console.log('Pending deliverables (unique engagements):', breakdown.pendingDeliverableEngagements);
     }
     if (breakdown.atRiskEngagements.length) {
-      console.log('At-risk flags (unique engagements):', breakdown.atRiskEngagements);
+      console.log('At risk (unique engagements):', breakdown.atRiskEngagements);
     }
-    console.table(breakdown.perEngagement);
+    console.table(
+      breakdown.perEngagement.map((row) => ({
+        engagementId: row.engagementId,
+        contact: row.contactName,
+        campaign: row.campaignName,
+        module: row.module,
+        reason: row.reason,
+        flags: row.flags?.join(', ') ?? '',
+        deliverableCount: row.deliverableCount ?? '',
+      })),
+    );
     console.groupEnd();
   }, [dashboard?.attentionBreakdown, dashboard?.today]);
 
@@ -400,10 +407,10 @@ function GlassCard({ children, className = '' }) {
 }
 
 const ATTENTION_HEADLINE_TOOLTIP =
-  'Unique engagements needing your attention (follow-up due today or overdue, awaiting deliverables, pending deliverable, or at-risk flag). Each creator counts once. Today\'s visits are reminders only and are excluded.';
+  'Unique engagements across Today\'s tasks, Pending deliverables, and At risk (one module per engagement). Visits are reminders only and excluded.';
 
 const ATTENTION_BREAKDOWN_TOOLTIP =
-  'Open AM work by type — a breakdown of the headline, not addends. One engagement can appear in multiple categories. Visits are excluded.';
+  'Open work by type — pill counts are rows per module; the headline is unique engagements across the three modules. Visits excluded.';
 
 const VISITS_REMINDER_TOOLTIP =
   'Scheduled visits today — reminders only, not counted in engagements needing attention.';

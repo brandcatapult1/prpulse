@@ -72,6 +72,34 @@ export function DashboardPage() {
     });
   }, [workspace, user?.id, revision]);
 
+  useEffect(() => {
+    const breakdown = dashboard?.attentionBreakdown;
+    if (!breakdown || !workspace?.engagements?.length) return;
+
+    console.group(
+      `[Dashboard] ${breakdown.total} engagement(s) need attention — breakdown by qualification`,
+    );
+    console.log('Headline total (unique engagement ids):', breakdown.total);
+    console.log('Dedupe key: engagementId — same creator in two campaigns counts twice');
+    if (breakdown.followUpDueToday.length) {
+      console.log('Follow-up due today:', breakdown.followUpDueToday);
+    }
+    if (breakdown.followUpOverdue.length) {
+      console.log('Follow-up overdue:', breakdown.followUpOverdue);
+    }
+    if (breakdown.awaitingDeliverables.length) {
+      console.log('Awaiting deliverables (AM tasks):', breakdown.awaitingDeliverables);
+    }
+    if (breakdown.pendingDeliverableEngagements.length) {
+      console.log('Pending deliverable (unique engagements):', breakdown.pendingDeliverableEngagements);
+    }
+    if (breakdown.atRiskEngagements.length) {
+      console.log('At-risk flags (unique engagements):', breakdown.atRiskEngagements);
+    }
+    console.table(breakdown.perEngagement);
+    console.groupEnd();
+  }, [dashboard?.attentionBreakdown, dashboard?.today]);
+
   const firstName = user?.full_name?.split(/\s+/)[0] ?? 'there';
 
   const showActionToast = useCallback((message, onUndo) => {
@@ -372,10 +400,10 @@ function GlassCard({ children, className = '' }) {
 }
 
 const ATTENTION_HEADLINE_TOOLTIP =
-  'Unique engagements needing your attention (follow-up due today or overdue, pending deliverable, or at-risk flag). Each creator counts once. Today\'s visits are excluded.';
+  'Unique engagements needing your attention (follow-up due today or overdue, awaiting deliverables, pending deliverable, or at-risk flag). Each creator counts once. Today\'s visits are reminders only and are excluded.';
 
 const ATTENTION_BREAKDOWN_TOOLTIP =
-  'Open items by type — these are a breakdown of the headline, not addends. One engagement can appear in multiple categories, so these numbers do not sum to the headline. Visits are excluded.';
+  'Open AM work by type — a breakdown of the headline, not addends. One engagement can appear in multiple categories. Visits are excluded.';
 
 const VISITS_REMINDER_TOOLTIP =
   'Scheduled visits today — reminders only, not counted in engagements needing attention.';

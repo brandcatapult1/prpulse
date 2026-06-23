@@ -63,25 +63,64 @@ function taskActionForEngagement(engagement) {
   return 'log_contact';
 }
 
+function hasOpenDeliverables(engagementId, getDeliverables) {
+  return getDeliverables(engagementId).some(
+    (d) => d.status !== 'posted' || !deliverableHasProof(d),
+  );
+}
+
+function isAwaitingDeliverableTask(engagement, getDeliverables) {
+  return engagement.conversation_status === 'awaiting_final_deliverables'
+    && hasOpenDeliverables(engagement.id, getDeliverables);
+}
+
 function buildTodaysTasks(engagements, today, getDeliverables) {
   return engagements
     .filter((e) => !isTerminalStatus(e.conversation_status))
-    .filter((e) => {
-      const followUp = dashboardDate(e.next_follow_up_date);
-      return followUp && followUp <= today;
-    })
     .filter((e) => !(e.conversation_status === 'scheduled' && scheduledVisitDate(e) === today))
     .filter((e) => {
-      if (e.conversation_status !== 'awaiting_final_deliverables') return true;
-      const pending = getDeliverables(e.id).some(
-        (d) => d.status !== 'posted' || !deliverableHasProof(d),
-      );
-      return !pending;
+      const followUp = dashboardDate(e.next_follow_up_date);
+      const hasDueFollowUp = Boolean(followUp && followUp <= today);
+      return hasDueFollowUp || isAwaitingDeliverableTask(e, getDeliverables);
     })
     .map((e) => {
       const followUp = dashboardDate(e.next_follow_up_date);
-      const overdue = followUp < today;
-      const days = daysBetweenIso(followUp, today);
+      const hasDueFollowUp = Boolean(followUp && followUp <= today);
+      const awaitingDeliverables = isAwaitingDeliverableTask(e, getDeliverables);
+      const overdue = hasDueFollowUp && followUp < today;
+      const days = hasDueFollowUp ? daysBetweenIso(followUp, today) : 0;
+
+      const qualifiers = [];
+      if (hasDueFollowUp) {
+        qualifiers.push(overdue ? 'follow_up_overdue' : 'follow_up_due_today');
+      }
+      if (awaitingDeliverables) qualifiers.push('awaiting_deliverables');
+
+      let situation = 'awaiting deliverables';
+      let urgency = 'default';
+      if (hasDueFollowUp) {
+        situation = overdue ? `overdue ${days}d` : 'due today';
+        urgency = overdue ? 'danger' : 'default';
+      } else {
+        const pending = getDeliverables(e.id).filter(
+          (d) => d.status !== 'posted' || !deliverableHasProof(d),
+        );
+        const earliestDue = pending
+          .map((d) => dashboardDate(d.due_date))
+          .filter(Boolean)
+          .sort()[0];
+        if (earliestDue && earliestDue < today) {
+          situation = 'deliverables overdue';
+          urgency = 'warning';
+        }
+      }
+
+      const pendingDueDates = getDeliverables(e.id)
+        .map((d) => dashboardDate(d.due_date))
+        .filter(Boolean)
+        .sort();
+      const sortDate = hasDueFollowUp ? followUp : (pendingDueDates[0] ?? today);
+
       return {
         id: e.id,
         engagementId: e.id,
@@ -89,12 +128,13 @@ function buildTodaysTasks(engagements, today, getDeliverables) {
         fullName: e.contact_name,
         initials: initials(e.contact_name),
         campaignName: e.campaign_name,
-        situation: overdue ? `overdue ${days}d` : 'due today',
-        urgency: overdue ? 'danger' : 'default',
+        situation,
+        urgency,
         isOverdue: overdue,
         action: taskActionForEngagement(e),
         engagement: e,
-        sortDate: followUp,
+        sortDate,
+        qualifiers,
       };
     })
     .sort((a, b) => {
@@ -244,25 +284,119 @@ function buildCampaignTargets(campaigns, engagements) {
     }));
 }
 
-function uniqueEngagementIds(rows) {
-  const ids = new Set();
-  for (const row of rows) {
-    if (row.engagementId) ids.add(row.engagementId);
-  }
-  return ids;
+/**
+ * Unique engagements with at least one open AM task: follow-up due today/overdue,
+ * awaiting deliverables, pending deliverable, or at-risk flag.
+ * Today's scheduled visits are excluded (reminder/support only).
+ * Dedupes by engagement id (same creator in two campaigns = two engagements).
+ */
+export function countEngagementsNeedingAttention({ todaysTasks, pendingDeliverables, atRisk }) {
+  return buildAttentionBreakdown({ todaysTasks, pendingDeliverables, atRisk }).total;
 }
 
 /**
- * Unique engagements with at least one open action: follow-up due today/overdue,
- * pending deliverable, or at-risk flag. Today's scheduled visits are excluded.
+ * Audit helper: exact engagement set behind the headline, grouped by qualification.
  */
-export function countEngagementsNeedingAttention({ todaysTasks, pendingDeliverables, atRisk }) {
-  const ids = new Set([
-    ...uniqueEngagementIds(todaysTasks ?? []),
-    ...uniqueEngagementIds(pendingDeliverables ?? []),
-    ...uniqueEngagementIds(atRisk ?? []),
+export function buildAttentionBreakdown({ todaysTasks, pendingDeliverables, atRisk }) {
+  const followUpDueToday = [];
+  const followUpOverdue = [];
+  const awaitingDeliverables = [];
+
+  for (const row of todaysTasks ?? []) {
+    const entry = {
+      engagementId: row.engagementId,
+      contactId: row.contactId ?? null,
+      contactName: row.fullName,
+      campaignName: row.campaignName,
+      followUpDate: row.sortDate,
+    };
+    const qualifiers = row.qualifiers ?? [];
+    if (qualifiers.includes('follow_up_due_today')) followUpDueToday.push(entry);
+    if (qualifiers.includes('follow_up_overdue')) followUpOverdue.push(entry);
+    if (qualifiers.includes('awaiting_deliverables')) {
+      awaitingDeliverables.push({
+        ...entry,
+        openDeliverableCount: (pendingDeliverables ?? []).filter(
+          (d) => d.engagementId === row.engagementId,
+        ).length,
+      });
+    }
+  }
+
+  const pendingDeliverableEngagements = [];
+  const pendingByEngagement = new Map();
+  for (const row of pendingDeliverables ?? []) {
+    if (!pendingByEngagement.has(row.engagementId)) {
+      const entry = {
+        engagementId: row.engagementId,
+        contactId: row.contactId ?? null,
+        contactName: row.fullName,
+        campaignName: row.campaignName,
+        deliverableCount: 0,
+      };
+      pendingByEngagement.set(row.engagementId, entry);
+      pendingDeliverableEngagements.push(entry);
+    }
+    pendingByEngagement.get(row.engagementId).deliverableCount += 1;
+  }
+
+  const atRiskEngagements = [];
+  const atRiskByEngagement = new Map();
+  for (const row of atRisk ?? []) {
+    if (!atRiskByEngagement.has(row.engagementId)) {
+      const entry = {
+        engagementId: row.engagementId,
+        contactId: row.contactId ?? null,
+        contactName: row.fullName,
+        campaignName: row.campaignName,
+        flags: [],
+      };
+      atRiskByEngagement.set(row.engagementId, entry);
+      atRiskEngagements.push(entry);
+    }
+    atRiskByEngagement.get(row.engagementId).flags.push(row.flag);
+  }
+
+  const allIds = new Set([
+    ...(todaysTasks ?? []).map((row) => row.engagementId).filter(Boolean),
+    ...pendingByEngagement.keys(),
+    ...atRiskByEngagement.keys(),
   ]);
-  return ids.size;
+
+  const perEngagement = [...allIds].map((id) => {
+    const reasons = [];
+    if (followUpDueToday.some((e) => e.engagementId === id)) reasons.push('follow_up_due_today');
+    if (followUpOverdue.some((e) => e.engagementId === id)) reasons.push('follow_up_overdue');
+    if (awaitingDeliverables.some((e) => e.engagementId === id)) reasons.push('awaiting_deliverables');
+    if (pendingByEngagement.has(id)) reasons.push('pending_deliverable');
+    if (atRiskByEngagement.has(id)) reasons.push('at_risk');
+
+    const meta =
+      followUpDueToday.find((e) => e.engagementId === id)
+      ?? followUpOverdue.find((e) => e.engagementId === id)
+      ?? pendingByEngagement.get(id)
+      ?? atRiskByEngagement.get(id);
+
+    return {
+      engagementId: id,
+      contactId: meta?.contactId ?? null,
+      contactName: meta?.contactName ?? '?',
+      campaignName: meta?.campaignName ?? '?',
+      reasons,
+    };
+  }).sort((a, b) =>
+    a.contactName.localeCompare(b.contactName)
+    || a.campaignName.localeCompare(b.campaignName));
+
+  return {
+    total: allIds.size,
+    followUpDueToday,
+    followUpOverdue,
+    awaitingDeliverables,
+    pendingDeliverableEngagements,
+    atRiskEngagements,
+    perEngagement,
+  };
 }
 
 /** @deprecated Use countEngagementsNeedingAttention — visits are not part of attention count. */
@@ -293,6 +427,11 @@ export function buildDashboardFromEngagements({
     pendingDeliverables,
     atRisk,
   });
+  const attentionBreakdown = buildAttentionBreakdown({
+    todaysTasks,
+    pendingDeliverables,
+    atRisk,
+  });
 
   return {
     today,
@@ -301,8 +440,9 @@ export function buildDashboardFromEngagements({
     pendingDeliverables,
     atRisk,
     campaignTargets,
+    attentionBreakdown,
     glance: {
-      /** Open follow-ups (due today or overdue), one row per engagement. */
+      /** AM tasks: follow-ups due/overdue plus awaiting-deliverable follow-ups. */
       tasks: todaysTasks.length,
       /** Open deliverable rows awaiting proof/post. */
       deliverables: pendingDeliverables.length,

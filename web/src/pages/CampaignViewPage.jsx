@@ -62,6 +62,7 @@ export function CampaignViewPage() {
   const [viewMode, setViewMode] = useState('board');
   const [quickEditId, setQuickEditId] = useState(null);
   const [scheduleIntent, setScheduleIntent] = useState(false);
+  const [scheduleLogContact, setScheduleLogContact] = useState(false);
   const [proofEngagement, setProofEngagement] = useState(null);
   const [feedbackEngagement, setFeedbackEngagement] = useState(null);
   const [toast, setToast] = useState(null);
@@ -92,6 +93,7 @@ export function CampaignViewPage() {
     const scheduleId = location.state?.scheduleEngagementId;
     if (!scheduleId) return;
     setScheduleIntent(true);
+    setScheduleLogContact(Boolean(location.state?.scheduleLogContact));
     setQuickEditId(scheduleId);
     navigate(location.pathname, { replace: true, state: {} });
   }, [location.state, location.pathname, navigate]);
@@ -304,14 +306,17 @@ export function CampaignViewPage() {
           boardRevision={boardRevision}
           onCardClick={(row) => {
             setScheduleIntent(false);
+            setScheduleLogContact(false);
             setQuickEditId(row.id);
           }}
           onRequestSchedule={(row) => {
             setScheduleIntent(true);
+            setScheduleLogContact(true);
             setQuickEditId(row.id);
           }}
           onOpenDrawer={(row) => {
             setScheduleIntent(false);
+            setScheduleLogContact(false);
             setQuickEditId(row.id);
           }}
           onRequestProof={(row) => setProofEngagement(row)}
@@ -338,11 +343,16 @@ export function CampaignViewPage() {
         engagementId={quickEditId}
         open={Boolean(quickEditId)}
         scheduleMode={scheduleIntent}
+        scheduleLogContact={scheduleLogContact}
         onClose={() => {
           setQuickEditId(null);
           setScheduleIntent(false);
+          setScheduleLogContact(false);
         }}
-        onScheduleModeCleared={() => setScheduleIntent(false)}
+        onScheduleModeCleared={() => {
+          setScheduleIntent(false);
+          setScheduleLogContact(false);
+        }}
         onUpdated={reload}
       />
 

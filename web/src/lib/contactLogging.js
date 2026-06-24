@@ -20,14 +20,16 @@ export function logNoReplyAttempt(engagement, retryDate) {
   };
 }
 
-/** Log a successful two-way contact today; resets consecutive no-reply streak. */
-export function logRepliedContact() {
+/** Contact fields for a successful two-way reply; persist only at terminal confirm. */
+export function buildRepliedContactLogPatch() {
   return {
-    patch: {
-      last_contact_date: todayIso(),
-      last_contact_log_type: 'conversation',
-      no_reply_count: 0,
-    },
-    toastMessage: 'Logged contact for today',
+    last_contact_date: todayIso(),
+    last_contact_log_type: 'conversation',
+    no_reply_count: 0,
   };
+}
+
+export function repliedContactToastMessage(outcomeSuffix) {
+  if (!outcomeSuffix) return 'Logged contact for today';
+  return `Logged contact for today — ${outcomeSuffix}`;
 }

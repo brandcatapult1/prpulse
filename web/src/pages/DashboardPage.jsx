@@ -306,7 +306,7 @@ export function DashboardPage() {
                   onScheduleRequest={(engagement) => {
                     handleCloseContactLogging();
                     navigate(`/campaigns/${engagement.campaign_id}`, {
-                      state: { scheduleEngagementId: engagement.id },
+                      state: { scheduleEngagementId: engagement.id, scheduleLogContact: true },
                     });
                   }}
                   onContactLogError={(message) => showActionToast(message ?? 'Could not save', null)}
@@ -375,7 +375,7 @@ export function DashboardPage() {
                   onScheduleRequest={(engagement) => {
                     handleCloseContactLogging();
                     navigate(`/campaigns/${engagement.campaign_id}`, {
-                      state: { scheduleEngagementId: engagement.id },
+                      state: { scheduleEngagementId: engagement.id, scheduleLogContact: true },
                     });
                   }}
                   onContactLogError={(message) => showActionToast(message ?? 'Could not save', null)}

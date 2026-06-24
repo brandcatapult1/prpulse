@@ -70,6 +70,14 @@ const interestOptions = [
   { value: 'low', label: 'Low' },
 ];
 
+function deliverablesSnapshot(list) {
+  return JSON.stringify((list ?? []).map(({ is_overdue, ...row }) => row));
+}
+
+function cloneDeliverables(list) {
+  return structuredClone(list ?? []);
+}
+
 export function EngagementRecordPage() {
   const { id } = useParams();
   const [modal, setModal] = useState(null);
@@ -77,6 +85,7 @@ export function EngagementRecordPage() {
   const [followUpSuggestion, setFollowUpSuggestion] = useState(null);
   const [engagement, setEngagement] = useState(null);
   const [deliverables, setDeliverables] = useState([]);
+  const [savedDeliverables, setSavedDeliverables] = useState([]);
   const [timeline, setTimeline] = useState([]);
   const [feedbackRecord, setFeedbackRecord] = useState(null);
   const [contactEngagements, setContactEngagements] = useState([]);
@@ -111,10 +120,22 @@ export function EngagementRecordPage() {
       const beforeList = await fetchDeliverables(id);
       const saved = await syncDeliverables(id, beforeList, list);
       setDeliverables(saved);
+      setSavedDeliverables(cloneDeliverables(saved));
       updateEngagementDeliverables(id, saved);
+      return saved;
     } catch {
       setToast('Could not save deliverables');
+      return null;
     }
+  };
+
+  const commitDeliverablesDraft = async () => {
+    const saved = await persistDeliverables(deliverables);
+    if (saved) setToast('Deliverables saved');
+  };
+
+  const discardDeliverablesDraft = () => {
+    setDeliverables(cloneDeliverables(savedDeliverables));
   };
 
   const updateDeliverable = (delId, patch) => {
@@ -126,9 +147,7 @@ export function EngagementRecordPage() {
       );
       return;
     }
-    persistDeliverables(
-      deliverables.map((d) => (d.id === delId ? { ...d, ...patch } : d)),
-    );
+    setDeliverables((rows) => rows.map((d) => (d.id === delId ? { ...d, ...patch } : d)));
   };
 
   useEffect(() => {
@@ -144,8 +163,10 @@ export function EngagementRecordPage() {
     ])
       .then(async ([eng, dels, tl, fb]) => {
         setEngagement(eng);
-        setDeliverables(dels ?? []);
-        updateEngagementDeliverables(id, dels ?? []);
+        const loadedDeliverables = dels ?? [];
+        setDeliverables(cloneDeliverables(loadedDeliverables));
+        setSavedDeliverables(cloneDeliverables(loadedDeliverables));
+        updateEngagementDeliverables(id, loadedDeliverables);
         setTimeline(Array.isArray(tl) ? tl : []);
         setFeedbackRecord(fb);
         if (eng?.contact_id) {
@@ -179,7 +200,10 @@ export function EngagementRecordPage() {
   }
 
   const canComplete =
-    deliverables.length > 0 && deliverables.every((d) => d.status === 'posted');
+    savedDeliverables.length > 0 && savedDeliverables.every((d) => d.status === 'posted');
+
+  const deliverablesDirty =
+    deliverablesSnapshot(deliverables) !== deliverablesSnapshot(savedDeliverables);
 
   const status = engagement.conversation_status;
   const followUp = followUpRules(status);
@@ -235,32 +259,13 @@ export function EngagementRecordPage() {
 
   const addDeliverable = (type) => {
     if (!deliverablesRule.canAdd) return;
-    const existing = deliverables.find(
-      (d) => d.deliverable_type === type && d.status !== 'posted',
-    );
-    const nextList = addDeliverableToList(deliverables, type, status);
-    const merged = nextList.find(
-      (d) => d.deliverable_type === type && d.status !== 'posted',
-    );
-    persistDeliverables(nextList);
-    setToast(
-      existing
-        ? `${deliverableTypeLabel(type)} ×${merged?.quantity ?? 1}`
-        : `Added ${deliverableTypeLabel(type)} ×${merged?.quantity ?? 1}`,
-    );
+    setDeliverables((rows) => addDeliverableToList(rows, type, status));
   };
 
   const removeDeliverable = (delId) => {
     const item = deliverables.find((d) => d.id === delId);
     if (!item || !canRemoveDeliverable(status, item)) return;
-    const nextList = removeDeliverableFromList(deliverables, delId);
-    const remaining = nextList.find((d) => d.id === delId);
-    persistDeliverables(nextList);
-    setToast(
-      remaining
-        ? `${deliverableTypeLabel(item.deliverable_type)} ×${remaining.quantity}`
-        : `Removed ${deliverableTypeLabel(item.deliverable_type)}`,
-    );
+    setDeliverables((rows) => removeDeliverableFromList(rows, delId));
   };
 
   const { posted: postedUnits, total: totalUnits } = deliverableListUnitTotals(deliverables);
@@ -477,13 +482,23 @@ export function EngagementRecordPage() {
                     canEditProof={deliverablesRule.canEditStatus}
                     canRemove={canRemoveDeliverable(status, d)}
                     deliverableStatusOptions={deliverableStatusOptions}
-                    onStatusChange={(delId, status) => updateDeliverable(delId, { status })}
+                    onStatusChange={(delId, nextStatus) => updateDeliverable(delId, { status: nextStatus })}
                     onUpdate={updateDeliverable}
                     onRemove={removeDeliverable}
-                    onSaved={() => setToast('Proof saved')}
                     compact
                   />
                 ))}
+              </div>
+            )}
+
+            {deliverablesDirty && deliverablesRule.canEditStatus && (
+              <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-line/80 pt-3">
+                <button type="button" className="btn-secondary text-2xs" onClick={discardDeliverablesDraft}>
+                  Discard
+                </button>
+                <button type="button" className="btn-primary text-2xs" onClick={commitDeliverablesDraft}>
+                  Save deliverables
+                </button>
               </div>
             )}
           </Card>
@@ -583,6 +598,7 @@ export function EngagementRecordPage() {
         onClose={() => setModal(null)}
         contactName={engagement.contact_name}
         deliverables={deliverables}
+        deliverablesDirty={deliverablesDirty}
         canAdd={deliverablesRule.canAdd}
         canEditStatus={deliverablesRule.canEditStatus}
         deliverableStatusOptions={deliverableStatusOptions}
@@ -591,7 +607,14 @@ export function EngagementRecordPage() {
         engagementStatus={status}
         onStatusChange={(delId, nextStatus) => updateDeliverable(delId, { status: nextStatus })}
         onUpdate={updateDeliverable}
-        onSaved={() => setToast('Proof saved')}
+        onSave={async () => {
+          await commitDeliverablesDraft();
+          setModal(null);
+        }}
+        onDiscard={() => {
+          discardDeliverablesDraft();
+          setModal(null);
+        }}
       />
 
       <FeedbackDrawer
@@ -779,6 +802,7 @@ function DeliverablesDrawer({
   onClose,
   contactName,
   deliverables,
+  deliverablesDirty,
   canAdd,
   canEditStatus,
   deliverableStatusOptions,
@@ -787,23 +811,34 @@ function DeliverablesDrawer({
   engagementStatus,
   onStatusChange,
   onUpdate,
-  onSaved,
+  onSave,
+  onDiscard,
 }) {
   return (
     <Drawer
       open={open}
       title={`All deliverables · ${contactName}`}
-      onClose={onClose}
+      onClose={onDiscard}
       footer={
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex w-full flex-wrap items-center justify-between gap-2">
           {canAdd ? (
             <DeliverableTypeButtons onAdd={onAddType} className="[&_button]:text-2xs" />
           ) : (
             <span className="text-2xs text-ink-tertiary">Read-only</span>
           )}
-          <button type="button" className="btn-primary ml-auto" onClick={onClose}>
-            Done
-          </button>
+          <div className="ml-auto flex gap-2">
+            <button type="button" className="btn-secondary" onClick={onDiscard}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={!deliverablesDirty}
+              onClick={onSave}
+            >
+              Save
+            </button>
+          </div>
         </div>
       }
     >
@@ -830,7 +865,6 @@ function DeliverablesDrawer({
               onStatusChange={onStatusChange}
               onUpdate={onUpdate}
               onRemove={onRemove}
-              onSaved={onSaved}
             />
           ))}
         </div>

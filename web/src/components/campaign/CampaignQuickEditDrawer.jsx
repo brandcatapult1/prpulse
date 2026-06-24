@@ -52,6 +52,26 @@ const REASON_OPTIONS = [
   ...COLLABORATION_REASONS,
 ];
 
+function engagementFieldsBaseline(eng) {
+  if (!eng) return null;
+  const fee = eng.agreed_fee;
+  return {
+    primary_collaboration_reason: eng.primary_collaboration_reason ?? null,
+    next_follow_up_date: eng.next_follow_up_date ?? null,
+    notes: (eng.notes ?? '').trim() || null,
+    agreed_fee: fee === '' || fee == null || Number.isNaN(Number(fee)) ? null : Number(fee),
+    collaboration_type: eng.collaboration_type ?? null,
+  };
+}
+
+function deliverablesSnapshot(list) {
+  return JSON.stringify((list ?? []).map(({ is_overdue, ...row }) => row));
+}
+
+function cloneDeliverables(list) {
+  return structuredClone(list ?? []);
+}
+
 function SectionLabel({ children, className = '' }) {
   return (
     <p className={`mb-1.5 text-[10px] font-medium uppercase tracking-wider text-ink-tertiary ${className}`}>
@@ -347,6 +367,8 @@ export function CampaignQuickEditDrawer({
   const [scheduleBaseline, setScheduleBaseline] = useState(null);
   const [scheduleSubmitting, setScheduleSubmitting] = useState(false);
   const [identityRevision, setIdentityRevision] = useState(0);
+  const [engagementBaseline, setEngagementBaseline] = useState(null);
+  const [deliverablesBaseline, setDeliverablesBaseline] = useState([]);
 
   function captureScheduleBaseline() {
     if (!engagement) return;
@@ -372,9 +394,24 @@ export function CampaignQuickEditDrawer({
     setScheduleBaseline(null);
   }
 
+  function discardDrawerDrafts() {
+    if (engagementBaseline && engagement) {
+      setEngagement((prev) => ({
+        ...prev,
+        ...engagementBaseline,
+        agreed_fee: engagementBaseline.agreed_fee,
+      }));
+      setVisitDraft(visitFieldsFromEngagement({ ...engagement, ...engagementBaseline }));
+    }
+    setDeliverables(cloneDeliverables(deliverablesBaseline));
+    updateEngagementDeliverables(engagementId, deliverablesBaseline);
+  }
+
   function handleDrawerClose() {
     if (scheduleFlow && !scheduleSubmitting) {
       discardScheduleBaseline();
+    } else if (!scheduleFlow) {
+      discardDrawerDrafts();
     }
     setScheduleFlow(false);
     setScheduleBaseline(null);
@@ -388,13 +425,18 @@ export function CampaignQuickEditDrawer({
       engagementsApi.get(engagementId),
       fetchDeliverables(engagementId),
     ]).then(([eng, dels]) => {
+      const loadedDeliverables = dels ?? [];
       setEngagement(eng);
-      setDeliverables(dels ?? []);
+      setDeliverables(loadedDeliverables);
+      setDeliverablesBaseline(cloneDeliverables(loadedDeliverables));
+      setEngagementBaseline(engagementFieldsBaseline(eng));
       setVisitDraft(visitFieldsFromEngagement(eng));
-      updateEngagementDeliverables(engagementId, dels ?? []);
+      updateEngagementDeliverables(engagementId, loadedDeliverables);
     }).catch(() => {
       setEngagement(null);
       setDeliverables([]);
+      setDeliverablesBaseline([]);
+      setEngagementBaseline(null);
       setVisitDraft(null);
     });
   }, [open, engagementId]);
@@ -439,18 +481,93 @@ export function CampaignQuickEditDrawer({
   });
   const dropReasonOptions = getDropReasonOptionsForStatus(status);
   const canReopen = isDroppedStatus(status) && canReopenDropped(user?.role, engagement);
+  const deliverablesDirty =
+    deliverablesSnapshot(deliverables) !== deliverablesSnapshot(deliverablesBaseline);
+  const engagementDirty = (() => {
+    if (!engagementBaseline) return false;
+    const current = engagementFieldsBaseline(engagement);
+    return (
+      current.primary_collaboration_reason !== engagementBaseline.primary_collaboration_reason
+      || current.next_follow_up_date !== engagementBaseline.next_follow_up_date
+      || current.notes !== engagementBaseline.notes
+      || current.agreed_fee !== engagementBaseline.agreed_fee
+    );
+  })();
+  const drawerDraftDirty = deliverablesDirty || engagementDirty;
 
-  async function persistDeliverables(nextList, message) {
-    try {
-      const beforeList = await fetchDeliverables(engagementId);
-      const saved = await syncDeliverables(engagementId, beforeList, nextList);
-      setDeliverables(saved);
-      updateEngagementDeliverables(engagementId, saved);
-      onUpdated?.();
-      if (message) setToast(message);
-    } catch (err) {
-      setToast(err.message ?? 'Could not save deliverables');
+  async function commitDrawerDrafts({ closeAfter = false } = {}) {
+    if (scheduleFlow) {
+      if (closeAfter) handleDrawerClose();
+      return;
     }
+
+    const base = engagementBaseline ?? engagementFieldsBaseline(engagement);
+    const current = engagementFieldsBaseline(engagement);
+    const engPatch = {};
+
+    if (current.primary_collaboration_reason !== base.primary_collaboration_reason) {
+      engPatch.primary_collaboration_reason = current.primary_collaboration_reason;
+    }
+    if (current.next_follow_up_date !== base.next_follow_up_date) {
+      engPatch.next_follow_up_date = current.next_follow_up_date;
+    }
+    if (current.notes !== base.notes) {
+      engPatch.notes = current.notes;
+    }
+    if (current.agreed_fee !== base.agreed_fee) {
+      engPatch.agreed_fee = current.agreed_fee;
+    }
+
+    const effectiveCollabType = engPatch.collaboration_type ?? current.collaboration_type ?? base.collaboration_type;
+    const effectiveFee = Object.prototype.hasOwnProperty.call(engPatch, 'agreed_fee')
+      ? engPatch.agreed_fee
+      : current.agreed_fee;
+    const feeInPatch = Object.prototype.hasOwnProperty.call(engPatch, 'agreed_fee')
+      || engPatch.collaboration_type === 'paid';
+    if (
+      effectiveCollabType === 'paid'
+      && feeInPatch
+      && (effectiveFee == null || Number.isNaN(effectiveFee) || effectiveFee <= 0)
+    ) {
+      setToast('Agreed fee is required for paid collabs');
+      return;
+    }
+
+    if (!deliverablesDirty && Object.keys(engPatch).length === 0) {
+      if (closeAfter) handleDrawerClose();
+      return;
+    }
+
+    try {
+      if (deliverablesDirty) {
+        const beforeList = await fetchDeliverables(engagementId);
+        const saved = await syncDeliverables(engagementId, beforeList, deliverables);
+        setDeliverables(saved);
+        setDeliverablesBaseline(cloneDeliverables(saved));
+        updateEngagementDeliverables(engagementId, saved);
+      }
+      if (Object.keys(engPatch).length) {
+        const updated = await patchEngagement(engagementId, engPatch);
+        const merged = { ...engagement, ...updated };
+        setEngagement(merged);
+        setEngagementBaseline(engagementFieldsBaseline(merged));
+        setVisitDraft(visitFieldsFromEngagement(merged));
+      }
+      onUpdated?.();
+      setToast('Saved');
+      if (closeAfter) {
+        setScheduleFlow(false);
+        setScheduleBaseline(null);
+        onScheduleModeCleared?.();
+        onClose();
+      }
+    } catch (err) {
+      setToast(err.message ?? 'Save failed');
+    }
+  }
+
+  async function handleDone() {
+    await commitDrawerDrafts({ closeAfter: true });
   }
 
   function addDeliverable(type) {
@@ -460,19 +577,7 @@ export function CampaignQuickEditDrawer({
       setDeliverables(nextList);
       return;
     }
-    const existing = deliverables.find(
-      (d) => d.deliverable_type === type && d.status !== 'posted',
-    );
-    const merged = nextList.find(
-      (d) => d.deliverable_type === type && d.status !== 'posted',
-    );
-    const qty = merged?.quantity ?? 1;
-    persistDeliverables(
-      nextList,
-      existing
-        ? `${deliverableTypeLabel(type)} ×${qty}`
-        : `Added ${deliverableTypeLabel(type)} ×${qty}`,
-    );
+    setDeliverables(nextList);
   }
 
   function removeDeliverable(delId) {
@@ -483,21 +588,16 @@ export function CampaignQuickEditDrawer({
       setDeliverables(nextList);
       return;
     }
-    const remaining = nextList.find((d) => d.id === delId);
-    const label = deliverableTypeLabel(item.deliverable_type);
-    persistDeliverables(
-      nextList,
-      remaining
-        ? `${label} ×${remaining.quantity}`
-        : `Removed ${label}`,
-    );
+    setDeliverables(nextList);
   }
 
   async function persist(patch, message) {
     try {
       const updated = await patchEngagement(engagementId, patch);
-      setEngagement((prev) => ({ ...prev, ...updated }));
-      setVisitDraft(visitFieldsFromEngagement({ ...engagement, ...updated }));
+      const merged = { ...engagement, ...updated };
+      setEngagement(merged);
+      setEngagementBaseline(engagementFieldsBaseline({ ...merged, ...patch }));
+      setVisitDraft(visitFieldsFromEngagement(merged));
       onUpdated?.();
       if (message) setToast(message);
     } catch (err) {
@@ -670,6 +770,8 @@ export function CampaignQuickEditDrawer({
       );
       setEngagement(updated);
       setDeliverables(saved ?? []);
+      setDeliverablesBaseline(cloneDeliverables(saved ?? []));
+      setEngagementBaseline(engagementFieldsBaseline(updated));
       setVisitDraft(visitFieldsFromEngagement(updated));
       updateEngagementDeliverables(engagementId, saved ?? []);
       onUpdated?.();
@@ -751,16 +853,6 @@ export function CampaignQuickEditDrawer({
     persist({ collaboration_type: 'barter', agreed_fee: null }, 'Switched to barter');
   }
 
-  function saveAgreedFee(raw) {
-    const fee = raw === '' ? null : Number(raw);
-    if (collabType === 'paid' && (fee == null || Number.isNaN(fee) || fee <= 0)) {
-      if (!scheduleFlow) setToast('Agreed fee is required for paid collabs');
-      return;
-    }
-    if (scheduleFlow) return;
-    persist({ agreed_fee: fee }, 'Fee updated');
-  }
-
   return (
     <>
       <Drawer
@@ -792,7 +884,15 @@ export function CampaignQuickEditDrawer({
             </div>
           ) : (
             <div className="flex items-center justify-between gap-3">
-              <button type="button" className="btn-secondary" onClick={handleDrawerClose}>Done</button>
+              <button type="button" className="btn-secondary" onClick={handleDrawerClose}>Cancel</button>
+              <div className="flex items-center gap-2">
+                {drawerDraftDirty && (
+                  <span className="text-[10px] text-health-amber">Unsaved changes</span>
+                )}
+                <button type="button" className="btn-primary" onClick={handleDone}>
+                  Done
+                </button>
+              </div>
               <Link to={`/engagements/${engagementId}`} className="btn-ghost text-2xs" onClick={handleDrawerClose}>
                 Full record →
               </Link>
@@ -948,11 +1048,7 @@ export function CampaignQuickEditDrawer({
                 value={engagement.primary_collaboration_reason ?? ''}
                 onChange={(e) => {
                   const value = e.target.value || null;
-                  if (scheduleFlow) {
-                    setEngagement((prev) => ({ ...prev, primary_collaboration_reason: value }));
-                    return;
-                  }
-                  persist({ primary_collaboration_reason: value }, 'Reason updated');
+                  setEngagement((prev) => ({ ...prev, primary_collaboration_reason: value }));
                 }}
               >
                 {REASON_OPTIONS.map((o) => (
@@ -1014,7 +1110,10 @@ export function CampaignQuickEditDrawer({
                     className="input-field mt-1 h-8"
                     value={engagement.next_follow_up_date ?? ''}
                     onChange={(e) =>
-                      persist({ next_follow_up_date: e.target.value || null }, 'Follow-up updated')
+                      setEngagement((prev) => ({
+                        ...prev,
+                        next_follow_up_date: e.target.value || null,
+                      }))
                     }
                   />
                 </label>
@@ -1075,7 +1174,6 @@ export function CampaignQuickEditDrawer({
                     className="input-field mt-1 h-8"
                     value={engagement.agreed_fee ?? ''}
                     onChange={(e) => setEngagement((prev) => ({ ...prev, agreed_fee: e.target.value }))}
-                    onBlur={(e) => saveAgreedFee(e.target.value)}
                     placeholder="40000"
                   />
                 </label>
@@ -1127,13 +1225,6 @@ export function CampaignQuickEditDrawer({
               value={engagement.notes ?? ''}
               placeholder="Quick context for the team…"
               onChange={(e) => setEngagement((prev) => ({ ...prev, notes: e.target.value }))}
-              onBlur={(e) => {
-                if (scheduleFlow) return;
-                const notes = e.target.value.trim() || null;
-                if (notes !== (engagement.notes ?? null)) {
-                  persist({ notes }, 'Notes saved');
-                }
-              }}
             />
           </section>
         </div>

@@ -15,6 +15,12 @@ dotenv.config();
 export const DEMO_MARKER = 'prpulse_demo_fixture';
 export const DEMO_USER_EMAIL_SUFFIX = '@brandcatapult.fixture';
 
+export const DEMO_OUTLETS = {
+  glowco: 'GlowCo Bandra',
+  brewhaus: 'BrewHaus Indiranagar',
+  spiceroute: 'SpiceRoute Salt Lake',
+};
+
 export const DEMO_BRANDS = [
   { key: 'glowco', name: 'GlowCo', category: 'Food & Beverage', contact: 'Ananya Iyer', email: 'ananya@glowco.demo' },
   { key: 'brewhaus', name: 'BrewHaus', category: 'Café & Beverages', contact: 'Kabir Shah', email: 'kabir@brewhaus.demo' },
@@ -539,6 +545,21 @@ async function upsertEngagement(client, { contactId, campaignId, managerId, plan
     notes: plan.notes ?? null,
   };
 
+  let visitOutletId = plan.visit_outlet_id ?? null;
+  if (!visitOutletId && fields.visit_date) {
+    const { rows: outletRows } = await client.query(
+      `SELECT o.id, o.outlet_name
+       FROM campaigns c
+       JOIN outlets o ON o.brand_id = c.brand_id AND o.is_default
+       WHERE c.id = $1`,
+      [campaignId],
+    );
+    visitOutletId = outletRows[0]?.id ?? null;
+    if (!fields.visit_outlet && outletRows[0]?.outlet_name) {
+      fields.visit_outlet = outletRows[0].outlet_name;
+    }
+  }
+
   const existing = await client.query(
     `SELECT id, conversation_status FROM engagements
      WHERE contact_id = $1 AND campaign_id = $2`,
@@ -561,11 +582,12 @@ async function upsertEngagement(client, { contactId, campaignId, managerId, plan
          visit_outlet = $12,
          visit_notes = $13,
          visit_completed_date = $14,
-         collaboration_type = $15,
-         agreed_fee = $16,
-         primary_collaboration_reason = $17,
-         dropped_from = $18,
-         notes = $19,
+         visit_outlet_id = $15,
+         collaboration_type = $16,
+         agreed_fee = $17,
+         primary_collaboration_reason = $18,
+         dropped_from = $19,
+         notes = $20,
          updated_at = now()
        WHERE id = $1
        RETURNING id`,
@@ -584,6 +606,7 @@ async function upsertEngagement(client, { contactId, campaignId, managerId, plan
         fields.visit_outlet,
         fields.visit_notes,
         fields.visit_completed_date,
+        visitOutletId,
         fields.collaboration_type,
         fields.agreed_fee,
         fields.primary_collaboration_reason,
@@ -599,9 +622,9 @@ async function upsertEngagement(client, { contactId, campaignId, managerId, plan
        contact_id, campaign_id, assigned_manager, conversation_status, interest_level,
        initial_contact_date, last_contact_date, last_contact_log_type, no_reply_count,
        next_follow_up_date, visit_date, visit_time, visit_outlet, visit_notes, visit_completed_date,
-       collaboration_type, agreed_fee, primary_collaboration_reason, dropped_from, notes, created_by
+       visit_outlet_id, collaboration_type, agreed_fee, primary_collaboration_reason, dropped_from, notes, created_by
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $3)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
      RETURNING id`,
     [
       contactId,
@@ -619,11 +642,13 @@ async function upsertEngagement(client, { contactId, campaignId, managerId, plan
       fields.visit_outlet,
       fields.visit_notes,
       fields.visit_completed_date,
+      visitOutletId,
       fields.collaboration_type,
       fields.agreed_fee,
       fields.primary_collaboration_reason,
       fields.dropped_from,
       fields.notes,
+      createdBy,
     ],
   );
   return rows[0].id;
@@ -765,6 +790,32 @@ async function applyEngagementPlan(client, { plan, campaignIds, contactIds, user
   return engagementId;
 }
 
+async function ensureDemoOutlets(client, brandIds) {
+  const outletIds = {};
+  for (const [brandKey, outletName] of Object.entries(DEMO_OUTLETS)) {
+    const brandId = brandIds[brandKey];
+    if (!brandId) continue;
+    const existing = await client.query(
+      `SELECT id FROM outlets WHERE brand_id = $1 AND is_default`,
+      [brandId],
+    );
+    if (existing.rows[0]) {
+      await client.query(
+        `UPDATE outlets SET outlet_name = $2, updated_at = now() WHERE id = $1`,
+        [existing.rows[0].id, outletName],
+      );
+      outletIds[brandKey] = existing.rows[0].id;
+      continue;
+    }
+    const { rows } = await client.query(
+      `INSERT INTO outlets (brand_id, outlet_name, is_default) VALUES ($1, $2, true) RETURNING id`,
+      [brandId, outletName],
+    );
+    outletIds[brandKey] = rows[0].id;
+  }
+  return outletIds;
+}
+
 async function seedBrandsAndCampaigns(client, userIds, actor) {
   const today = todayIstIso();
   const brandIds = {};
@@ -827,7 +878,9 @@ async function seedBrandsAndCampaigns(client, userIds, actor) {
     }
   }
 
-  return campaignIds;
+  const outletIds = await ensureDemoOutlets(client, brandIds);
+
+  return { campaignIds, outletIds, brandIds };
 }
 
 export async function repairDemoHygiene(client, { actorUserId } = {}) {
@@ -849,7 +902,7 @@ export async function repairDemoHygiene(client, { actorUserId } = {}) {
     contactIds[c.key] = await upsertContact(client, c, actor.id);
   }
 
-  const campaignIds = await seedBrandsAndCampaigns(client, userIds, actor);
+  const { campaignIds } = await seedBrandsAndCampaigns(client, userIds, actor);
   const plan = buildEngagementPlan(dates);
 
   let engagementCount = 0;
@@ -897,7 +950,7 @@ export async function seedDemoFixtures(client, { actorUserId, reset = false } = 
     contactIds[c.key] = await upsertContact(client, c, actor.id);
   }
 
-  const campaignIds = await seedBrandsAndCampaigns(client, userIds, actor);
+  const { campaignIds } = await seedBrandsAndCampaigns(client, userIds, actor);
   const plan = buildEngagementPlan(dates);
 
   let engagementCount = 0;

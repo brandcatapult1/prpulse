@@ -17,7 +17,13 @@ import {
   syncDeliverableScreenshots,
 } from '../lib/deliverableRows.mjs';
 import {
-  recordDeliverablePostedActivity,
+  ENGAGEMENT_OUTLET_JOINS,
+  ENGAGEMENT_OUTLET_SELECT,
+  ensureDefaultOutletForBrand,
+  getDefaultOutletForCampaign,
+  normalizeVisitTime,
+  syncVisitOutletText,
+} from '../lib/outlets.mjs';
   recordDidntDeliverActivity,
   recordEngagementPatchActivity,
   recordFeedbackActivity,
@@ -43,6 +49,7 @@ const ENGAGEMENT_PATCH_FIELDS = [
   'visit_date',
   'visit_time',
   'visit_outlet',
+  'visit_outlet_id',
   'visit_notes',
   'visit_completed_date',
   'notes',
@@ -59,11 +66,12 @@ const ENGAGEMENT_PATCH_FIELDS = [
 engagementsRouter.get('/campaign/:campaignId', requireAuth, async (req, res) => {
   const { rows } = await pool.query(
     `SELECT e.*, ${ENGAGEMENT_CONTACT_COLS}, u.full_name AS owner_name,
-            cam.campaign_name
+            cam.campaign_name, ${ENGAGEMENT_OUTLET_SELECT}
      FROM engagements e
      JOIN contacts c ON c.id = e.contact_id
      JOIN users u ON u.id = e.assigned_manager
      JOIN campaigns cam ON cam.id = e.campaign_id
+     ${ENGAGEMENT_OUTLET_JOINS}
      WHERE e.campaign_id = $1
      ORDER BY e.updated_at DESC`,
     [req.params.campaignId],
@@ -75,11 +83,12 @@ engagementsRouter.get('/campaign/:campaignId', requireAuth, async (req, res) => 
 engagementsRouter.get('/assigned/me', requireAuth, async (req, res) => {
   const { rows } = await pool.query(
     `SELECT e.*, c.full_name AS contact_name, u.full_name AS owner_name,
-            cam.campaign_name, cam.status AS campaign_status
+            cam.campaign_name, cam.status AS campaign_status, ${ENGAGEMENT_OUTLET_SELECT}
      FROM engagements e
      JOIN contacts c ON c.id = e.contact_id
      JOIN users u ON u.id = e.assigned_manager
      JOIN campaigns cam ON cam.id = e.campaign_id
+     ${ENGAGEMENT_OUTLET_JOINS}
      WHERE e.assigned_manager = $1 AND cam.status <> 'archived'
      ORDER BY e.updated_at DESC`,
     [req.user.id],
@@ -90,12 +99,13 @@ engagementsRouter.get('/assigned/me', requireAuth, async (req, res) => {
 engagementsRouter.get('/:id', requireAuth, async (req, res) => {
   const { rows } = await pool.query(
     `SELECT e.*, ${ENGAGEMENT_CONTACT_COLS}, cam.campaign_name, b.brand_name,
-            u.full_name AS owner_name
+            u.full_name AS owner_name, ${ENGAGEMENT_OUTLET_SELECT}
      FROM engagements e
      JOIN contacts c ON c.id = e.contact_id
      JOIN campaigns cam ON cam.id = e.campaign_id
      JOIN brands b ON b.id = cam.brand_id
      JOIN users u ON u.id = e.assigned_manager
+     ${ENGAGEMENT_OUTLET_JOINS}
      WHERE e.id = $1`,
     [req.params.id],
   );
@@ -105,6 +115,22 @@ engagementsRouter.get('/:id', requireAuth, async (req, res) => {
 
 engagementsRouter.patch('/:id', requireAuth, patchEngagement);
 engagementsRouter.patch('/:id/status', requireAuth, patchEngagement);
+
+async function loadEngagementRow(client, engagementId) {
+  const { rows } = await client.query(
+    `SELECT e.*, ${ENGAGEMENT_CONTACT_COLS}, cam.campaign_name, b.brand_name,
+            u.full_name AS owner_name, ${ENGAGEMENT_OUTLET_SELECT}
+     FROM engagements e
+     JOIN contacts c ON c.id = e.contact_id
+     JOIN campaigns cam ON cam.id = e.campaign_id
+     JOIN brands b ON b.id = cam.brand_id
+     JOIN users u ON u.id = e.assigned_manager
+     ${ENGAGEMENT_OUTLET_JOINS}
+     WHERE e.id = $1`,
+    [engagementId],
+  );
+  return rows[0] ?? null;
+}
 
 async function patchEngagement(req, res) {
   try {
@@ -120,10 +146,18 @@ async function patchEngagement(req, res) {
         }
       }
 
+      if (Object.prototype.hasOwnProperty.call(patch, 'visit_time')) {
+        patch.visit_time = normalizeVisitTime(patch.visit_time);
+      }
+
       const newStatus = patch.conversation_status ?? cur.conversation_status;
+      const followUpExplicit = Object.prototype.hasOwnProperty.call(req.body, 'next_follow_up_date');
       let followUp = cur.next_follow_up_date;
-      if (Object.prototype.hasOwnProperty.call(req.body, 'next_follow_up_date')) {
+
+      if (followUpExplicit) {
         followUp = patch.next_follow_up_date;
+      } else if (Object.prototype.hasOwnProperty.call(patch, 'visit_date') && patch.visit_date) {
+        followUp = patch.visit_date;
       } else if (patch.conversation_status && patch.conversation_status !== cur.conversation_status) {
         if (newStatus === 'scheduled' && (patch.visit_date ?? cur.visit_date)) {
           followUp = patch.visit_date ?? cur.visit_date;
@@ -133,32 +167,65 @@ async function patchEngagement(req, res) {
         }
       }
 
+      const visitFieldsTouched =
+        Object.prototype.hasOwnProperty.call(patch, 'visit_date')
+        || Object.prototype.hasOwnProperty.call(patch, 'visit_time')
+        || Object.prototype.hasOwnProperty.call(patch, 'visit_notes')
+        || newStatus === 'scheduled'
+        || cur.conversation_status === 'scheduled';
+
+      if (
+        visitFieldsTouched
+        && !Object.prototype.hasOwnProperty.call(req.body, 'visit_outlet_id')
+        && !patch.visit_outlet_id
+        && !cur.visit_outlet_id
+      ) {
+        const outlet = await getDefaultOutletForCampaign(client, cur.campaign_id);
+        if (outlet) {
+          patch.visit_outlet_id = outlet.id;
+        }
+      }
+
+      if (patch.visit_outlet_id) {
+        const outletName = await syncVisitOutletText(client, patch.visit_outlet_id);
+        if (outletName) patch.visit_outlet = outletName;
+      }
+
       const sets = [];
       const params = [req.params.id];
       let idx = 2;
 
       for (const key of ENGAGEMENT_PATCH_FIELDS) {
         if (key === 'next_follow_up_date') continue;
-        if (!Object.prototype.hasOwnProperty.call(req.body, key)) continue;
+        if (!Object.prototype.hasOwnProperty.call(patch, key)) continue;
         sets.push(`${key} = $${idx}`);
         params.push(patch[key]);
         idx += 1;
       }
 
-      const followUpExplicit = Object.prototype.hasOwnProperty.call(req.body, 'next_follow_up_date');
       const statusChanged =
         patch.conversation_status && patch.conversation_status !== cur.conversation_status;
-      if (followUpExplicit || (statusChanged && followUp !== cur.next_follow_up_date)) {
-        sets.push(`next_follow_up_date = $${idx}`);
-        params.push(followUp);
-        idx += 1;
+      if (
+        followUpExplicit
+        || statusChanged
+        || Object.prototype.hasOwnProperty.call(patch, 'visit_date')
+      ) {
+        if (
+          followUp !== cur.next_follow_up_date
+          || followUpExplicit
+          || Object.prototype.hasOwnProperty.call(patch, 'visit_date')
+        ) {
+          sets.push(`next_follow_up_date = $${idx}`);
+          params.push(followUp);
+          idx += 1;
+        }
       }
 
       if (patch.conversation_status && patch.conversation_status !== cur.conversation_status) {
         sets.push('last_status_change_at = now()');
       }
 
-      if (sets.length === 0) return cur;
+      if (sets.length === 0) return loadEngagementRow(client, req.params.id);
 
       const { rows } = await client.query(
         `UPDATE engagements SET ${sets.join(', ')}, updated_at = now()
@@ -181,7 +248,7 @@ async function patchEngagement(req, res) {
           contactId: cur.contact_id,
         });
       }
-      return updated;
+      return loadEngagementRow(client, req.params.id);
     });
     res.json(updated);
   } catch (err) {

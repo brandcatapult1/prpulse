@@ -5,6 +5,7 @@ import { canMarkDidntDeliver } from './campaignPermissions.js';
 import { sideEffectsOnStatusChange } from './engagementRules.js';
 import { ACTIVITY_ACTION } from './activityEvents.js';
 import { queueStageTransitionActivity } from './activityLog.js';
+import { toApiVisitTime } from './visitFields.js';
 import {
   conversationStatusToDroppedFrom,
   DIDNT_DELIVER_REASON,
@@ -178,7 +179,10 @@ export function transitionStage(engagement, target, payload = {}) {
       patch: {
         conversation_status: 'scheduled',
         visit_date: payload.visitDate,
-        next_follow_up_date: payload.visitDate,
+        visit_time: toApiVisitTime(payload.visitTime),
+        visit_notes: payload.visitNotes?.trim() || null,
+        visit_outlet_id: payload.visitOutletId ?? null,
+        next_follow_up_date: payload.nextFollowUpDate ?? payload.visitDate,
       },
     });
   }

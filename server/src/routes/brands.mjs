@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db.mjs';
 import { requireAuth, requireRole } from '../middleware/auth.mjs';
+import { ensureDefaultOutletForBrand } from '../lib/outlets.mjs';
 
 export const brandsRouter = Router();
 
@@ -55,31 +56,44 @@ brandsRouter.post('/', requireAuth, requireRole('senior_manager', 'admin'), asyn
   }
 
   try {
-    const { rows } = await pool.query(
-      `INSERT INTO brands (brand_name, brand_category, primary_contact, contact_email, account_manager)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, brand_name, brand_category, logo_path AS logo_label,
-         primary_contact, contact_email, is_active,
-         account_manager AS account_manager_id`,
-      [
-        brand_name.trim(),
-        brand_category?.trim() || null,
-        primary_contact?.trim() || null,
-        contact_email?.trim() || null,
-        account_manager_id || null,
-      ],
-    );
+    const row = await pool.connect().then(async (client) => {
+      try {
+        await client.query('BEGIN');
+        const { rows } = await client.query(
+          `INSERT INTO brands (brand_name, brand_category, primary_contact, contact_email, account_manager)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING id, brand_name, brand_category, logo_path AS logo_label,
+             primary_contact, contact_email, is_active,
+             account_manager AS account_manager_id`,
+          [
+            brand_name.trim(),
+            brand_category?.trim() || null,
+            primary_contact?.trim() || null,
+            contact_email?.trim() || null,
+            account_manager_id || null,
+          ],
+        );
+        await ensureDefaultOutletForBrand(client, rows[0].id, brand_name.trim());
+        await client.query('COMMIT');
+        return rows[0];
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+    });
 
     let account_manager_name = null;
-    if (rows[0].account_manager_id) {
+    if (row.account_manager_id) {
       const { rows: mgr } = await pool.query(
         'SELECT full_name FROM users WHERE id = $1',
-        [rows[0].account_manager_id],
+        [row.account_manager_id],
       );
       account_manager_name = mgr[0]?.full_name ?? null;
     }
 
-    res.status(201).json({ ...rows[0], account_manager_name, campaign_count: 0 });
+    res.status(201).json({ ...row, account_manager_name, campaign_count: 0 });
   } catch (err) {
     console.warn('Brand create failed:', err.message ?? err);
     res.status(503).json({ error: err.message ?? 'Could not create brand' });

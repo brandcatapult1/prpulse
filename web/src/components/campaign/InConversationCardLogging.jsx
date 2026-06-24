@@ -6,6 +6,12 @@ import {
   STAGE,
   transitionStage,
 } from '../../lib/engagementTransitions.js';
+import { VisitCaptureForm } from '../visit/VisitCaptureForm.jsx';
+import {
+  buildScheduledTransitionPayload,
+  emptyVisitFields,
+  resolveEngagementOutletName,
+} from '../../lib/visitFields.js';
 
 /**
  * In-conversation contact log flow (Replied / No reply → stage transitions).
@@ -22,7 +28,7 @@ export function InConversationCardLogging({
   const [step, setStep] = useState('idle');
   const [retryDate, setRetryDate] = useState('');
   const [followUpDate, setFollowUpDate] = useState('');
-  const [visitDate, setVisitDate] = useState('');
+  const [visitFields, setVisitFields] = useState(emptyVisitFields());
 
   const noReplyCount = engagement.no_reply_count ?? 0;
 
@@ -30,7 +36,7 @@ export function InConversationCardLogging({
     setStep('idle');
     setRetryDate('');
     setFollowUpDate('');
-    setVisitDate('');
+    setVisitFields(emptyVisitFields());
   }
 
   function apply(patch, message) {
@@ -67,13 +73,17 @@ export function InConversationCardLogging({
   }
 
   function handleScheduledConfirm() {
-    if (!visitDate) return;
-    const result = transitionStage(engagement, STAGE.SCHEDULED, { visitDate });
+    if (!visitFields.visitDate) return;
+    const result = transitionStage(
+      engagement,
+      STAGE.SCHEDULED,
+      buildScheduledTransitionPayload(engagement, visitFields),
+    );
     if (!result.ok) {
       onError?.(result.error ?? 'Could not schedule visit');
       return;
     }
-    apply(result.patch, `Scheduled — visit ${formatDate(visitDate)}`);
+    apply(result.patch, `Scheduled — visit ${formatDate(visitFields.visitDate)}`);
   }
 
   function handleDropped(reason) {
@@ -191,24 +201,20 @@ export function InConversationCardLogging({
   if (step === 'replied_scheduled') {
     return (
       <LoggingPanel embedded={embedded}>
-        <label className="block text-[11px] text-ink-secondary">
-          Visit date
-          <input
-            type="date"
-            className="input-field mt-1 w-full text-2xs"
-            value={visitDate}
-            onChange={(e) => setVisitDate(e.target.value)}
-            autoFocus
-          />
-        </label>
-        <div className="flex gap-1">
+        <VisitCaptureForm
+          compact
+          outletName={resolveEngagementOutletName(engagement)}
+          value={visitFields}
+          onChange={setVisitFields}
+        />
+        <div className="mt-2 flex gap-1">
           <button type="button" className="btn-secondary flex-1 !py-1 text-[11px]" onClick={() => setStep('replied_where')}>
             Back
           </button>
           <button
             type="button"
             className="btn-primary flex-1 !py-1 text-[11px]"
-            disabled={!visitDate}
+            disabled={!visitFields.visitDate}
             onClick={handleScheduledConfirm}
           >
             Schedule visit

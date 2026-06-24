@@ -1,5 +1,9 @@
 import { todayIstIso, addDaysToIsoDate, toDateInputValue } from './dates.js';
 import { deliverableHasProof } from './deliverableLogging.js';
+import {
+  formatVisitTimeForDisplay,
+  resolveEngagementOutletName,
+} from './visitFields.js';
 
 export const MODULE_ROW_LIMIT = 8;
 
@@ -154,8 +158,8 @@ function buildTodaysVisits(engagements, today) {
         initials: initials(e.contact_name),
         campaignName: e.campaign_name,
         visitDate,
-        visitTime: e.visit_time ?? null,
-        venue: e.visit_outlet ?? 'Visit',
+        visitTime: formatVisitTimeForDisplay(e.visit_time),
+        venue: resolveEngagementOutletName(e) ?? 'Visit',
         engagement: e,
       };
     })

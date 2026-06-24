@@ -1,4 +1,8 @@
 import { formatDate } from '../../lib/format.jsx';
+import {
+  formatVisitTimeVenue,
+  resolveEngagementOutletName,
+} from '../../lib/visitFields.js';
 import { getCreatorCardIdentity } from '../../lib/contactSocialLinks.js';
 import {
   columnIdForStatus,
@@ -103,6 +107,10 @@ function StatusLine({ engagement, columnId }) {
   if (columnId === 'scheduled') {
     const visitDate = engagement.visit_date ?? engagement.next_follow_up_date;
     const overdue = isVisitOverdue(engagement);
+    const timeVenue = formatVisitTimeVenue(
+      engagement.visit_time,
+      resolveEngagementOutletName(engagement),
+    );
     return (
       <div className="space-y-1">
         {overdue && (
@@ -117,6 +125,9 @@ function StatusLine({ engagement, columnId }) {
             Visit {visitDate ? formatDate(visitDate) : '—'}
           </p>
         </StatusLineRow>
+        {timeVenue && (
+          <p className="pl-[18px] text-[11px] text-ink-tertiary">{timeVenue}</p>
+        )}
       </div>
     );
   }

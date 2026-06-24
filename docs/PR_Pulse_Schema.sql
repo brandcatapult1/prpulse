@@ -183,6 +183,18 @@ CREATE TABLE brands (
   updated_at      timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE outlets (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  brand_id     uuid NOT NULL REFERENCES brands(id) ON DELETE RESTRICT,
+  outlet_name  text NOT NULL,
+  is_default   boolean NOT NULL DEFAULT false,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  updated_at   timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX uq_outlets_one_default_per_brand
+  ON outlets (brand_id) WHERE is_default;
+
 CREATE TABLE campaigns (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   campaign_name       text NOT NULL,
@@ -234,6 +246,7 @@ CREATE TABLE engagements (
   visit_date           date,
   visit_time           time,
   visit_outlet         text,
+  visit_outlet_id      uuid REFERENCES outlets(id) ON DELETE SET NULL,
   visit_notes          text,
   dropped_from         text,                       -- stage slug when dropped; reopen routing
   drop_reason          text,                       -- reason slug when status = dropped (e.g. didnt_deliver)

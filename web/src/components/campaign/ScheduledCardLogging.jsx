@@ -10,17 +10,24 @@ import {
   STAGE,
   transitionStage,
 } from '../../lib/engagementTransitions.js';
+import { VisitCaptureForm } from '../visit/VisitCaptureForm.jsx';
+import {
+  buildScheduledTransitionPayload,
+  emptyVisitFields,
+  resolveEngagementOutletName,
+  visitFieldsFromEngagement,
+} from '../../lib/visitFields.js';
 
 /**
  * Inline logging for Scheduled column cards only — one disclosure level at a time.
  */
 export function ScheduledCardLogging({ engagement, onApply, onError }) {
   const [step, setStep] = useState('idle');
-  const [visitDate, setVisitDate] = useState('');
+  const [visitFields, setVisitFields] = useState(() => visitFieldsFromEngagement(engagement));
 
   function reset() {
     setStep('idle');
-    setVisitDate('');
+    setVisitFields(visitFieldsFromEngagement(engagement));
   }
 
   function apply(patch, message) {
@@ -38,13 +45,17 @@ export function ScheduledCardLogging({ engagement, onApply, onError }) {
   }
 
   function handleRescheduleConfirm() {
-    if (!visitDate) return;
-    const result = transitionStage(engagement, STAGE.SCHEDULED, { visitDate });
+    if (!visitFields.visitDate) return;
+    const result = transitionStage(
+      engagement,
+      STAGE.SCHEDULED,
+      buildScheduledTransitionPayload(engagement, visitFields),
+    );
     if (!result.ok) {
       onError?.(result.error ?? 'Could not reschedule visit');
       return;
     }
-    apply(result.patch, visitRescheduleToastMessage(visitDate));
+    apply(result.patch, visitRescheduleToastMessage(visitFields.visitDate));
   }
 
   function handleCancelled(reason) {
@@ -60,24 +71,20 @@ export function ScheduledCardLogging({ engagement, onApply, onError }) {
   if (step === 'reschedule_date') {
     return (
       <LoggingPanel>
-        <label className="block text-[11px] text-ink-secondary">
-          New visit date
-          <input
-            type="date"
-            className="input-field mt-1 w-full text-2xs"
-            value={visitDate}
-            onChange={(e) => setVisitDate(e.target.value)}
-            autoFocus
-          />
-        </label>
-        <div className="flex gap-1">
+        <VisitCaptureForm
+          compact
+          outletName={resolveEngagementOutletName(engagement)}
+          value={visitFields}
+          onChange={setVisitFields}
+        />
+        <div className="mt-2 flex gap-1">
           <button type="button" className="btn-secondary flex-1 !py-1 text-[11px]" onClick={reset}>
             Cancel
           </button>
           <button
             type="button"
             className="btn-primary flex-1 !py-1 text-[11px]"
-            disabled={!visitDate}
+            disabled={!visitFields.visitDate}
             onClick={handleRescheduleConfirm}
           >
             Reschedule
@@ -94,7 +101,10 @@ export function ScheduledCardLogging({ engagement, onApply, onError }) {
         <button
           type="button"
           className="btn-secondary w-full !py-1 text-[11px]"
-          onClick={() => setStep('reschedule_date')}
+          onClick={() => {
+            setVisitFields(visitFieldsFromEngagement(engagement));
+            setStep('reschedule_date');
+          }}
         >
           Reschedule
         </button>

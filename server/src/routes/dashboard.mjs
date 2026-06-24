@@ -2,6 +2,10 @@ import { Router } from 'express';
 import { pool } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
 import { loadDeliverablesForEngagement } from '../lib/deliverableRows.mjs';
+import {
+  ENGAGEMENT_OUTLET_JOINS,
+  ENGAGEMENT_OUTLET_SELECT,
+} from '../lib/outlets.mjs';
 
 export const dashboardRouter = Router();
 
@@ -75,11 +79,12 @@ dashboardRouter.get('/workspace', requireAuth, async (req, res) => {
   const [engagementsRes, campaignsRes] = await Promise.all([
     pool.query(
       `SELECT e.*, c.full_name AS contact_name, u.full_name AS owner_name,
-              cam.campaign_name, cam.status AS campaign_status
+              cam.campaign_name, cam.status AS campaign_status, ${ENGAGEMENT_OUTLET_SELECT}
        FROM engagements e
        JOIN contacts c ON c.id = e.contact_id
        JOIN users u ON u.id = e.assigned_manager
        JOIN campaigns cam ON cam.id = e.campaign_id
+       ${ENGAGEMENT_OUTLET_JOINS}
        WHERE ${engagementScopeSql}
        ORDER BY e.updated_at DESC`,
       isBroadRole ? [] : [userId],

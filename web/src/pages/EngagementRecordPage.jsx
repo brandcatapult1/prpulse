@@ -55,6 +55,13 @@ import {
 } from '../lib/engagementRules.js';
 import { formatCollaborationReason } from '../lib/collaborationReasons.js';
 import { addDeliverableToList, deliverableListUnitTotals, removeDeliverableFromList } from '../lib/deliverableList.js';
+import {
+  buildScheduledTransitionPayload,
+  formatVisitTimeVenue,
+  resolveEngagementOutletName,
+  visitFieldsFromEngagement,
+} from '../lib/visitFields.js';
+import { STAGE, transitionStage } from '../lib/engagementTransitions.js';
 
 const interestOptions = [
   { value: 'high', label: 'High' },
@@ -324,7 +331,13 @@ export function EngagementRecordPage() {
           title="Visit"
           subtitle={
             visit.available && engagement.visit_date
-              ? formatDate(engagement.visit_date)
+              ? [
+                  formatDate(engagement.visit_date),
+                  formatVisitTimeVenue(
+                    engagement.visit_time,
+                    resolveEngagementOutletName(engagement),
+                  ),
+                ].filter(Boolean).join(' · ')
               : visit.lockedReason
           }
           disabled={!visit.available}
@@ -598,12 +611,18 @@ export function EngagementRecordPage() {
         open={modal === 'visit'}
         onClose={() => setModal(null)}
         contactName={engagement.contact_name}
-        onSave={(visitDate) => {
-          persistEngagement({
-            conversation_status: 'scheduled',
-            visit_date: visitDate,
-            next_follow_up_date: visitDate,
-          });
+        outletName={resolveEngagementOutletName(engagement)}
+        title={`Visit · ${engagement.contact_name}`}
+        intro="Required when status is Scheduled. Follow-up will be set to the visit date you pick."
+        initialValues={visitFieldsFromEngagement(engagement)}
+        onSave={(fields) => {
+          const payload = buildScheduledTransitionPayload(engagement, fields);
+          const result = transitionStage(engagement, STAGE.SCHEDULED, payload);
+          if (!result.ok) {
+            setToast(result.error ?? 'Could not save visit');
+            return;
+          }
+          persistEngagement(result.patch);
           setFollowUpSuggestion(null);
           setModal(null);
           setToast('Visit saved — follow-up set to visit date');
@@ -815,63 +834,6 @@ function DeliverablesModal({
           ))}
         </div>
       )}
-    </Modal>
-  );
-}
-
-function VisitModal({ open, onClose, contactName, onSave }) {
-  const [visitDate, setVisitDate] = useState('');
-
-  useEffect(() => {
-    if (open) setVisitDate('');
-  }, [open]);
-
-  return (
-    <Modal
-      open={open}
-      title={`Visit · ${contactName}`}
-      onClose={onClose}
-      footer={
-        <div className="flex justify-end gap-2">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={!visitDate}
-            onClick={() => onSave(visitDate)}
-          >
-            Save visit
-          </button>
-        </div>
-      }
-    >
-      <p className="mb-4 text-2xs text-ink-secondary">
-        Required when status is Scheduled. Follow-up will be set to the visit date you pick.
-      </p>
-      <div className="grid gap-3">
-        <div>
-          <label className="mb-1.5 block text-2xs font-medium text-ink-secondary">Visit date *</label>
-          <input
-            type="date"
-            className="input-field"
-            required
-            value={visitDate}
-            onChange={(e) => setVisitDate(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-2xs font-medium text-ink-secondary">Time</label>
-          <input type="time" className="input-field" />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-2xs font-medium text-ink-secondary">Outlet / location</label>
-          <input className="input-field" placeholder="e.g. Connaught Place outlet" />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-2xs font-medium text-ink-secondary">Notes</label>
-          <textarea className="input-field min-h-[72px] py-2" placeholder="What to cover at the visit…" />
-        </div>
-      </div>
     </Modal>
   );
 }

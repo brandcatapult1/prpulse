@@ -31,6 +31,14 @@ import {
 import { STAGE, transitionStage } from '../../lib/engagementTransitions.js';
 import { buildVisitDoneTransition, visitDoneToastMessage } from '../../lib/visitLogging.js';
 import {
+  buildScheduledTransitionPayload,
+  buildVisitFieldsPatch,
+  resolveEngagementOutletName,
+  visitFieldsFromEngagement,
+} from '../../lib/visitFields.js';
+import { VisitCaptureForm } from '../visit/VisitCaptureForm.jsx';
+import { VisitModal } from '../visit/VisitModal.jsx';
+import {
   deliverablesRules,
   canRemoveDeliverable,
   isComplete,
@@ -324,6 +332,7 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
   const [pendingMove, setPendingMove] = useState(null);
   const [moveSelectKey, setMoveSelectKey] = useState(0);
   const [toast, setToast] = useState(null);
+  const [visitDraft, setVisitDraft] = useState(null);
   const [identityRevision, setIdentityRevision] = useState(0);
 
   useEffect(() => {
@@ -334,10 +343,12 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
     ]).then(([eng, dels]) => {
       setEngagement(eng);
       setDeliverables(dels ?? []);
+      setVisitDraft(visitFieldsFromEngagement(eng));
       updateEngagementDeliverables(engagementId, dels ?? []);
     }).catch(() => {
       setEngagement(null);
       setDeliverables([]);
+      setVisitDraft(null);
     });
   }, [open, engagementId]);
 
@@ -408,6 +419,7 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
     try {
       const updated = await patchEngagement(engagementId, patch);
       setEngagement((prev) => ({ ...prev, ...updated }));
+      setVisitDraft(visitFieldsFromEngagement({ ...engagement, ...updated }));
       onUpdated?.();
       if (message) setToast(message);
     } catch (err) {
@@ -498,10 +510,23 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
     if (await applyTransition(result, message)) resetMoveUi();
   }
 
-  async function handleVisitSave(visitDate) {
+  async function handleVisitSave(fields) {
     const move = pendingMove ?? { target: STAGE.SCHEDULED };
-    const result = transitionStage(engagement, move.target, { visitDate });
-    if (await applyTransition(result, `Visit set for ${formatDate(visitDate)}`)) resetMoveUi();
+    const result = transitionStage(
+      engagement,
+      move.target,
+      buildScheduledTransitionPayload(engagement, fields),
+    );
+    if (await applyTransition(result, `Visit set for ${formatDate(fields.visitDate)}`)) resetMoveUi();
+  }
+
+  async function handleScheduledVisitSave() {
+    if (!visitDraft?.visitDate) return;
+    const patch = buildVisitFieldsPatch({
+      ...visitDraft,
+      visitOutletId: resolveEngagementOutletId(engagement),
+    });
+    await persist(patch, 'Visit updated');
   }
 
   async function handleDropReason(reason) {
@@ -660,6 +685,28 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
             </div>
           </section>
 
+          {status === 'scheduled' && (
+            <section className="py-3">
+              <SectionLabel>Visit</SectionLabel>
+              <SectionBlock tone="neutral">
+                <VisitCaptureForm
+                  compact
+                  outletName={resolveEngagementOutletName(engagement)}
+                  value={visitDraft ?? visitFieldsFromEngagement(engagement)}
+                  onChange={setVisitDraft}
+                />
+                <button
+                  type="button"
+                  className="btn-secondary mt-2 !h-7 text-2xs"
+                  disabled={!visitDraft?.visitDate}
+                  onClick={handleScheduledVisitSave}
+                >
+                  Save visit
+                </button>
+              </SectionBlock>
+            </section>
+          )}
+
           <section className="py-3">
             <SectionBlock tone="neutral">
               <SectionLabel className="mb-2">The deal</SectionLabel>
@@ -754,6 +801,9 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
       <VisitModal
         open={visitOpen}
         contactName={engagement.contact_name}
+        outletName={resolveEngagementOutletName(engagement)}
+        intro="Pick visit date and time — follow-up will auto-set to the visit date. Requires at least one deliverable and a collab reason."
+        saveLabel="Save & schedule"
         onClose={() => {
           setVisitOpen(false);
           setPendingMove(null);
@@ -839,50 +889,6 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
 
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </>
-  );
-}
-
-function VisitModal({ open, onClose, contactName, onSave }) {
-  const [visitDate, setVisitDate] = useState('');
-
-  useEffect(() => {
-    if (open) setVisitDate('');
-  }, [open]);
-
-  return (
-    <Modal
-      open={open}
-      title={`Plan visit · ${contactName}`}
-      onClose={onClose}
-      footer={
-        <div className="flex justify-end gap-2">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={!visitDate}
-            onClick={() => onSave(visitDate)}
-          >
-            Save & schedule
-          </button>
-        </div>
-      }
-    >
-      <p className="mb-4 text-2xs text-ink-secondary">
-        Pick a visit date — follow-up will auto-set to the same day. Requires at least one
-        deliverable and a collab reason.
-      </p>
-      <label className="block text-2xs text-ink-secondary">
-        Visit date
-        <input
-          type="date"
-          className="input-field mt-1"
-          required
-          value={visitDate}
-          onChange={(e) => setVisitDate(e.target.value)}
-        />
-      </label>
-    </Modal>
   );
 }
 

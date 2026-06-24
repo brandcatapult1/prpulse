@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Toast } from '../components/ui/Primitives.jsx';
 import { LogDeliverablePanel } from '../components/campaign/LogDeliverablePanel.jsx';
 import { ContactLoggingPanel } from '../components/campaign/ContactLoggingPanel.jsx';
@@ -31,6 +31,7 @@ import { getCachedContact } from '../lib/contactsCache.js';
 
 export function DashboardPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [workspace, setWorkspace] = useState(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -251,6 +252,12 @@ export function DashboardPage() {
     [showActionToast],
   );
 
+  const openEngagementRecord = useCallback((engagementId) => {
+    const path = engagementRecordPath(engagementId);
+    if (!path) return;
+    navigate(path);
+  }, [navigate]);
+
   if (loading && !workspace) {
     return (
       <div className="relative -m-4 flex min-h-[calc(100vh-3rem)] items-center justify-center md:-m-5">
@@ -291,6 +298,7 @@ export function DashboardPage() {
                 <TaskRow
                   key={row.id}
                   row={row}
+                  onOpen={() => openEngagementRecord(row.engagementId)}
                   onLogContact={() => handleOpenContactLogging(row.engagementId)}
                   onVisitDone={() => handleVisitDone(row.engagementId)}
                   onLogDeliverable={() => handleLogDeliverableClick(row.engagementId)}
@@ -310,6 +318,7 @@ export function DashboardPage() {
                 <VisitRow
                   key={row.id}
                   row={row}
+                  onOpen={() => openEngagementRecord(row.engagementId)}
                   onRemind={() => handleRemindCreator(row)}
                   onVisitDone={() => handleVisitDone(row.engagementId)}
                 />
@@ -328,6 +337,7 @@ export function DashboardPage() {
                 <DeliverableRow
                   key={row.id}
                   row={row}
+                  onOpen={() => openEngagementRecord(row.engagementId)}
                   onLog={() => handleLogDeliverableClick(row.engagementId)}
                 />
               ))}
@@ -345,6 +355,7 @@ export function DashboardPage() {
                 <AtRiskRow
                   key={row.id}
                   row={row}
+                  onOpen={() => openEngagementRecord(row.engagementId)}
                   onLogContact={() => handleOpenContactLogging(row.engagementId)}
                   onVisitDone={() => handleVisitDone(row.engagementId)}
                 />
@@ -518,6 +529,72 @@ function Avatar({ initials: label }) {
   );
 }
 
+function engagementRecordPath(engagementId) {
+  if (engagementId == null || engagementId === '' || engagementId === 'undefined') return null;
+  return `/engagements/${engagementId}`;
+}
+
+function dashboardRowTone({ isOverdue, situation, urgency }) {
+  if (isOverdue || situation === 'overdue') return 'urgent';
+  if (urgency === 'warning' && typeof situation === 'string' && situation.startsWith('at risk')) {
+    return 'caution';
+  }
+  return 'neutral';
+}
+
+const DASHBOARD_ROW_TONE_RESTING = {
+  neutral: 'bg-transparent',
+  urgent: 'bg-red-50/50',
+  caution: 'bg-amber-50/40',
+};
+
+const DASHBOARD_ROW_HIT_HOVER = {
+  neutral: 'hover:bg-black/[0.04] active:bg-black/[0.07]',
+  urgent: 'hover:bg-red-100/55 active:bg-red-100/70',
+  caution: 'hover:bg-amber-100/50 active:bg-amber-100/65',
+};
+
+function DashboardListRow({ engagementId, tone = 'neutral', onOpen, children, actions }) {
+  const canOpen = Boolean(engagementRecordPath(engagementId));
+
+  return (
+    <li
+      className={`flex items-center gap-3 px-4 py-3 transition-colors ${DASHBOARD_ROW_TONE_RESTING[tone] ?? DASHBOARD_ROW_TONE_RESTING.neutral}`}
+    >
+      <button
+        type="button"
+        className={`flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/30 ${
+          canOpen
+            ? `cursor-pointer ${DASHBOARD_ROW_HIT_HOVER[tone] ?? DASHBOARD_ROW_HIT_HOVER.neutral}`
+            : 'cursor-default'
+        }`}
+        onClick={() => {
+          if (canOpen) onOpen?.();
+        }}
+        disabled={!canOpen}
+        aria-label={canOpen ? 'Open engagement record' : undefined}
+      >
+        {children}
+      </button>
+      {actions ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5">{actions}</div>
+      ) : null}
+    </li>
+  );
+}
+
+function DashboardRowIdentity({ row, subtitle }) {
+  return (
+    <>
+      <Avatar initials={row.initials} />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium text-ink">{row.fullName}</div>
+        <div className="truncate text-2xs text-ink-tertiary">{subtitle}</div>
+      </div>
+    </>
+  );
+}
+
 function urgencyTextClass(urgency) {
   if (urgency === 'danger') return 'text-health-red';
   if (urgency === 'warning') return 'text-health-amber';
@@ -545,7 +622,7 @@ function ActionButton({ label, onClick, variant = 'outline' }) {
   );
 }
 
-function TaskRow({ row, onLogContact, onVisitDone, onLogDeliverable }) {
+function TaskRow({ row, onOpen, onLogContact, onVisitDone, onLogDeliverable }) {
   const action =
     row.action === 'visit_done' ? (
       <ActionButton label="Visit done" onClick={onVisitDone} variant="primary" />
@@ -560,63 +637,71 @@ function TaskRow({ row, onLogContact, onVisitDone, onLogDeliverable }) {
     );
 
   return (
-    <li
-      className={`flex items-center gap-3 px-4 py-3 ${
-        row.isOverdue ? 'bg-red-50/60' : ''
-      }`}
+    <DashboardListRow
+      engagementId={row.engagementId}
+      tone={dashboardRowTone(row)}
+      onOpen={onOpen}
+      actions={action}
     >
-      <Avatar initials={row.initials} />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-ink">{row.fullName}</div>
-        <div className="truncate text-2xs text-ink-tertiary">
-          {row.campaignName}
-          <span className="text-ink-tertiary/60"> · </span>
-          <span className={urgencyTextClass(row.urgency)}>{row.situation}</span>
-        </div>
-      </div>
-      {action}
-    </li>
+      <DashboardRowIdentity
+        row={row}
+        subtitle={(
+          <>
+            {row.campaignName}
+            <span className="text-ink-tertiary/60"> · </span>
+            <span className={urgencyTextClass(row.urgency)}>{row.situation}</span>
+          </>
+        )}
+      />
+    </DashboardListRow>
   );
 }
 
-function VisitRow({ row, onRemind, onVisitDone }) {
+function VisitRow({ row, onOpen, onRemind, onVisitDone }) {
   const timeVenue = row.visitTime
     ? `${row.visitTime} · ${row.venue}`
     : row.venue;
 
   return (
-    <li className="flex flex-wrap items-center gap-3 px-4 py-3">
-      <Avatar initials={row.initials} />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-ink">{row.fullName}</div>
-        <div className="truncate text-2xs text-ink-tertiary">{timeVenue}</div>
-      </div>
-      <div className="flex shrink-0 flex-wrap gap-1.5">
-        <ActionButton label="Remind creator" onClick={onRemind} variant="success" />
-        <ActionButton label="Visit done" onClick={onVisitDone} />
-      </div>
-    </li>
+    <DashboardListRow
+      engagementId={row.engagementId}
+      tone="neutral"
+      onOpen={onOpen}
+      actions={(
+        <>
+          <ActionButton label="Remind creator" onClick={onRemind} variant="success" />
+          <ActionButton label="Visit done" onClick={onVisitDone} />
+        </>
+      )}
+    >
+      <DashboardRowIdentity row={row} subtitle={timeVenue} />
+    </DashboardListRow>
   );
 }
 
-function DeliverableRow({ row, onLog }) {
+function DeliverableRow({ row, onOpen, onLog }) {
   return (
-    <li className="flex items-center gap-3 px-4 py-3">
-      <Avatar initials={row.initials} />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-ink">{row.fullName}</div>
-        <div className="truncate text-2xs text-ink-tertiary">
-          <span className="capitalize">{row.deliverableType}</span>
-          <span className="text-ink-tertiary/60"> · </span>
-          <span className={urgencyTextClass(row.urgency)}>{row.situation}</span>
-        </div>
-      </div>
-      <ActionButton label="Log deliverable" onClick={onLog} />
-    </li>
+    <DashboardListRow
+      engagementId={row.engagementId}
+      tone={dashboardRowTone(row)}
+      onOpen={onOpen}
+      actions={<ActionButton label="Log deliverable" onClick={onLog} />}
+    >
+      <DashboardRowIdentity
+        row={row}
+        subtitle={(
+          <>
+            <span className="capitalize">{row.deliverableType}</span>
+            <span className="text-ink-tertiary/60"> · </span>
+            <span className={urgencyTextClass(row.urgency)}>{row.situation}</span>
+          </>
+        )}
+      />
+    </DashboardListRow>
   );
 }
 
-function AtRiskRow({ row, onLogContact, onVisitDone }) {
+function AtRiskRow({ row, onOpen, onLogContact, onVisitDone }) {
   const flagText = row.flagDetail ? `${row.flag} · ${row.flagDetail}` : row.flag;
   const action =
     row.action === 'visit_done' ? (
@@ -626,18 +711,23 @@ function AtRiskRow({ row, onLogContact, onVisitDone }) {
     );
 
   return (
-    <li className="flex items-center gap-3 px-4 py-3">
-      <Avatar initials={row.initials} />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-ink">{row.fullName}</div>
-        <div className="truncate text-2xs text-ink-tertiary">
-          {row.campaignName}
-          <span className="text-ink-tertiary/60"> · </span>
-          <span className="text-health-amber">{flagText}</span>
-        </div>
-      </div>
-      {action}
-    </li>
+    <DashboardListRow
+      engagementId={row.engagementId}
+      tone="neutral"
+      onOpen={onOpen}
+      actions={action}
+    >
+      <DashboardRowIdentity
+        row={row}
+        subtitle={(
+          <>
+            {row.campaignName}
+            <span className="text-ink-tertiary/60"> · </span>
+            <span className="text-health-amber">{flagText}</span>
+          </>
+        )}
+      />
+    </DashboardListRow>
   );
 }
 

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool, withUserTransaction } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
+import { requireSeniorOrAdmin } from '../middleware/permissions.mjs';
 
 export const registrationsRouter = Router();
 
@@ -78,7 +79,7 @@ registrationsRouter.get('/', requireAuth, async (_req, res) => {
   }
 });
 
-registrationsRouter.patch('/:id', requireAuth, async (req, res) => {
+registrationsRouter.patch('/:id', requireAuth, requireSeniorOrAdmin, async (req, res) => {
   const { status, linked_contact_id } = req.body ?? {};
   const allowed = ['pending_review', 'approved', 'rejected', 'duplicate'];
   if (!allowed.includes(status)) {

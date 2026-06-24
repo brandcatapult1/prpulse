@@ -1,14 +1,12 @@
 import { Router } from 'express';
 import { pool, withUserTransaction } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
+import { requireSeniorOrAdmin } from '../middleware/permissions.mjs';
 
 export const importRouter = Router();
 
 function requireImportRole(req, res, next) {
-  if (!['admin', 'senior_manager'].includes(req.user.role)) {
-    return res.status(403).json({ error: 'Senior Manager or Admin access required' });
-  }
-  return next();
+  return requireSeniorOrAdmin(req, res, next);
 }
 
 importRouter.post('/contacts', requireAuth, requireImportRole, async (req, res) => {

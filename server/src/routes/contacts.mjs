@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool, withUserTransaction } from '../db.mjs';
 import { requireAuth, scopeArchived, scopeBlacklisted } from '../middleware/auth.mjs';
+import { requireSeniorOrAdmin } from '../middleware/permissions.mjs';
 
 export const contactsRouter = Router();
 
@@ -107,7 +108,7 @@ contactsRouter.patch('/:id', requireAuth, async (req, res) => {
   }
 });
 
-contactsRouter.post('/:id/blacklist', requireAuth, async (req, res) => {
+contactsRouter.post('/:id/blacklist', requireAuth, requireSeniorOrAdmin, async (req, res) => {
   const { reason } = req.body ?? {};
   if (!reason?.trim()) return res.status(400).json({ error: 'Reason is required' });
 
@@ -136,7 +137,7 @@ contactsRouter.post('/:id/blacklist', requireAuth, async (req, res) => {
   }
 });
 
-contactsRouter.delete('/:id/blacklist', requireAuth, async (req, res) => {
+contactsRouter.delete('/:id/blacklist', requireAuth, requireSeniorOrAdmin, async (req, res) => {
   try {
     await withUserTransaction(req.user.id, async (client) => {
       const { rowCount } = await client.query(

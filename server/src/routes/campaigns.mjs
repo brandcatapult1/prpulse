@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { pool, withUserTransaction } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
+import { requireCampaignWriteAccess, requireStaffRole } from '../middleware/permissions.mjs';
+import { assertCreatorAssignedForCampaignManager } from '../lib/permissions.mjs';
 import { listActivityEventsForCampaign } from '../lib/activityEvents.mjs';
 
 export const campaignsRouter = Router();
@@ -40,7 +42,7 @@ campaignsRouter.get('/assignable-managers', requireAuth, async (_req, res) => {
   }
 });
 
-campaignsRouter.post('/', requireAuth, async (req, res) => {
+campaignsRouter.post('/', requireAuth, requireStaffRole, async (req, res) => {
   const {
     campaign_name,
     brand_id,
@@ -90,6 +92,7 @@ campaignsRouter.post('/', requireAuth, async (req, res) => {
   managerIdSet.add(String(req.user.id));
 
   try {
+    assertCreatorAssignedForCampaignManager(req.user, [...managerIdSet]);
     const row = await withUserTransaction(req.user.id, async (client) => {
       const brand = await client.query('SELECT id, brand_name FROM brands WHERE id = $1', [brand_id]);
       if (!brand.rows[0]) throw Object.assign(new Error('Brand not found'), { status: 404 });
@@ -161,7 +164,7 @@ campaignsRouter.get('/:id/activity-events', requireAuth, async (req, res) => {
   res.json(events);
 });
 
-campaignsRouter.post('/:id/populate', requireAuth, async (req, res) => {
+campaignsRouter.post('/:id/populate', requireAuth, requireCampaignWriteAccess('id'), async (req, res) => {
   const { contact_ids = [], assigned_manager } = req.body;
   if (!Array.isArray(contact_ids) || contact_ids.length === 0) {
     return res.status(400).json({ error: 'contact_ids required' });

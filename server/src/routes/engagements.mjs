@@ -2,6 +2,10 @@ import { Router } from 'express';
 import { pool, withUserTransaction } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
 import {
+  requireDidntDeliverPermission,
+  requireEngagementWriteAccess,
+} from '../middleware/permissions.mjs';
+import {
   ACTIVITY_ACTION,
   activityRowToTimelineEntry,
   legacyTimelineRowToEntry,
@@ -115,10 +119,10 @@ engagementsRouter.get('/:id', requireAuth, async (req, res) => {
   res.json(rows[0]);
 });
 
-engagementsRouter.patch('/:id', requireAuth, patchEngagement);
-engagementsRouter.patch('/:id/status', requireAuth, patchEngagement);
+engagementsRouter.patch('/:id', requireAuth, requireEngagementWriteAccess('id'), requireDidntDeliverPermission, patchEngagement);
+engagementsRouter.patch('/:id/status', requireAuth, requireEngagementWriteAccess('id'), requireDidntDeliverPermission, patchEngagement);
 
-engagementsRouter.post('/:id/schedule', requireAuth, async (req, res) => {
+engagementsRouter.post('/:id/schedule', requireAuth, requireEngagementWriteAccess('id'), async (req, res) => {
   try {
     const result = await withUserTransaction(req.user.id, async (client) =>
       commitScheduleEngagement(client, req.user, req.params.id, req.body, loadEngagementRow),
@@ -281,7 +285,7 @@ engagementsRouter.get('/:id/deliverables', requireAuth, async (req, res) => {
   }
 });
 
-engagementsRouter.post('/:id/deliverables', requireAuth, async (req, res) => {
+engagementsRouter.post('/:id/deliverables', requireAuth, requireEngagementWriteAccess('id'), async (req, res) => {
   try {
     const row = await withUserTransaction(req.user.id, async (client) => {
       const eng = await client.query('SELECT id, campaign_id FROM engagements WHERE id = $1', [req.params.id]);
@@ -323,7 +327,7 @@ engagementsRouter.post('/:id/deliverables', requireAuth, async (req, res) => {
   }
 });
 
-engagementsRouter.patch('/:engagementId/deliverables/:deliverableId', requireAuth, async (req, res) => {
+engagementsRouter.patch('/:engagementId/deliverables/:deliverableId', requireAuth, requireEngagementWriteAccess('engagementId'), async (req, res) => {
   try {
     const row = await withUserTransaction(req.user.id, async (client) => {
       const cur = await client.query(
@@ -398,7 +402,7 @@ engagementsRouter.patch('/:engagementId/deliverables/:deliverableId', requireAut
   }
 });
 
-engagementsRouter.delete('/:engagementId/deliverables/:deliverableId', requireAuth, async (req, res) => {
+engagementsRouter.delete('/:engagementId/deliverables/:deliverableId', requireAuth, requireEngagementWriteAccess('engagementId'), async (req, res) => {
   try {
     await withUserTransaction(req.user.id, async (client) => {
       const { rowCount } = await client.query(
@@ -418,7 +422,7 @@ engagementsRouter.get('/:id/feedback', requireAuth, async (req, res) => {
   res.json(rows[0] ?? null);
 });
 
-engagementsRouter.put('/:id/feedback', requireAuth, async (req, res) => {
+engagementsRouter.put('/:id/feedback', requireAuth, requireEngagementWriteAccess('id'), async (req, res) => {
   const {
     content_quality,
     professionalism,
@@ -495,7 +499,7 @@ engagementsRouter.get('/:id/timeline', requireAuth, async (req, res) => {
 });
 
 /** Log visit reminder (WhatsApp opened — client-side action). */
-engagementsRouter.post('/:id/visit-reminder', requireAuth, async (req, res) => {
+engagementsRouter.post('/:id/visit-reminder', requireAuth, requireEngagementWriteAccess('id'), async (req, res) => {
   try {
     await withUserTransaction(req.user.id, async (client) => {
       const eng = await client.query('SELECT id, campaign_id FROM engagements WHERE id = $1', [req.params.id]);

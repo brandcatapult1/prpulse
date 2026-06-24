@@ -19,11 +19,12 @@ import {
 import {
   ENGAGEMENT_OUTLET_JOINS,
   ENGAGEMENT_OUTLET_SELECT,
-  ensureDefaultOutletForBrand,
   getDefaultOutletForCampaign,
   normalizeVisitTime,
   syncVisitOutletText,
 } from '../lib/outlets.mjs';
+import {
+  recordDeliverablePostedActivity,
   recordDidntDeliverActivity,
   recordEngagementPatchActivity,
   recordFeedbackActivity,

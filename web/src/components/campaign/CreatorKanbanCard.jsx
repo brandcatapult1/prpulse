@@ -290,6 +290,7 @@ export function CreatorKanbanCard({
   onApplyDidntDeliver,
   onApplyReopen,
   onApplyContactFeedback,
+  onRequestSchedule,
   onLoggingError,
   userRole,
   boardRevision,
@@ -355,6 +356,7 @@ export function CreatorKanbanCard({
           engagement={engagement}
           onApply={onApplyLogging}
           onError={onLoggingError}
+          onScheduleRequest={onRequestSchedule}
         />
       )}
 

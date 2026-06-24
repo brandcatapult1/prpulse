@@ -4,6 +4,7 @@ import { CreatorKanbanCard } from './CreatorKanbanCard.jsx';
 export function CampaignKanbanBoard({
   engagements,
   onCardClick,
+  onRequestSchedule,
   onApplyLogging,
   onApplyDeliverables,
   onApplyDidntDeliver,
@@ -53,6 +54,7 @@ export function CampaignKanbanBoard({
                     onApplyContactFeedback={(payload) =>
                       onApplyContactFeedback?.(engagement.id, payload)
                     }
+                    onRequestSchedule={() => onRequestSchedule?.(engagement)}
                     onLoggingError={onLoggingError}
                   />
                 ))

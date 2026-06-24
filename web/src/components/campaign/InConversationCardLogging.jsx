@@ -6,12 +6,6 @@ import {
   STAGE,
   transitionStage,
 } from '../../lib/engagementTransitions.js';
-import { VisitCaptureForm } from '../visit/VisitCaptureForm.jsx';
-import {
-  buildScheduledTransitionPayload,
-  emptyVisitFields,
-  resolveEngagementOutletName,
-} from '../../lib/visitFields.js';
 
 /**
  * In-conversation contact log flow (Replied / No reply → stage transitions).
@@ -21,6 +15,7 @@ export function InConversationCardLogging({
   engagement,
   onApply,
   onError,
+  onScheduleRequest,
   alwaysShowActions = false,
   embedded = false,
   onComplete,
@@ -28,7 +23,6 @@ export function InConversationCardLogging({
   const [step, setStep] = useState('idle');
   const [retryDate, setRetryDate] = useState('');
   const [followUpDate, setFollowUpDate] = useState('');
-  const [visitFields, setVisitFields] = useState(emptyVisitFields());
 
   const noReplyCount = engagement.no_reply_count ?? 0;
 
@@ -36,7 +30,6 @@ export function InConversationCardLogging({
     setStep('idle');
     setRetryDate('');
     setFollowUpDate('');
-    setVisitFields(emptyVisitFields());
   }
 
   function apply(patch, message) {
@@ -72,18 +65,14 @@ export function InConversationCardLogging({
     );
   }
 
-  function handleScheduledConfirm() {
-    if (!visitFields.visitDate) return;
-    const result = transitionStage(
-      engagement,
-      STAGE.SCHEDULED,
-      buildScheduledTransitionPayload(engagement, visitFields),
-    );
-    if (!result.ok) {
-      onError?.(result.error ?? 'Could not schedule visit');
+  function handleScheduleRequest() {
+    if (onScheduleRequest) {
+      onScheduleRequest();
+      reset();
+      onComplete?.();
       return;
     }
-    apply(result.patch, `Scheduled — visit ${formatDate(visitFields.visitDate)}`);
+    onError?.('Open the campaign board to schedule this visit');
   }
 
   function handleDropped(reason) {
@@ -130,7 +119,7 @@ export function InConversationCardLogging({
         <button type="button" className="btn-secondary w-full !py-1 text-[11px]" onClick={() => setStep('replied_follow_up')}>
           Still in conversation
         </button>
-        <button type="button" className="btn-secondary w-full !py-1 text-[11px]" onClick={() => setStep('replied_scheduled')}>
+        <button type="button" className="btn-secondary w-full !py-1 text-[11px]" onClick={handleScheduleRequest}>
           Scheduled
         </button>
         <button
@@ -192,32 +181,6 @@ export function InConversationCardLogging({
             onClick={handleStillConfirm}
           >
             Save
-          </button>
-        </div>
-      </LoggingPanel>
-    );
-  }
-
-  if (step === 'replied_scheduled') {
-    return (
-      <LoggingPanel embedded={embedded}>
-        <VisitCaptureForm
-          compact
-          outletName={resolveEngagementOutletName(engagement)}
-          value={visitFields}
-          onChange={setVisitFields}
-        />
-        <div className="mt-2 flex gap-1">
-          <button type="button" className="btn-secondary flex-1 !py-1 text-[11px]" onClick={() => setStep('replied_where')}>
-            Back
-          </button>
-          <button
-            type="button"
-            className="btn-primary flex-1 !py-1 text-[11px]"
-            disabled={!visitFields.visitDate}
-            onClick={handleScheduledConfirm}
-          >
-            Schedule visit
           </button>
         </div>
       </LoggingPanel>

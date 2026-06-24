@@ -28,7 +28,7 @@ import {
   rejectProfileToastMessage,
   reopenToastMessage,
 } from '../../lib/outreachLogging.js';
-import { STAGE, transitionStage } from '../../lib/engagementTransitions.js';
+import { STAGE, transitionStage, formatScheduledBlockMessage, getScheduledPrerequisitesMissing, SCHEDULED_PREREQUISITE } from '../../lib/engagementTransitions.js';
 import { buildVisitDoneTransition, visitDoneToastMessage } from '../../lib/visitLogging.js';
 import {
   buildScheduledTransitionPayload,
@@ -37,7 +37,6 @@ import {
   visitFieldsFromEngagement,
 } from '../../lib/visitFields.js';
 import { VisitCaptureForm } from '../visit/VisitCaptureForm.jsx';
-import { VisitModal } from '../visit/VisitModal.jsx';
 import {
   deliverablesRules,
   canRemoveDeliverable,
@@ -321,11 +320,18 @@ function DrawerIdentityHeader({ engagement, onEmailSaved, onToast }) {
   );
 }
 
-export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated }) {
+export function CampaignQuickEditDrawer({
+  engagementId,
+  open,
+  onClose,
+  onUpdated,
+  scheduleMode = false,
+  onScheduleModeCleared,
+}) {
   const { user } = useAuth();
   const [engagement, setEngagement] = useState(null);
   const [deliverables, setDeliverables] = useState([]);
-  const [visitOpen, setVisitOpen] = useState(false);
+  const [scheduleFlow, setScheduleFlow] = useState(false);
   const [followUpOpen, setFollowUpOpen] = useState(false);
   const [dropOpen, setDropOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(null);
@@ -351,6 +357,26 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
       setVisitDraft(null);
     });
   }, [open, engagementId]);
+
+  useEffect(() => {
+    if (open && scheduleMode) {
+      setScheduleFlow(true);
+    }
+    if (!open) {
+      setScheduleFlow(false);
+    }
+  }, [open, scheduleMode]);
+
+  useEffect(() => {
+    if (!open || !scheduleFlow) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById('campaign-drawer-schedule')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [open, scheduleFlow]);
 
   if (!engagementId || !engagement) return null;
 
@@ -427,6 +453,27 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
     }
   }
 
+  function scrollToScheduleMissing(missing) {
+    if (missing.includes(SCHEDULED_PREREQUISITE.visitDate)) {
+      document.getElementById('campaign-drawer-schedule')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }
+    if (missing.includes(SCHEDULED_PREREQUISITE.deliverables)) {
+      document.getElementById('campaign-drawer-deliverables')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }
+    if (missing.includes(SCHEDULED_PREREQUISITE.collabReason)) {
+      document.getElementById('campaign-drawer-collab-reason')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }
+  }
+
   async function applyTransition(result, message) {
     if (!result.ok) {
       setToast(result.error ?? 'Could not move');
@@ -450,11 +497,18 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
 
   function resetMoveUi() {
     setPendingMove(null);
-    setVisitOpen(false);
     setFollowUpOpen(false);
     setDropOpen(false);
     setConfirmOpen(null);
     setMoveSelectKey((k) => k + 1);
+  }
+
+  function exitScheduleFlow({ closeDrawer = false } = {}) {
+    setScheduleFlow(false);
+    setPendingMove(null);
+    setMoveSelectKey((k) => k + 1);
+    onScheduleModeCleared?.();
+    if (closeDrawer) onClose();
   }
 
   async function handleMoveSelect(moveValue) {
@@ -468,7 +522,8 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
     }
     if (target.needsPrompt === 'visit_date') {
       setPendingMove(target);
-      setVisitOpen(true);
+      setScheduleFlow(true);
+      setVisitDraft(visitFieldsFromEngagement(engagement));
       return;
     }
     if (target.needsPrompt === 'drop_reason') {
@@ -510,14 +565,29 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
     if (await applyTransition(result, message)) resetMoveUi();
   }
 
-  async function handleVisitSave(fields) {
-    const move = pendingMove ?? { target: STAGE.SCHEDULED };
+  async function handleScheduleVisitSubmit() {
+    if (!visitDraft?.visitDate) {
+      setToast('Visit date is required');
+      scrollToScheduleMissing([SCHEDULED_PREREQUISITE.visitDate]);
+      return;
+    }
+
+    const missing = getScheduledPrerequisitesMissing(engagement, visitDraft.visitDate);
+    if (missing.length > 0) {
+      setToast(formatScheduledBlockMessage(missing) ?? 'Complete scheduling requirements');
+      scrollToScheduleMissing(missing);
+      return;
+    }
+
     const result = transitionStage(
       engagement,
-      move.target,
-      buildScheduledTransitionPayload(engagement, fields),
+      pendingMove?.target ?? STAGE.SCHEDULED,
+      buildScheduledTransitionPayload(engagement, visitDraft),
     );
-    if (await applyTransition(result, `Visit set for ${formatDate(fields.visitDate)}`)) resetMoveUi();
+    if (await applyTransition(result, `Scheduled — visit ${formatDate(visitDraft.visitDate)}`)) {
+      exitScheduleFlow();
+      resetMoveUi();
+    }
   }
 
   async function handleScheduledVisitSave() {
@@ -589,14 +659,35 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
     <>
       <Drawer
         open={open}
+        title={scheduleFlow ? `Schedule visit · ${engagement.contact_name}` : undefined}
         onClose={onClose}
         footer={
-          <div className="flex items-center justify-between gap-3">
-            <button type="button" className="btn-secondary" onClick={onClose}>Done</button>
-            <Link to={`/engagements/${engagementId}`} className="btn-ghost text-2xs" onClick={onClose}>
-              Full record →
-            </Link>
-          </div>
+          scheduleFlow ? (
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => exitScheduleFlow({ closeDrawer: scheduleMode })}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={!visitDraft?.visitDate}
+                onClick={handleScheduleVisitSubmit}
+              >
+                Schedule visit
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3">
+              <button type="button" className="btn-secondary" onClick={onClose}>Done</button>
+              <Link to={`/engagements/${engagementId}`} className="btn-ghost text-2xs" onClick={onClose}>
+                Full record →
+              </Link>
+            </div>
+          )
         }
       >
         <div className="divide-y divide-line/80">
@@ -606,6 +697,23 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
             onEmailSaved={() => setIdentityRevision((r) => r + 1)}
             onToast={setToast}
           />
+
+          {scheduleFlow && (
+            <section id="campaign-drawer-schedule" className="py-3">
+              <SectionBlock tone="accent">
+                <SectionLabel className="mb-1 text-brand/70">Visit details</SectionLabel>
+                <p className="mb-2 text-[10px] text-ink-tertiary">
+                  Add visit date, at least one deliverable, and a collab reason below — then confirm once.
+                </p>
+                <VisitCaptureForm
+                  compact
+                  outletName={resolveEngagementOutletName(engagement)}
+                  value={visitDraft ?? visitFieldsFromEngagement(engagement)}
+                  onChange={setVisitDraft}
+                />
+              </SectionBlock>
+            </section>
+          )}
 
           <section id="campaign-drawer-collab-reason" className="py-3">
             <SectionBlock tone="accent">
@@ -625,7 +733,9 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
                 ))}
               </select>
               {!engagement.primary_collaboration_reason && (
-                <p className="mt-1 text-[10px] text-health-amber">Required before scheduling</p>
+                <p className="mt-1 text-[10px] text-health-amber">
+                  {scheduleFlow ? 'Required to schedule' : 'Required before scheduling'}
+                </p>
               )}
             </SectionBlock>
           </section>
@@ -639,7 +749,7 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
                   {drawerCurrentStageLabel(engagement, formatStatus)}
                 </p>
               </div>
-              {moveTargets.length > 0 ? (
+              {moveTargets.length > 0 && !scheduleFlow ? (
                 <label className="block">
                   <FieldLabel>Move to</FieldLabel>
                   <select
@@ -685,7 +795,7 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
             </div>
           </section>
 
-          {status === 'scheduled' && (
+          {status === 'scheduled' && !scheduleFlow && (
             <section className="py-3">
               <SectionLabel>Visit</SectionLabel>
               <SectionBlock tone="neutral">
@@ -757,6 +867,9 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
                 {deliverablesNote && (
                   <p className="mt-1 text-[10px] text-ink-tertiary">{deliverablesNote}</p>
                 )}
+                {scheduleFlow && deliverables.length === 0 && (
+                  <p className="mt-1 text-[10px] text-health-amber">Add at least one deliverable to schedule</p>
+                )}
 
                 {deliverables.length > 0 && (
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -797,20 +910,6 @@ export function CampaignQuickEditDrawer({ engagementId, open, onClose, onUpdated
           </section>
         </div>
       </Drawer>
-
-      <VisitModal
-        open={visitOpen}
-        contactName={engagement.contact_name}
-        outletName={resolveEngagementOutletName(engagement)}
-        intro="Pick visit date and time — follow-up will auto-set to the visit date. Requires at least one deliverable and a collab reason."
-        saveLabel="Save & schedule"
-        onClose={() => {
-          setVisitOpen(false);
-          setPendingMove(null);
-          setMoveSelectKey((k) => k + 1);
-        }}
-        onSave={handleVisitSave}
-      />
 
       <FollowUpModal
         open={followUpOpen}

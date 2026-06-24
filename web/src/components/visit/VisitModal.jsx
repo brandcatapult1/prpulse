@@ -46,7 +46,7 @@ export function VisitModal({
       )}
       <VisitCaptureForm
         outletName={outletName}
-        initialValues={fields}
+        value={fields}
         onChange={setFields}
       />
     </Modal>

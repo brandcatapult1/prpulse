@@ -610,15 +610,11 @@ function ActionButton({ label, onClick, variant = 'outline' }) {
 function TaskRow({ row, onOpen, onLogContact, onVisitDone, onLogDeliverable }) {
   const action =
     row.action === 'visit_done' ? (
-      <ActionButton label="Visit done" onClick={onVisitDone} variant="primary" />
+      <ActionButton label="Visit done" onClick={onVisitDone} />
     ) : row.action === 'log_deliverable' ? (
       <ActionButton label="Log deliverable" onClick={onLogDeliverable} />
     ) : (
-      <ActionButton
-        label="Log contact"
-        onClick={onLogContact}
-        variant={row.isOverdue ? 'primary' : 'outline'}
-      />
+      <ActionButton label="Log contact" onClick={onLogContact} />
     );
 
   return (

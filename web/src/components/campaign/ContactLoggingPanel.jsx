@@ -32,6 +32,7 @@ export function ContactLoggingPanel({
   onClose,
   onApply,
   onError,
+  onScheduleRequest,
   anchorEl = null,
 }) {
   const useAnchored = usePrefersAnchoredPanel(anchorEl);
@@ -48,6 +49,7 @@ export function ContactLoggingPanel({
         embedded
         onApply={onApply}
         onError={onError}
+        onScheduleRequest={onScheduleRequest}
         onComplete={onClose}
       />
     </>
@@ -77,7 +79,7 @@ export function ContactLoggingPanel({
 }
 
 /** Kanban card trigger — opens ContactLoggingPanel anchored to the button. */
-export function InConversationLoggingTrigger({ engagement, onApply, onError }) {
+export function InConversationLoggingTrigger({ engagement, onApply, onError, onScheduleRequest }) {
   const [open, setOpen] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
 
@@ -113,6 +115,7 @@ export function InConversationLoggingTrigger({ engagement, onApply, onError }) {
         onClose={handleClose}
         onApply={onApply}
         onError={onError}
+        onScheduleRequest={onScheduleRequest}
       />
     </>
   );

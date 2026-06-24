@@ -57,6 +57,7 @@ export function CampaignViewPage() {
   const [activeFilters, setActiveFilters] = useState(CAMPAIGN_EMPTY_FILTERS);
   const [viewMode, setViewMode] = useState('board');
   const [quickEditId, setQuickEditId] = useState(null);
+  const [scheduleIntent, setScheduleIntent] = useState(false);
   const [toast, setToast] = useState(null);
   const [boardRevision, setBoardRevision] = useState(0);
 
@@ -287,7 +288,14 @@ export function CampaignViewPage() {
           engagements={filteredEngagements}
           userRole={user?.role}
           boardRevision={boardRevision}
-          onCardClick={(row) => setQuickEditId(row.id)}
+          onCardClick={(row) => {
+            setScheduleIntent(false);
+            setQuickEditId(row.id);
+          }}
+          onRequestSchedule={(row) => {
+            setScheduleIntent(true);
+            setQuickEditId(row.id);
+          }}
           onApplyLogging={applyEngagementLogging}
           onApplyDeliverables={applyDeliverablesLogging}
           onApplyDidntDeliver={applyDidntDeliverLogging}
@@ -309,7 +317,12 @@ export function CampaignViewPage() {
       <CampaignQuickEditDrawer
         engagementId={quickEditId}
         open={Boolean(quickEditId)}
-        onClose={() => setQuickEditId(null)}
+        scheduleMode={scheduleIntent}
+        onClose={() => {
+          setQuickEditId(null);
+          setScheduleIntent(false);
+        }}
+        onScheduleModeCleared={() => setScheduleIntent(false)}
         onUpdated={reload}
       />
 

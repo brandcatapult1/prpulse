@@ -118,3 +118,8 @@ export async function fetchReportPeriods() {
 export async function fetchEngagementTimeline(engagementId) {
   return engagementsApi.timeline(engagementId);
 }
+
+/** Atomically sync deliverables and move engagement to scheduled. */
+export async function commitScheduleEngagement(engagementId, body) {
+  return engagementsApi.schedule(engagementId, body);
+}

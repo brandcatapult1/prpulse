@@ -11,6 +11,7 @@ import {
   syncDeliverables,
   patchContact,
   fetchDeliverables,
+  commitScheduleEngagement,
 } from '../../lib/persistence.js';
 import { updateEngagementDeliverables } from '../../lib/deliverablesCache.js';
 import { updateCachedContact } from '../../lib/contactsCache.js';
@@ -31,9 +32,10 @@ import {
 import { STAGE, transitionStage, formatScheduledBlockMessage, getScheduledPrerequisitesMissing, SCHEDULED_PREREQUISITE } from '../../lib/engagementTransitions.js';
 import { buildVisitDoneTransition, visitDoneToastMessage } from '../../lib/visitLogging.js';
 import {
-  buildScheduledTransitionPayload,
   buildVisitFieldsPatch,
+  resolveEngagementOutletId,
   resolveEngagementOutletName,
+  toApiVisitTime,
   visitFieldsFromEngagement,
 } from '../../lib/visitFields.js';
 import { VisitCaptureForm } from '../visit/VisitCaptureForm.jsx';
@@ -340,7 +342,43 @@ export function CampaignQuickEditDrawer({
   const [moveSelectKey, setMoveSelectKey] = useState(0);
   const [toast, setToast] = useState(null);
   const [visitDraft, setVisitDraft] = useState(null);
+  const [scheduleBaseline, setScheduleBaseline] = useState(null);
+  const [scheduleSubmitting, setScheduleSubmitting] = useState(false);
   const [identityRevision, setIdentityRevision] = useState(0);
+
+  function captureScheduleBaseline() {
+    if (!engagement) return;
+    setScheduleBaseline({
+      deliverables: structuredClone(deliverables),
+      visitDraft: { ...(visitDraft ?? visitFieldsFromEngagement(engagement)) },
+      engagement: {
+        primary_collaboration_reason: engagement.primary_collaboration_reason ?? null,
+        notes: engagement.notes ?? null,
+      },
+    });
+  }
+
+  function discardScheduleBaseline() {
+    if (!scheduleBaseline) return;
+    setDeliverables(scheduleBaseline.deliverables);
+    setVisitDraft(scheduleBaseline.visitDraft);
+    setEngagement((prev) => ({
+      ...prev,
+      primary_collaboration_reason: scheduleBaseline.engagement.primary_collaboration_reason,
+      notes: scheduleBaseline.engagement.notes,
+    }));
+    setScheduleBaseline(null);
+  }
+
+  function handleDrawerClose() {
+    if (scheduleFlow && !scheduleSubmitting) {
+      discardScheduleBaseline();
+    }
+    setScheduleFlow(false);
+    setScheduleBaseline(null);
+    onScheduleModeCleared?.();
+    onClose();
+  }
 
   useEffect(() => {
     if (!open || !engagementId) return;
@@ -360,13 +398,16 @@ export function CampaignQuickEditDrawer({
   }, [open, engagementId]);
 
   useEffect(() => {
-    if (open && scheduleMode) {
+    if (open && scheduleMode && engagement) {
+      captureScheduleBaseline();
       setScheduleFlow(true);
     }
     if (!open) {
       setScheduleFlow(false);
+      setScheduleBaseline(null);
+      setScheduleSubmitting(false);
     }
-  }, [open, scheduleMode]);
+  }, [open, scheduleMode, engagement?.id]);
 
   useEffect(() => {
     if (!open || !scheduleFlow) return;
@@ -412,10 +453,14 @@ export function CampaignQuickEditDrawer({
 
   function addDeliverable(type) {
     if (!deliverablesRule.canAdd) return;
+    const nextList = addDeliverableToList(deliverables, type, status);
+    if (scheduleFlow) {
+      setDeliverables(nextList);
+      return;
+    }
     const existing = deliverables.find(
       (d) => d.deliverable_type === type && d.status !== 'posted',
     );
-    const nextList = addDeliverableToList(deliverables, type, status);
     const merged = nextList.find(
       (d) => d.deliverable_type === type && d.status !== 'posted',
     );
@@ -432,6 +477,10 @@ export function CampaignQuickEditDrawer({
     const item = deliverables.find((d) => d.id === delId);
     if (!item || !canRemoveDeliverable(status, item)) return;
     const nextList = removeDeliverableFromList(deliverables, delId);
+    if (scheduleFlow) {
+      setDeliverables(nextList);
+      return;
+    }
     const remaining = nextList.find((d) => d.id === delId);
     const label = deliverableTypeLabel(item.deliverable_type);
     persistDeliverables(
@@ -506,6 +555,7 @@ export function CampaignQuickEditDrawer({
 
   function exitScheduleFlow({ closeDrawer = false } = {}) {
     setScheduleFlow(false);
+    setScheduleBaseline(null);
     setPendingMove(null);
     setMoveSelectKey((k) => k + 1);
     onScheduleModeCleared?.();
@@ -524,6 +574,7 @@ export function CampaignQuickEditDrawer({
     }
     if (target.needsPrompt === 'visit_date') {
       setPendingMove(target);
+      captureScheduleBaseline();
       setScheduleFlow(true);
       setVisitDraft(visitFieldsFromEngagement(engagement));
       return;
@@ -568,27 +619,51 @@ export function CampaignQuickEditDrawer({
   }
 
   async function handleScheduleVisitSubmit() {
-    if (!visitDraft?.visitDate) {
+    if (scheduleSubmitting) return;
+
+    const visitDate = visitDraft?.visitDate;
+    if (!visitDate) {
       setToast('Visit date is required');
       scrollToScheduleMissing([SCHEDULED_PREREQUISITE.visitDate]);
       return;
     }
 
-    const missing = getScheduledPrerequisitesMissing(engagement, visitDraft.visitDate);
+    const missing = getScheduledPrerequisitesMissing(engagement, visitDate, {
+      deliverables,
+      collabReason: engagement.primary_collaboration_reason,
+    });
     if (missing.length > 0) {
       setToast(formatScheduledBlockMessage(missing) ?? 'Complete scheduling requirements');
       scrollToScheduleMissing(missing);
       return;
     }
 
-    const result = transitionStage(
-      engagement,
-      pendingMove?.target ?? STAGE.SCHEDULED,
-      buildScheduledTransitionPayload(engagement, visitDraft),
-    );
-    if (await applyTransition(result, `Scheduled — visit ${formatDate(visitDraft.visitDate)}`)) {
+    setScheduleSubmitting(true);
+    try {
+      const { engagement: updated, deliverables: saved } = await commitScheduleEngagement(
+        engagementId,
+        {
+          visit_date: visitDate,
+          visit_time: toApiVisitTime(visitDraft.visitTime),
+          visit_notes: visitDraft.visitNotes?.trim() || null,
+          visit_outlet_id: resolveEngagementOutletId(engagement),
+          primary_collaboration_reason: engagement.primary_collaboration_reason,
+          notes: engagement.notes?.trim() || null,
+          deliverables: deliverables.map(({ is_overdue: _omit, ...d }) => d),
+        },
+      );
+      setEngagement(updated);
+      setDeliverables(saved ?? []);
+      setVisitDraft(visitFieldsFromEngagement(updated));
+      updateEngagementDeliverables(engagementId, saved ?? []);
+      onUpdated?.();
+      setToast(`Scheduled — visit ${formatDate(visitDate)}`);
       exitScheduleFlow();
       resetMoveUi();
+    } catch (err) {
+      setToast(err.message ?? 'Could not schedule visit');
+    } finally {
+      setScheduleSubmitting(false);
     }
   }
 
@@ -662,30 +737,34 @@ export function CampaignQuickEditDrawer({
       <Drawer
         open={open}
         title={scheduleFlow ? `Schedule visit · ${engagement.contact_name}` : undefined}
-        onClose={onClose}
+        onClose={handleDrawerClose}
         footer={
           scheduleFlow ? (
             <div className="flex items-center justify-between gap-3">
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={() => exitScheduleFlow({ closeDrawer: scheduleMode })}
+                disabled={scheduleSubmitting}
+                onClick={() => {
+                  discardScheduleBaseline();
+                  exitScheduleFlow({ closeDrawer: scheduleMode });
+                }}
               >
                 Cancel
               </button>
               <button
                 type="button"
                 className="btn-primary"
-                disabled={!visitDraft?.visitDate}
+                disabled={!visitDraft?.visitDate || scheduleSubmitting}
                 onClick={handleScheduleVisitSubmit}
               >
-                Schedule visit
+                {scheduleSubmitting ? 'Scheduling…' : 'Schedule visit'}
               </button>
             </div>
           ) : (
             <div className="flex items-center justify-between gap-3">
-              <button type="button" className="btn-secondary" onClick={onClose}>Done</button>
-              <Link to={`/engagements/${engagementId}`} className="btn-ghost text-2xs" onClick={onClose}>
+              <button type="button" className="btn-secondary" onClick={handleDrawerClose}>Done</button>
+              <Link to={`/engagements/${engagementId}`} className="btn-ghost text-2xs" onClick={handleDrawerClose}>
                 Full record →
               </Link>
             </div>
@@ -838,12 +917,14 @@ export function CampaignQuickEditDrawer({
               <select
                 className="input-field h-8"
                 value={engagement.primary_collaboration_reason ?? ''}
-                onChange={(e) =>
-                  persist(
-                    { primary_collaboration_reason: e.target.value || null },
-                    'Reason updated',
-                  )
-                }
+                onChange={(e) => {
+                  const value = e.target.value || null;
+                  if (scheduleFlow) {
+                    setEngagement((prev) => ({ ...prev, primary_collaboration_reason: value }));
+                    return;
+                  }
+                  persist({ primary_collaboration_reason: value }, 'Reason updated');
+                }}
               >
                 {REASON_OPTIONS.map((o) => (
                   <option key={o.value || 'empty'} value={o.value}>{o.label}</option>
@@ -1018,6 +1099,7 @@ export function CampaignQuickEditDrawer({
               placeholder="Quick context for the team…"
               onChange={(e) => setEngagement((prev) => ({ ...prev, notes: e.target.value }))}
               onBlur={(e) => {
+                if (scheduleFlow) return;
                 const notes = e.target.value.trim() || null;
                 if (notes !== (engagement.notes ?? null)) {
                   persist({ notes }, 'Notes saved');

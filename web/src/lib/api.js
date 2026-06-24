@@ -70,6 +70,8 @@ export const engagementsApi = {
   timeline: (id) => api(`/engagements/${id}/timeline`),
   visitReminder: (id, body) =>
     api(`/engagements/${id}/visit-reminder`, { method: 'POST', body: JSON.stringify(body) }),
+  schedule: (id, body) =>
+    api(`/engagements/${id}/schedule`, { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export const registrationsApi = {

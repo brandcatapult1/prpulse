@@ -29,6 +29,7 @@ import {
   recordEngagementPatchActivity,
   recordFeedbackActivity,
 } from '../lib/engagementActivity.mjs';
+import { commitScheduleEngagement } from '../lib/scheduleEngagement.mjs';
 
 export const engagementsRouter = Router();
 
@@ -116,6 +117,18 @@ engagementsRouter.get('/:id', requireAuth, async (req, res) => {
 
 engagementsRouter.patch('/:id', requireAuth, patchEngagement);
 engagementsRouter.patch('/:id/status', requireAuth, patchEngagement);
+
+engagementsRouter.post('/:id/schedule', requireAuth, async (req, res) => {
+  try {
+    const result = await withUserTransaction(req.user.id, async (client) =>
+      commitScheduleEngagement(client, req.user, req.params.id, req.body, loadEngagementRow),
+    );
+    res.json(result);
+  } catch (err) {
+    const status = err.status ?? (err.code === '23514' || err.code === 'check_violation' ? 422 : 500);
+    res.status(status).json({ error: err.message });
+  }
+});
 
 async function loadEngagementRow(client, engagementId) {
   const { rows } = await client.query(

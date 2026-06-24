@@ -50,13 +50,15 @@ export const SCHEDULED_PREREQUISITE = {
 export const SCHEDULED_REQUIRES_DELIVERABLES_MESSAGE =
   'Add at least one deliverable before scheduling';
 
-export function getScheduledPrerequisitesMissing(engagement, visitDate) {
+export function getScheduledPrerequisitesMissing(engagement, visitDate, overrides = {}) {
   const missing = [];
   if (!visitDate) missing.push(SCHEDULED_PREREQUISITE.visitDate);
-  if (getDeliverablesForEngagement(engagement.id).length === 0) {
+  const dels = overrides.deliverables ?? getDeliverablesForEngagement(engagement.id);
+  if (dels.length === 0) {
     missing.push(SCHEDULED_PREREQUISITE.deliverables);
   }
-  if (!engagement.primary_collaboration_reason) {
+  const collabReason = overrides.collabReason ?? engagement.primary_collaboration_reason;
+  if (!collabReason) {
     missing.push(SCHEDULED_PREREQUISITE.collabReason);
   }
   return missing;

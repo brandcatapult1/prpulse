@@ -43,8 +43,9 @@ function inferDiscreteEngagementEvents(before, patch) {
 
   if (
     patch.last_contact_log_type === 'conversation'
+    && patch.last_contact_date
+    && patch.last_contact_date !== before.last_contact_date
     && !patch.initial_contact_date
-    && patch.conversation_status === undefined
   ) {
     events.push({
       action: ACTIVITY_ACTION.CONTACT_REPLIED,

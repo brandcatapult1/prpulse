@@ -31,6 +31,7 @@ import {
 } from '../../lib/outreachLogging.js';
 import { STAGE, transitionStage, formatScheduledBlockMessage, getScheduledPrerequisitesMissing, SCHEDULED_PREREQUISITE } from '../../lib/engagementTransitions.js';
 import { buildVisitDoneTransition, visitDoneToastMessage } from '../../lib/visitLogging.js';
+import { buildRepliedContactLogPatch, repliedContactToastMessage } from '../../lib/contactLogging.js';
 import {
   buildVisitFieldsPatch,
   resolveEngagementOutletId,
@@ -328,6 +329,7 @@ export function CampaignQuickEditDrawer({
   onClose,
   onUpdated,
   scheduleMode = false,
+  scheduleLogContact = false,
   onScheduleModeCleared,
 }) {
   const { user } = useAuth();
@@ -638,6 +640,14 @@ export function CampaignQuickEditDrawer({
       return;
     }
 
+    if (engagement.collaboration_type === 'paid') {
+      const fee = Number(engagement.agreed_fee);
+      if (!fee || Number.isNaN(fee) || fee <= 0) {
+        setToast('Agreed fee is required for paid collabs');
+        return;
+      }
+    }
+
     setScheduleSubmitting(true);
     try {
       const { engagement: updated, deliverables: saved } = await commitScheduleEngagement(
@@ -648,8 +658,14 @@ export function CampaignQuickEditDrawer({
           visit_notes: visitDraft.visitNotes?.trim() || null,
           visit_outlet_id: resolveEngagementOutletId(engagement),
           primary_collaboration_reason: engagement.primary_collaboration_reason,
+          collaboration_type: engagement.collaboration_type,
+          agreed_fee:
+            engagement.collaboration_type === 'paid' && engagement.agreed_fee !== ''
+              ? Number(engagement.agreed_fee)
+              : null,
           notes: engagement.notes?.trim() || null,
           deliverables: deliverables.map(({ is_overdue: _omit, ...d }) => d),
+          ...(scheduleLogContact ? buildRepliedContactLogPatch() : {}),
         },
       );
       setEngagement(updated);
@@ -657,7 +673,11 @@ export function CampaignQuickEditDrawer({
       setVisitDraft(visitFieldsFromEngagement(updated));
       updateEngagementDeliverables(engagementId, saved ?? []);
       onUpdated?.();
-      setToast(`Scheduled — visit ${formatDate(visitDate)}`);
+      setToast(
+        scheduleLogContact
+          ? repliedContactToastMessage(`scheduled visit ${formatDate(visitDate)}`)
+          : `Scheduled — visit ${formatDate(visitDate)}`,
+      );
       exitScheduleFlow();
       resetMoveUi();
     } catch (err) {
@@ -716,19 +736,28 @@ export function CampaignQuickEditDrawer({
   }
 
   function makePaid() {
+    if (scheduleFlow) {
+      setEngagement((prev) => ({ ...prev, collaboration_type: 'paid' }));
+      return;
+    }
     persist({ collaboration_type: 'paid' }, 'Switched to paid');
   }
 
   function makeBarter() {
+    if (scheduleFlow) {
+      setEngagement((prev) => ({ ...prev, collaboration_type: 'barter', agreed_fee: null }));
+      return;
+    }
     persist({ collaboration_type: 'barter', agreed_fee: null }, 'Switched to barter');
   }
 
   function saveAgreedFee(raw) {
     const fee = raw === '' ? null : Number(raw);
     if (collabType === 'paid' && (fee == null || Number.isNaN(fee) || fee <= 0)) {
-      setToast('Agreed fee is required for paid collabs');
+      if (!scheduleFlow) setToast('Agreed fee is required for paid collabs');
       return;
     }
+    if (scheduleFlow) return;
     persist({ agreed_fee: fee }, 'Fee updated');
   }
 

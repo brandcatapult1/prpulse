@@ -146,11 +146,24 @@ export async function commitScheduleEngagement(client, user, engagementId, body,
     next_follow_up_date: body.visit_date,
   };
 
+  if (body.last_contact_date) {
+    patch.last_contact_date = body.last_contact_date;
+    patch.last_contact_log_type = body.last_contact_log_type ?? 'conversation';
+    patch.no_reply_count = body.no_reply_count ?? 0;
+  }
+
   if (body.visit_outlet_id) {
     patch.visit_outlet_id = body.visit_outlet_id;
   } else if (!cur.visit_outlet_id) {
     const outlet = await getDefaultOutletForCampaign(client, cur.campaign_id);
     if (outlet) patch.visit_outlet_id = outlet.id;
+  }
+
+  if (body.collaboration_type != null) {
+    patch.collaboration_type = body.collaboration_type;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'agreed_fee')) {
+    patch.agreed_fee = body.agreed_fee;
   }
 
   if (patch.visit_outlet_id) {

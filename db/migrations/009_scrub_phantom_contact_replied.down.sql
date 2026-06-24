@@ -1,0 +1,1 @@
+-- No-op down: scrubbed rows cannot be restored.

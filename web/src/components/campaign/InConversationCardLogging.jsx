@@ -32,6 +32,10 @@ export function InConversationCardLogging({
     setFollowUpDate('');
   }
 
+  function repliedContactPatch() {
+    return logRepliedContact().patch;
+  }
+
   function apply(patch, message) {
     onApply(patch, message, Object.keys(patch));
     reset();
@@ -48,8 +52,6 @@ export function InConversationCardLogging({
   }
 
   function handleRepliedStart() {
-    const { patch, toastMessage } = logRepliedContact();
-    onApply(patch, toastMessage, Object.keys(patch));
     setStep('replied_where');
   }
 
@@ -60,7 +62,7 @@ export function InConversationCardLogging({
     });
     if (!result.ok) return;
     apply(
-      result.patch,
+      { ...repliedContactPatch(), ...result.patch },
       `Logged — next follow-up ${formatDate(followUpDate)}`,
     );
   }
@@ -79,7 +81,10 @@ export function InConversationCardLogging({
     const result = transitionStage(engagement, STAGE.DROPPED, { dropReason: reason });
     if (!result.ok) return;
     const label = DROP_REASON_OPTIONS.find((o) => o.value === reason)?.label ?? 'Dropped';
-    apply(result.patch, `Moved to Dropped — ${label}`);
+    apply(
+      { ...repliedContactPatch(), ...result.patch },
+      `Moved to Dropped — ${label}`,
+    );
   }
 
   if (step === 'no_reply_date') {
@@ -229,6 +234,10 @@ function ActionButton({ label, onClick, variant = 'primary' }) {
       onClick={onClick}
     >
       {label}
+    </button>
+  );
+}
+el}
     </button>
   );
 }

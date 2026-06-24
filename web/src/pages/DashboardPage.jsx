@@ -534,38 +534,16 @@ function engagementRecordPath(engagementId) {
   return `/engagements/${engagementId}`;
 }
 
-function dashboardRowTone({ isOverdue, situation, urgency }) {
-  if (isOverdue || situation === 'overdue') return 'urgent';
-  if (urgency === 'warning' && typeof situation === 'string' && situation.startsWith('at risk')) {
-    return 'caution';
-  }
-  return 'neutral';
-}
-
-const DASHBOARD_ROW_TONE_RESTING = {
-  neutral: 'bg-transparent',
-  urgent: 'bg-red-50/50',
-  caution: 'bg-amber-50/40',
-};
-
-const DASHBOARD_ROW_HIT_HOVER = {
-  neutral: 'hover:bg-black/[0.04] active:bg-black/[0.07]',
-  urgent: 'hover:bg-red-100/55 active:bg-red-100/70',
-  caution: 'hover:bg-amber-100/50 active:bg-amber-100/65',
-};
-
-function DashboardListRow({ engagementId, tone = 'neutral', onOpen, children, actions }) {
+function DashboardListRow({ engagementId, onOpen, children, actions }) {
   const canOpen = Boolean(engagementRecordPath(engagementId));
 
   return (
-    <li
-      className={`flex items-center gap-3 px-4 py-3 transition-colors ${DASHBOARD_ROW_TONE_RESTING[tone] ?? DASHBOARD_ROW_TONE_RESTING.neutral}`}
-    >
+    <li className="flex items-center gap-3 px-4 py-3 transition-colors">
       <button
         type="button"
         className={`flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/30 ${
           canOpen
-            ? `cursor-pointer ${DASHBOARD_ROW_HIT_HOVER[tone] ?? DASHBOARD_ROW_HIT_HOVER.neutral}`
+            ? 'cursor-pointer hover:bg-black/[0.04] active:bg-black/[0.07]'
             : 'cursor-default'
         }`}
         onClick={() => {
@@ -599,6 +577,13 @@ function urgencyTextClass(urgency) {
   if (urgency === 'danger') return 'text-health-red';
   if (urgency === 'warning') return 'text-health-amber';
   return 'text-ink-tertiary';
+}
+
+function situationTextClass(situation, urgency) {
+  if (situation === 'overdue' || (typeof situation === 'string' && situation.startsWith('overdue'))) {
+    return 'text-health-red';
+  }
+  return urgencyTextClass(urgency);
 }
 
 function ActionButton({ label, onClick, variant = 'outline' }) {
@@ -639,7 +624,6 @@ function TaskRow({ row, onOpen, onLogContact, onVisitDone, onLogDeliverable }) {
   return (
     <DashboardListRow
       engagementId={row.engagementId}
-      tone={dashboardRowTone(row)}
       onOpen={onOpen}
       actions={action}
     >
@@ -649,7 +633,7 @@ function TaskRow({ row, onOpen, onLogContact, onVisitDone, onLogDeliverable }) {
           <>
             {row.campaignName}
             <span className="text-ink-tertiary/60"> · </span>
-            <span className={urgencyTextClass(row.urgency)}>{row.situation}</span>
+            <span className={situationTextClass(row.situation, row.urgency)}>{row.situation}</span>
           </>
         )}
       />
@@ -665,7 +649,6 @@ function VisitRow({ row, onOpen, onRemind, onVisitDone }) {
   return (
     <DashboardListRow
       engagementId={row.engagementId}
-      tone="neutral"
       onOpen={onOpen}
       actions={(
         <>
@@ -683,7 +666,6 @@ function DeliverableRow({ row, onOpen, onLog }) {
   return (
     <DashboardListRow
       engagementId={row.engagementId}
-      tone={dashboardRowTone(row)}
       onOpen={onOpen}
       actions={<ActionButton label="Log deliverable" onClick={onLog} />}
     >
@@ -693,7 +675,7 @@ function DeliverableRow({ row, onOpen, onLog }) {
           <>
             <span className="capitalize">{row.deliverableType}</span>
             <span className="text-ink-tertiary/60"> · </span>
-            <span className={urgencyTextClass(row.urgency)}>{row.situation}</span>
+            <span className={situationTextClass(row.situation, row.urgency)}>{row.situation}</span>
           </>
         )}
       />
@@ -713,7 +695,6 @@ function AtRiskRow({ row, onOpen, onLogContact, onVisitDone }) {
   return (
     <DashboardListRow
       engagementId={row.engagementId}
-      tone="neutral"
       onOpen={onOpen}
       actions={action}
     >

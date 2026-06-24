@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../components/ui/DataKit.jsx';
-import { ConfirmDialog, Drawer, EmptyState, Modal, Toast } from '../components/ui/Primitives.jsx';
+import { Drawer, EmptyState, Toast } from '../components/ui/Primitives.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { Pill, formatDate } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
@@ -196,7 +196,7 @@ export function RegistrationsPage() {
         onMarkDuplicate={(contactId) => selected && handleMarkDuplicate(selected, contactId)}
       />
 
-      <Modal
+      <Drawer
         open={Boolean(approveChoice)}
         title="Mobile number already exists"
         onClose={() => setApproveChoice(null)}
@@ -232,7 +232,7 @@ export function RegistrationsPage() {
             {' '}({approveChoice.match.mobile_number}). Choose how to proceed.
           </p>
         )}
-      </Modal>
+      </Drawer>
 
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Modal } from '../ui/Primitives.jsx';
+import { Drawer } from '../ui/Primitives.jsx';
 import { brandsApi, campaignsApi } from '../../lib/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import {
@@ -117,7 +117,7 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
   }
 
   return (
-    <Modal
+    <Drawer
       open={open}
       title="New campaign"
       onClose={onClose}
@@ -279,6 +279,6 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
           </select>
         </label>
       </div>
-    </Modal>
+    </Drawer>
   );
 }

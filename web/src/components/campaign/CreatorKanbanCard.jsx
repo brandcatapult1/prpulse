@@ -17,7 +17,7 @@ import {
 } from '../../lib/campaignKanban.js';
 import { droppedFromLabel, isDidntDeliverDrop, resolveDroppedFrom } from '../../lib/dropTransitions.js';
 import { isContactBlacklisted } from '../../lib/contactsHelpers.js';
-import { InConversationLoggingTrigger } from './ContactLoggingPanel.jsx';
+import { InConversationCardLogging } from './InConversationCardLogging.jsx';
 import { ScheduledCardLogging } from './ScheduledCardLogging.jsx';
 import { AwaitingDeliverablesCardLogging } from './AwaitingDeliverablesCardLogging.jsx';
 import { NotContactedCardLogging } from './NotContactedCardLogging.jsx';
@@ -280,7 +280,7 @@ function CreatorCardHeader({ engagement }) {
 
 /**
  * Glanceable creator summary for the campaign Kanban board.
- * Card body opens quick-edit drawer; in-conversation cards open ContactLoggingPanel on action.
+ * Card body opens quick-edit drawer; in-conversation cards log contact inline.
  */
 export function CreatorKanbanCard({
   engagement,
@@ -291,6 +291,9 @@ export function CreatorKanbanCard({
   onApplyReopen,
   onApplyContactFeedback,
   onRequestSchedule,
+  onOpenDrawer,
+  onRequestProof,
+  onRequestFeedback,
   onLoggingError,
   userRole,
   boardRevision,
@@ -352,7 +355,7 @@ export function CreatorKanbanCard({
       )}
 
       {showInConversationLogging && onApplyLogging && (
-        <InConversationLoggingTrigger
+        <InConversationCardLogging
           engagement={engagement}
           onApply={onApplyLogging}
           onError={onLoggingError}
@@ -365,6 +368,7 @@ export function CreatorKanbanCard({
           engagement={engagement}
           onApply={onApplyLogging}
           onError={onLoggingError}
+          onOpenDrawer={onOpenDrawer}
         />
       )}
 
@@ -389,12 +393,12 @@ export function CreatorKanbanCard({
         />
       )}
 
-      {showCompleteLogging && onApplyContactFeedback && (
+      {showCompleteLogging && (
         <CompleteCardLogging
           engagement={engagement}
           boardRevision={boardRevision}
-          onApplyContactFeedback={onApplyContactFeedback}
-          onError={onLoggingError}
+          onRequestProof={onRequestProof}
+          onRequestFeedback={onRequestFeedback}
         />
       )}
     </div>

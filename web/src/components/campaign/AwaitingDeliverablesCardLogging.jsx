@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { ConfirmDialog, Modal } from '../ui/Primitives.jsx';
+import { LogDeliverableDrawer } from '../deliverables/LogDeliverableDrawer.jsx';
+import { InlineCardConfirm } from '../ui/InlineCardConfirm.jsx';
 import { getDeliverablesForEngagement } from '../../lib/deliverablesCache.js';
 import { canMarkDidntDeliver } from '../../lib/campaignPermissions.js';
 import { deliverableProgress } from '../../lib/campaignKanban.js';
@@ -15,7 +16,6 @@ import {
   STAGE,
   transitionStage,
 } from '../../lib/engagementTransitions.js';
-import { LogDeliverablePanel } from './LogDeliverablePanel.jsx';
 
 function deliverableLabel(d) {
   const qty = deliverableTotalUnits(d);
@@ -40,9 +40,7 @@ export function AwaitingDeliverablesCardLogging({
   onError,
 }) {
   const [loggingDeliverableId, setLoggingDeliverableId] = useState(null);
-  const [logAnchorEl, setLogAnchorEl] = useState(null);
-  const [completeOpen, setCompleteOpen] = useState(false);
-  const [didntDeliverOpen, setDidntDeliverOpen] = useState(false);
+  const [step, setStep] = useState('idle');
   const [blacklistOnDrop, setBlacklistOnDrop] = useState(false);
 
   const deliverables = useMemo(
@@ -57,28 +55,20 @@ export function AwaitingDeliverablesCardLogging({
   const showDidntDeliver = canMarkDidntDeliver(userRole);
   const loggingDeliverable = deliverables.find((d) => d.id === loggingDeliverableId) ?? null;
 
-  function closeLogPanel() {
-    setLoggingDeliverableId(null);
-    setLogAnchorEl(null);
-  }
-
   function handleLogDeliverable(nextDeliverable) {
     const nextList = deliverables.map((d) => (d.id === nextDeliverable.id ? nextDeliverable : d));
-    onApplyDeliverables(
-      nextList,
-      markDeliverablePostedToastMessage(nextDeliverable),
-    );
+    onApplyDeliverables(nextList, markDeliverablePostedToastMessage(nextDeliverable));
   }
 
   function handleMarkComplete() {
     const result = transitionStage(engagement, STAGE.COMPLETE);
     if (!result.ok) {
       onError?.(result.error ?? 'Could not mark complete');
-      setCompleteOpen(false);
+      setStep('idle');
       return;
     }
     onApplyEngagement(result.patch, 'Collaboration marked complete', Object.keys(result.patch));
-    setCompleteOpen(false);
+    setStep('idle');
   }
 
   function handleDidntDeliver() {
@@ -88,7 +78,7 @@ export function AwaitingDeliverablesCardLogging({
     });
     if (!result.ok) {
       onError?.(result.error ?? 'Could not mark didn\'t deliver');
-      setDidntDeliverOpen(false);
+      setStep('idle');
       return;
     }
     onApplyDidntDeliver({
@@ -98,8 +88,50 @@ export function AwaitingDeliverablesCardLogging({
         ? "Didn't Deliver — creator blacklisted"
         : "Didn't Deliver — moved to Dropped",
     });
-    setDidntDeliverOpen(false);
+    setStep('idle');
     setBlacklistOnDrop(false);
+  }
+
+  if (step === 'confirm_complete') {
+    return (
+      <LoggingPanel>
+        <InlineCardConfirm
+          title="Mark collaboration complete?"
+          body="All deliverables are posted with proof on file."
+          confirmLabel="Mark complete"
+          onConfirm={handleMarkComplete}
+          onCancel={() => setStep('idle')}
+        />
+      </LoggingPanel>
+    );
+  }
+
+  if (step === 'confirm_didnt_deliver') {
+    return (
+      <LoggingPanel>
+        <InlineCardConfirm
+          title="Mark didn't deliver?"
+          body="Moves this creator to Dropped with reason Didn't Deliver."
+          confirmLabel="Confirm"
+          danger
+          onConfirm={handleDidntDeliver}
+          onCancel={() => {
+            setStep('idle');
+            setBlacklistOnDrop(false);
+          }}
+        >
+          <label className="flex items-start gap-2 text-[11px] text-ink-secondary">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={blacklistOnDrop}
+              onChange={(e) => setBlacklistOnDrop(e.target.checked)}
+            />
+            <span>Also blacklist this creator on their contact record</span>
+          </label>
+        </InlineCardConfirm>
+      </LoggingPanel>
+    );
   }
 
   return (
@@ -130,10 +162,7 @@ export function AwaitingDeliverablesCardLogging({
                     <button
                       type="button"
                       className="flex w-full items-center gap-2 rounded-md border border-line bg-white px-2 py-1.5 text-left text-[11px] hover:border-brand/40"
-                      onClick={(e) => {
-                        setLogAnchorEl(e.currentTarget);
-                        setLoggingDeliverableId(d.id);
-                      }}
+                      onClick={() => setLoggingDeliverableId(d.id)}
                     >
                       <span className="text-ink-tertiary" aria-hidden>○</span>
                       <span className="capitalize text-ink">{deliverableLabel(d)}</span>
@@ -149,7 +178,7 @@ export function AwaitingDeliverablesCardLogging({
             <button
               type="button"
               className="btn-primary mt-2 w-full !py-1.5 text-[11px]"
-              onClick={() => setCompleteOpen(true)}
+              onClick={() => setStep('confirm_complete')}
             >
               Mark Collaboration Complete
             </button>
@@ -159,7 +188,7 @@ export function AwaitingDeliverablesCardLogging({
             <button
               type="button"
               className="btn-ghost mt-2 w-full !py-1 text-[11px] text-health-red"
-              onClick={() => setDidntDeliverOpen(true)}
+              onClick={() => setStep('confirm_didnt_deliver')}
             >
               Mark Didn&apos;t Deliver
             </button>
@@ -167,61 +196,12 @@ export function AwaitingDeliverablesCardLogging({
         </div>
       </LoggingPanel>
 
-      <LogDeliverablePanel
+      <LogDeliverableDrawer
         deliverable={loggingDeliverable}
         open={Boolean(loggingDeliverable)}
-        anchorEl={logAnchorEl}
-        onClose={closeLogPanel}
+        onClose={() => setLoggingDeliverableId(null)}
         onConfirm={handleLogDeliverable}
       />
-
-      <ConfirmDialog
-        open={completeOpen}
-        title="Mark Collaboration Complete?"
-        body="All deliverables are posted with proof on file. Confirm to close this collaboration."
-        confirmLabel="Mark complete"
-        onConfirm={handleMarkComplete}
-        onCancel={() => setCompleteOpen(false)}
-      />
-
-      <Modal
-        open={didntDeliverOpen}
-        title="Mark Didn't Deliver?"
-        onClose={() => {
-          setDidntDeliverOpen(false);
-          setBlacklistOnDrop(false);
-        }}
-        footer={
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => {
-                setDidntDeliverOpen(false);
-                setBlacklistOnDrop(false);
-              }}
-            >
-              Cancel
-            </button>
-            <button type="button" className="btn-primary" onClick={handleDidntDeliver}>
-              Confirm
-            </button>
-          </div>
-        }
-      >
-        <p className="text-2xs text-ink-secondary">
-          Moves this creator to Dropped with reason Didn&apos;t Deliver.
-        </p>
-        <label className="mt-4 flex items-start gap-2 text-2xs text-ink-secondary">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={blacklistOnDrop}
-            onChange={(e) => setBlacklistOnDrop(e.target.checked)}
-          />
-          <span>Also blacklist this creator on their contact record</span>
-        </label>
-      </Modal>
     </>
   );
 }

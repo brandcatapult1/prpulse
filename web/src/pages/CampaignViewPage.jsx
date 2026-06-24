@@ -24,6 +24,10 @@ import {
   fetchDeliverables,
 } from '../lib/persistence.js';
 import { setDeliverablesCache, updateEngagementDeliverables } from '../lib/deliverablesCache.js';
+import { BoardFeedbackDrawer } from '../components/feedback/FeedbackDrawer.jsx';
+import { DeliverableProofDrawer } from '../components/deliverables/DeliverableProofDrawer.jsx';
+import { buildContactFeedbackUpdate, contactFeedbackToastMessage } from '../lib/contactFeedbackLogging.js';
+import { getContactProfileExtras } from '../lib/contactProfile.js';
 import { mergeContactsCache } from '../lib/contactsCache.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -58,6 +62,8 @@ export function CampaignViewPage() {
   const [viewMode, setViewMode] = useState('board');
   const [quickEditId, setQuickEditId] = useState(null);
   const [scheduleIntent, setScheduleIntent] = useState(false);
+  const [proofEngagement, setProofEngagement] = useState(null);
+  const [feedbackEngagement, setFeedbackEngagement] = useState(null);
   const [toast, setToast] = useState(null);
   const [boardRevision, setBoardRevision] = useState(0);
 
@@ -81,6 +87,14 @@ export function CampaignViewPage() {
   useEffect(() => {
     reload();
   }, [id, location.key, reload]);
+
+  useEffect(() => {
+    const scheduleId = location.state?.scheduleEngagementId;
+    if (!scheduleId) return;
+    setScheduleIntent(true);
+    setQuickEditId(scheduleId);
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [location.state, location.pathname, navigate]);
 
   const filteredEngagements = useMemo(
     () => filterCampaignEngagements(engagements, activeFilters),
@@ -296,6 +310,12 @@ export function CampaignViewPage() {
             setScheduleIntent(true);
             setQuickEditId(row.id);
           }}
+          onOpenDrawer={(row) => {
+            setScheduleIntent(false);
+            setQuickEditId(row.id);
+          }}
+          onRequestProof={(row) => setProofEngagement(row)}
+          onRequestFeedback={(row) => setFeedbackEngagement(row)}
           onApplyLogging={applyEngagementLogging}
           onApplyDeliverables={applyDeliverablesLogging}
           onApplyDidntDeliver={applyDidntDeliverLogging}
@@ -324,6 +344,36 @@ export function CampaignViewPage() {
         }}
         onScheduleModeCleared={() => setScheduleIntent(false)}
         onUpdated={reload}
+      />
+
+      <DeliverableProofDrawer
+        engagementId={proofEngagement?.id}
+        contactName={proofEngagement?.contact_name}
+        open={Boolean(proofEngagement)}
+        onClose={() => setProofEngagement(null)}
+      />
+
+      <BoardFeedbackDrawer
+        open={Boolean(feedbackEngagement)}
+        contactName={feedbackEngagement?.contact_name ?? ''}
+        contactId={feedbackEngagement?.contact_id}
+        onClose={() => setFeedbackEngagement(null)}
+        onSubmit={({ rating, wouldWorkAgain, note }) => {
+          if (!feedbackEngagement) return;
+          const existing = getContactProfileExtras(feedbackEngagement.contact_id);
+          const { contactProfilePatch, engagementFeedback } = buildContactFeedbackUpdate(existing, {
+            rating,
+            wouldWorkAgain,
+            note,
+          });
+          applyContactFeedbackLogging(feedbackEngagement.id, {
+            contactId: feedbackEngagement.contact_id,
+            contactProfilePatch,
+            engagementFeedback,
+            message: contactFeedbackToastMessage(rating, wouldWorkAgain),
+          });
+          setFeedbackEngagement(null);
+        }}
       />
 
       <AddCreatorsDrawer

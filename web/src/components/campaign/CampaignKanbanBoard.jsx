@@ -5,6 +5,9 @@ export function CampaignKanbanBoard({
   engagements,
   onCardClick,
   onRequestSchedule,
+  onOpenDrawer,
+  onRequestProof,
+  onRequestFeedback,
   onApplyLogging,
   onApplyDeliverables,
   onApplyDidntDeliver,
@@ -55,6 +58,9 @@ export function CampaignKanbanBoard({
                       onApplyContactFeedback?.(engagement.id, payload)
                     }
                     onRequestSchedule={() => onRequestSchedule?.(engagement)}
+                    onOpenDrawer={() => onOpenDrawer?.(engagement)}
+                    onRequestProof={() => onRequestProof?.(engagement)}
+                    onRequestFeedback={() => onRequestFeedback?.(engagement)}
                     onLoggingError={onLoggingError}
                   />
                 ))

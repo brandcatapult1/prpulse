@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Modal, Toast } from '../ui/Primitives.jsx';
+import { Drawer, Toast } from '../ui/Primitives.jsx';
 import { contactsApi, campaignsApi } from '../../lib/api.js';
 import { populateCampaign } from '../../lib/persistence.js';
 import { mergeContactsCache } from '../../lib/contactsCache.js';
@@ -115,7 +115,7 @@ export function QuickAddModal({ open, onClose, onSaved, defaultCampaignId = '' }
 
   return (
     <>
-      <Modal
+      <Drawer
         open={open}
         title="Quick add contact"
         onClose={onClose}
@@ -175,7 +175,7 @@ export function QuickAddModal({ open, onClose, onSaved, defaultCampaignId = '' }
             </select>
           </label>
         </div>
-      </Modal>
+      </Drawer>
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </>
   );

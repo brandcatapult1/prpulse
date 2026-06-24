@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Modal } from '../ui/Primitives.jsx';
+import { InlineCardConfirm } from '../ui/InlineCardConfirm.jsx';
 import { isContactBlacklisted } from '../../lib/contactsHelpers.js';
 import { canReopenDropped, droppedFromLabel, isDidntDeliverDrop } from '../../lib/dropTransitions.js';
 import { reopenToastMessage } from '../../lib/outreachLogging.js';
 import { resolveDroppedFrom, STAGE, transitionStage } from '../../lib/engagementTransitions.js';
 
 export function DroppedCardLogging({ engagement, userRole, onApplyReopen, onError }) {
-  const [reopenOpen, setReopenOpen] = useState(false);
+  const [step, setStep] = useState('idle');
   const [clearBlacklist, setClearBlacklist] = useState(false);
 
   const droppedFrom = resolveDroppedFrom(engagement);
@@ -22,7 +22,7 @@ export function DroppedCardLogging({ engagement, userRole, onApplyReopen, onErro
     });
     if (!result.ok) {
       onError?.(result.error ?? 'Could not reopen');
-      setReopenOpen(false);
+      setStep('idle');
       return;
     }
     onApplyReopen({
@@ -30,77 +30,63 @@ export function DroppedCardLogging({ engagement, userRole, onApplyReopen, onErro
       clearBlacklist: result.clearBlacklist && needsBlacklistPrompt && clearBlacklist,
       message: reopenToastMessage(droppedFromLabel(droppedFrom)),
     });
-    setReopenOpen(false);
+    setStep('idle');
     setClearBlacklist(false);
   }
 
-  return (
-    <>
+  if (step === 'confirm_reopen') {
+    return (
       <LoggingPanel>
-        <div className="max-md:block md:hidden md:group-hover/card:block">
-          {isDidntDeliver && droppedFrom && (
-            <p className="mb-2 text-[11px] text-ink-secondary">
-              Failed at: {droppedFromLabel(droppedFrom)}
-            </p>
+        <InlineCardConfirm
+          title="Reopen engagement?"
+          body={`Return to ${droppedFromLabel(droppedFrom)}?`}
+          confirmLabel="Reopen"
+          onConfirm={handleReopenConfirm}
+          onCancel={() => {
+            setStep('idle');
+            setClearBlacklist(false);
+          }}
+        >
+          {needsBlacklistPrompt && (
+            <label className="flex items-start gap-2 text-[11px] text-ink-secondary">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={clearBlacklist}
+                onChange={(e) => setClearBlacklist(e.target.checked)}
+              />
+              <span>Clear blacklist on this creator&apos;s contact record</span>
+            </label>
           )}
-          {blacklisted && (
-            <p className="mb-2 text-[11px] font-medium text-health-red">Blacklisted</p>
-          )}
-          {canReopen ? (
-            <button
-              type="button"
-              className="btn-secondary w-full !py-1 text-[11px]"
-              onClick={() => setReopenOpen(true)}
-            >
-              Reopen
-            </button>
-          ) : (
-            <p className="text-[11px] text-ink-tertiary">Reopen requires Senior Manager or Admin</p>
-          )}
-        </div>
+        </InlineCardConfirm>
       </LoggingPanel>
+    );
+  }
 
-      <Modal
-        open={reopenOpen}
-        title="Reopen engagement?"
-        onClose={() => {
-          setReopenOpen(false);
-          setClearBlacklist(false);
-        }}
-        footer={
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => {
-                setReopenOpen(false);
-                setClearBlacklist(false);
-              }}
-            >
-              Cancel
-            </button>
-            <button type="button" className="btn-primary" onClick={handleReopenConfirm}>
-              Reopen
-            </button>
-          </div>
-        }
-      >
-        <p className="text-2xs text-ink-secondary">
-          Return to <span className="font-medium text-ink">{droppedFromLabel(droppedFrom)}</span>?
-        </p>
-        {needsBlacklistPrompt && (
-          <label className="mt-4 flex items-start gap-2 text-2xs text-ink-secondary">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={clearBlacklist}
-              onChange={(e) => setClearBlacklist(e.target.checked)}
-            />
-            <span>Clear blacklist on this creator&apos;s contact record</span>
-          </label>
+  return (
+    <LoggingPanel>
+      <div className="max-md:block md:hidden md:group-hover/card:block">
+        {isDidntDeliver && droppedFrom && (
+          <p className="mb-2 text-[11px] text-ink-secondary">
+            Failed at: {droppedFromLabel(droppedFrom)}
+          </p>
         )}
-      </Modal>
-    </>
+        {blacklisted && (
+          <p className="mb-2 text-[11px] font-medium text-health-red">Blacklisted</p>
+        )}
+        {canReopen ? (
+          <button
+            type="button"
+            className="btn-secondary w-full !py-1 text-[11px]"
+            onClick={() => setStep('confirm_reopen')}
+          >
+            Reopen
+          </button>
+        ) : (
+          <p className="text-[11px] text-ink-tertiary">Reopen requires Senior Manager or Admin</p>
+        )}
+      </div>
+    </LoggingPanel>
   );
 }
 

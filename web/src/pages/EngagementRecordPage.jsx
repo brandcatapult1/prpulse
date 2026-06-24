@@ -2,14 +2,15 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   Card,
+  Drawer,
   EmptyState,
-  Modal,
   Toast,
 } from '../components/ui/Primitives.jsx';
 import { RatingStars, StatusButton } from '../components/ui/DataKit.jsx';
 import { DeliverableRow } from '../components/deliverables/DeliverableProofSection.jsx';
 import { DeliverableTypeButtons, deliverableTypeLabel } from '../components/deliverables/DeliverableTypeButtons.jsx';
-import { FeedbackModal } from '../components/feedback/FeedbackModal.jsx';
+import { FeedbackDrawer } from '../components/feedback/FeedbackDrawer.jsx';
+import { VisitDrawer } from '../components/visit/VisitDrawer.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import {
   Pill,
@@ -577,7 +578,7 @@ export function EngagementRecordPage() {
         </Card>
       </div>
 
-      <DeliverablesModal
+      <DeliverablesDrawer
         open={modal === 'deliverables'}
         onClose={() => setModal(null)}
         contactName={engagement.contact_name}
@@ -593,7 +594,7 @@ export function EngagementRecordPage() {
         onSaved={() => setToast('Proof saved')}
       />
 
-      <FeedbackModal
+      <FeedbackDrawer
         open={modal === 'feedback'}
         onClose={() => setModal(null)}
         contactName={engagement.contact_name}
@@ -607,7 +608,7 @@ export function EngagementRecordPage() {
         }}
       />
 
-      <VisitModal
+      <VisitDrawer
         open={modal === 'visit'}
         onClose={() => setModal(null)}
         contactName={engagement.contact_name}
@@ -629,7 +630,7 @@ export function EngagementRecordPage() {
         }}
       />
 
-      <TimelineModal
+      <TimelineDrawer
         open={modal === 'timeline'}
         onClose={() => setModal(null)}
         contactName={engagement.contact_name}
@@ -773,7 +774,7 @@ function FollowUpField({ value, suggestion, editable, lockedHint, onChange, onAc
   );
 }
 
-function DeliverablesModal({
+function DeliverablesDrawer({
   open,
   onClose,
   contactName,
@@ -789,7 +790,7 @@ function DeliverablesModal({
   onSaved,
 }) {
   return (
-    <Modal
+    <Drawer
       open={open}
       title={`All deliverables · ${contactName}`}
       onClose={onClose}
@@ -834,13 +835,13 @@ function DeliverablesModal({
           ))}
         </div>
       )}
-    </Modal>
+    </Drawer>
   );
 }
 
-function TimelineModal({ open, onClose, contactName, entries }) {
+function TimelineDrawer({ open, onClose, contactName, entries }) {
   return (
-    <Modal
+    <Drawer
       open={open}
       title={`Timeline · ${contactName}`}
       onClose={onClose}
@@ -874,7 +875,7 @@ function TimelineModal({ open, onClose, contactName, entries }) {
           );
         })}
       </div>
-    </Modal>
+    </Drawer>
   );
 }
 

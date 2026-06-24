@@ -20,14 +20,15 @@ Act as a senior UI designer: **premium, restrained, easy-to-use** for daily powe
 - **Campaign health** — always `HealthBadge` (dot + human label); never print raw colour names (`green`/`amber`/`red`).
 
 ## Structure
-- **Build the primitive component kit first**, then compose every screen from it: `AppShell`, `DataTable`, `FilterBar`, `Drawer`, `Modal`, `SidePanel`, `ExpandableSection`, `StatusButton`, `QuickAction`, `Card`, `Pill`/`Tag`, `HealthBadge`, `RatingStars`, `Toast`, `EmptyState`, `Skeleton`, `ConfirmDialog`. Do not invent per-screen form layouts.
-- **Progressive disclosure:** no screen shows all of an entity's fields. Secondary workflows open in `Drawer`/`Modal`/`SidePanel`. **Drawers are one level deep**; on mobile they are full-screen sheets — never stack a second drawer.
+- **Build the primitive component kit first**, then compose every screen from it: `AppShell`, `DataTable`, `FilterBar`, `Drawer`, `SidePanel`, `ExpandableSection`, `StatusButton`, `QuickAction`, `Card`, `Pill`/`Tag`, `HealthBadge`, `RatingStars`, `Toast`, `EmptyState`, `Skeleton`, `InlineCardConfirm`. Do not invent per-screen form layouts.
+- **No floating popups:** light/vital actions render **inline within the card or row** (contact-log choices, branch buttons, single-step confirms). Anything requiring heavier or multi-field input opens in the **side drawer** (schedule visit, log deliverable with proof, feedback, visit capture, deliverables editor, timeline, create forms). Never use centered modals or anchored popovers for user input.
+- **Progressive disclosure:** no screen shows all of an entity's fields. Secondary workflows open in `Drawer`/`SidePanel`. **Drawers are one level deep**; on mobile they are full-screen sheets — never stack a second drawer.
 - **Engagement Record stays compact:** main view = Contact, Campaign, Status, Interest, Owner, Last Contact, Next Follow-up, Agreed Fee, Notes. Deliverables / Feedback / Visit / Timeline are **drawers**, never inline sections.
 - Records are **read-first** with an explicit Edit affordance. Buttons over typing.
 
 ## Mirror the DB guards in the UI (don't duplicate logic — reflect state)
 - Disable **Collaboration Complete** until ≥1 deliverable exists and all are `Posted`; show the blocking reason.
-- Selecting **Scheduled** requires visit date, ≥1 deliverable, and **collab reason**; block message names missing prerequisites. Visit modal captures date; on save, `next_follow_up_date = visit_date`.
+- Selecting **Scheduled** requires visit date, ≥1 deliverable, and **collab reason**; block message names missing prerequisites. Schedule flow opens in the campaign quick-edit **drawer**; on save, `next_follow_up_date = visit_date`.
 - Agreed Fee / Collaboration Type render **read-only while Completed** (lock + "Reopen to amend").
 - **Overdue** is a computed badge from `v_deliverables`, never a status choice.
 

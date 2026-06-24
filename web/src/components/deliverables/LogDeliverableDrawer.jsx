@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AnchoredPanel } from '../ui/OverlayPortal.jsx';
-import { Modal } from '../ui/Primitives.jsx';
+import { Drawer } from '../ui/Primitives.jsx';
 import {
   buildUnitPostedPatch,
   canMarkDeliverablePosted,
@@ -10,7 +9,7 @@ import {
 } from '../../lib/deliverableLogging.js';
 import { todayIso } from '../../lib/dates.js';
 
-function deliverablePanelTitle(deliverable) {
+function deliverableDrawerTitle(deliverable) {
   const typeLabel = `${deliverable.deliverable_type} ×${deliverableTotalUnits(deliverable)}`;
   const nextUnit = deliverablePostedUnits(deliverable) + 1;
   const totalUnits = deliverableTotalUnits(deliverable);
@@ -19,7 +18,7 @@ function deliverablePanelTitle(deliverable) {
     : `Log deliverable · ${typeLabel}`;
 }
 
-function LogDeliverableForm({
+export function LogDeliverableForm({
   deliverable,
   contentLink,
   setContentLink,
@@ -27,12 +26,9 @@ function LogDeliverableForm({
   setScreenshots,
   publishedDate,
   setPublishedDate,
-  compact = false,
 }) {
   const fileRef = useRef(null);
   const emphasis = deliverableProofEmphasis(deliverable.deliverable_type);
-  const labelClass = compact ? 'text-[11px]' : 'text-2xs';
-  const inputClass = compact ? 'input-field mt-1 w-full text-2xs' : 'input-field mt-1 w-full text-sm';
 
   function handleFiles(event) {
     const files = Array.from(event.target.files ?? []);
@@ -46,18 +42,18 @@ function LogDeliverableForm({
   }
 
   return (
-    <div className={compact ? 'space-y-3' : 'space-y-4'}>
-      <p className={`${labelClass} text-ink-secondary`}>
+    <div className="space-y-4">
+      <p className="text-2xs text-ink-secondary">
         Add a post link and/or screenshot — at least one is required.
       </p>
 
-      <label className={`block ${labelClass} text-ink-secondary`}>
+      <label className="block text-2xs text-ink-secondary">
         <span className={emphasis.screenshotPrimary ? 'font-normal text-ink-tertiary' : 'font-medium text-ink'}>
           {emphasis.linkLabel}
         </span>
         <input
           type="url"
-          className={inputClass}
+          className="input-field mt-1 w-full text-sm"
           placeholder="https://instagram.com/…"
           value={contentLink}
           onChange={(e) => setContentLink(e.target.value)}
@@ -66,18 +62,14 @@ function LogDeliverableForm({
 
       <div>
         <span
-          className={`mb-1.5 block ${labelClass} ${
+          className={`mb-1.5 block text-2xs ${
             emphasis.screenshotPrimary ? 'font-medium text-ink' : 'text-ink-secondary'
           }`}
         >
           {emphasis.screenshotLabel}
         </span>
         <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFiles} />
-        <button
-          type="button"
-          className={compact ? 'btn-secondary !py-1 text-[11px]' : 'btn-secondary text-2xs'}
-          onClick={() => fileRef.current?.click()}
-        >
+        <button type="button" className="btn-secondary text-2xs" onClick={() => fileRef.current?.click()}>
           Upload screenshot
         </button>
         {screenshots.length > 0 && (
@@ -85,7 +77,7 @@ function LogDeliverableForm({
             {screenshots.map((shot) => (
               <li
                 key={shot.id}
-                className={`flex items-center justify-between rounded-md border border-line px-2 py-1 ${labelClass}`}
+                className="flex items-center justify-between rounded-md border border-line px-2 py-1 text-2xs"
               >
                 <span className="truncate">{shot.label}</span>
                 <button
@@ -101,11 +93,11 @@ function LogDeliverableForm({
         )}
       </div>
 
-      <label className={`block ${labelClass} text-ink-secondary`}>
+      <label className="block text-2xs text-ink-secondary">
         Posted date
         <input
           type="date"
-          className={inputClass}
+          className="input-field mt-1 w-full text-sm"
           value={publishedDate}
           onChange={(e) => setPublishedDate(e.target.value)}
         />
@@ -114,30 +106,11 @@ function LogDeliverableForm({
   );
 }
 
-function usePrefersAnchoredPanel(anchorEl) {
-  const [isMobile, setIsMobile] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches,
-  );
-
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 767px)');
-    const update = () => setIsMobile(mq.matches);
-    mq.addEventListener('change', update);
-    return () => mq.removeEventListener('change', update);
-  }, []);
-
-  return Boolean(anchorEl) && !isMobile;
-}
-
-/**
- * One-level panel to log a single deliverable as posted with proof.
- * Pass anchorEl on kanban cards for a portaled popover anchored to the trigger.
- */
-export function LogDeliverablePanel({ deliverable, open, onClose, onConfirm, anchorEl = null }) {
+/** Side drawer for logging a deliverable as posted with proof. */
+export function LogDeliverableDrawer({ deliverable, open, onClose, onConfirm }) {
   const [contentLink, setContentLink] = useState('');
   const [screenshots, setScreenshots] = useState([]);
   const [publishedDate, setPublishedDate] = useState(todayIso());
-  const useAnchored = usePrefersAnchoredPanel(anchorEl);
 
   useEffect(() => {
     if (!deliverable?.id || !open) return;
@@ -146,11 +119,9 @@ export function LogDeliverablePanel({ deliverable, open, onClose, onConfirm, anc
     setPublishedDate(todayIso());
   }, [open, deliverable?.id]);
 
-  if (!deliverable || !open) return null;
+  if (!deliverable) return null;
 
   const canSubmit = canMarkDeliverablePosted({ contentLink, screenshots });
-  const title = deliverablePanelTitle(deliverable);
-  const compact = Boolean(anchorEl);
 
   function resetAndClose() {
     setContentLink('');
@@ -170,63 +141,31 @@ export function LogDeliverablePanel({ deliverable, open, onClose, onConfirm, anc
     resetAndClose();
   }
 
-  const form = (
-    <LogDeliverableForm
-      deliverable={deliverable}
-      contentLink={contentLink}
-      setContentLink={setContentLink}
-      screenshots={screenshots}
-      setScreenshots={setScreenshots}
-      publishedDate={publishedDate}
-      setPublishedDate={setPublishedDate}
-      compact={compact}
-    />
-  );
-
-  const footer = (
-    <div className={compact ? 'mt-2 flex gap-1' : 'flex justify-end gap-2'}>
-      <button
-        type="button"
-        className={compact ? 'btn-secondary flex-1 !py-1 text-[11px]' : 'btn-secondary'}
-        onClick={resetAndClose}
-      >
-        Cancel
-      </button>
-      <button
-        type="button"
-        className={compact ? 'btn-primary flex-1 !py-1 text-[11px]' : 'btn-primary'}
-        disabled={!canSubmit}
-        onClick={handleConfirm}
-      >
-        Mark posted
-      </button>
-    </div>
-  );
-
-  if (useAnchored) {
-    return (
-      <AnchoredPanel open={open} anchorEl={anchorEl} onClose={resetAndClose} width={300}>
-        <div className="p-3">
-          <div className="mb-2 flex items-start justify-between gap-2">
-            <h4 className="text-[11px] font-medium text-ink">{title}</h4>
-            <button type="button" onClick={resetAndClose} className="text-ink-tertiary hover:text-ink">×</button>
-          </div>
-          {form}
-          {footer}
-        </div>
-      </AnchoredPanel>
-    );
-  }
-
   return (
-    <Modal
+    <Drawer
       open={open}
-      mobileSheet
-      title={title}
+      title={deliverableDrawerTitle(deliverable)}
       onClose={resetAndClose}
-      footer={footer}
+      footer={
+        <div className="flex justify-end gap-2">
+          <button type="button" className="btn-secondary" onClick={resetAndClose}>
+            Cancel
+          </button>
+          <button type="button" className="btn-primary" disabled={!canSubmit} onClick={handleConfirm}>
+            Mark posted
+          </button>
+        </div>
+      }
     >
-      {form}
-    </Modal>
+      <LogDeliverableForm
+        deliverable={deliverable}
+        contentLink={contentLink}
+        setContentLink={setContentLink}
+        screenshots={screenshots}
+        setScreenshots={setScreenshots}
+        publishedDate={publishedDate}
+        setPublishedDate={setPublishedDate}
+      />
+    </Drawer>
   );
 }

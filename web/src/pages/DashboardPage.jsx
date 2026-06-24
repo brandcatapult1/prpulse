@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Toast } from '../components/ui/Primitives.jsx';
-import { LogDeliverablePanel } from '../components/campaign/LogDeliverablePanel.jsx';
-import { ContactLoggingPanel } from '../components/campaign/ContactLoggingPanel.jsx';
+import { LogDeliverableDrawer } from '../components/deliverables/LogDeliverableDrawer.jsx';
+import { InConversationCardLogging } from '../components/campaign/InConversationCardLogging.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import {
   buildVisitDoneTransition,
@@ -145,13 +145,8 @@ export function DashboardPage() {
     [workspace?.engagements, showActionToast],
   );
 
-  const contactLoggingEngagement = useMemo(
-    () => workspace?.engagements?.find((e) => e.id === contactLoggingEngagementId) ?? null,
-    [workspace?.engagements, contactLoggingEngagementId],
-  );
-
   const handleOpenContactLogging = useCallback((engagementId) => {
-    setContactLoggingEngagementId(engagementId);
+    setContactLoggingEngagementId((current) => (current === engagementId ? null : engagementId));
   }, []);
 
   const handleCloseContactLogging = useCallback(() => {
@@ -298,10 +293,23 @@ export function DashboardPage() {
                 <TaskRow
                   key={row.id}
                   row={row}
+                  engagement={workspace?.engagements?.find((e) => e.id === row.engagementId)}
+                  contactLoggingOpen={contactLoggingEngagementId === row.engagementId}
                   onOpen={() => openEngagementRecord(row.engagementId)}
                   onLogContact={() => handleOpenContactLogging(row.engagementId)}
                   onVisitDone={() => handleVisitDone(row.engagementId)}
                   onLogDeliverable={() => handleLogDeliverableClick(row.engagementId)}
+                  onCloseContactLog={handleCloseContactLogging}
+                  onApplyContactLog={(patch, message, snapshotKeys) =>
+                    applyEngagementLogging(row.engagementId, patch, message, snapshotKeys)
+                  }
+                  onScheduleRequest={(engagement) => {
+                    handleCloseContactLogging();
+                    navigate(`/campaigns/${engagement.campaign_id}`, {
+                      state: { scheduleEngagementId: engagement.id },
+                    });
+                  }}
+                  onContactLogError={(message) => showActionToast(message ?? 'Could not save', null)}
                 />
               ))}
             </DashboardModule>
@@ -355,9 +363,22 @@ export function DashboardPage() {
                 <AtRiskRow
                   key={row.id}
                   row={row}
+                  engagement={workspace?.engagements?.find((e) => e.id === row.engagementId)}
+                  contactLoggingOpen={contactLoggingEngagementId === row.engagementId}
                   onOpen={() => openEngagementRecord(row.engagementId)}
                   onLogContact={() => handleOpenContactLogging(row.engagementId)}
                   onVisitDone={() => handleVisitDone(row.engagementId)}
+                  onCloseContactLog={handleCloseContactLogging}
+                  onApplyContactLog={(patch, message, snapshotKeys) =>
+                    applyEngagementLogging(row.engagementId, patch, message, snapshotKeys)
+                  }
+                  onScheduleRequest={(engagement) => {
+                    handleCloseContactLogging();
+                    navigate(`/campaigns/${engagement.campaign_id}`, {
+                      state: { scheduleEngagementId: engagement.id },
+                    });
+                  }}
+                  onContactLogError={(message) => showActionToast(message ?? 'Could not save', null)}
                 />
               ))}
             </DashboardModule>
@@ -367,23 +388,7 @@ export function DashboardPage() {
         <CampaignTargetsSection campaigns={dashboard.campaignTargets} />
       </div>
 
-      <ContactLoggingPanel
-        engagement={contactLoggingEngagement}
-        open={Boolean(contactLoggingEngagement)}
-        onClose={handleCloseContactLogging}
-        onApply={(patch, message, snapshotKeys) => {
-          if (!contactLoggingEngagement) return;
-          applyEngagementLogging(
-            contactLoggingEngagement.id,
-            patch,
-            message,
-            snapshotKeys,
-          );
-        }}
-        onError={(message) => showActionToast(message ?? 'Could not save', null)}
-      />
-
-      <LogDeliverablePanel
+      <LogDeliverableDrawer
         deliverable={loggingDeliverable}
         open={Boolean(loggingDeliverable)}
         onClose={() => setLoggingDeliverable(null)}
@@ -607,7 +612,19 @@ function ActionButton({ label, onClick, variant = 'outline' }) {
   );
 }
 
-function TaskRow({ row, onOpen, onLogContact, onVisitDone, onLogDeliverable }) {
+function TaskRow({
+  row,
+  engagement,
+  contactLoggingOpen,
+  onOpen,
+  onLogContact,
+  onVisitDone,
+  onLogDeliverable,
+  onCloseContactLog,
+  onApplyContactLog,
+  onScheduleRequest,
+  onContactLogError,
+}) {
   const action =
     row.action === 'visit_done' ? (
       <ActionButton label="Visit done" onClick={onVisitDone} />
@@ -618,22 +635,33 @@ function TaskRow({ row, onOpen, onLogContact, onVisitDone, onLogDeliverable }) {
     );
 
   return (
-    <DashboardListRow
-      engagementId={row.engagementId}
-      onOpen={onOpen}
-      actions={action}
-    >
-      <DashboardRowIdentity
-        row={row}
-        subtitle={(
-          <>
-            {row.campaignName}
-            <span className="text-ink-tertiary/60"> · </span>
-            <span className={situationTextClass(row.situation, row.urgency)}>{row.situation}</span>
-          </>
-        )}
-      />
-    </DashboardListRow>
+    <>
+      <DashboardListRow engagementId={row.engagementId} onOpen={onOpen} actions={action}>
+        <DashboardRowIdentity
+          row={row}
+          subtitle={(
+            <>
+              {row.campaignName}
+              <span className="text-ink-tertiary/60"> · </span>
+              <span className={situationTextClass(row.situation, row.urgency)}>{row.situation}</span>
+            </>
+          )}
+        />
+      </DashboardListRow>
+      {contactLoggingOpen && engagement && (
+        <li className="border-t border-line/30 px-4 py-3">
+          <InConversationCardLogging
+            engagement={engagement}
+            alwaysShowActions
+            embedded
+            onApply={onApplyContactLog}
+            onError={onContactLogError}
+            onScheduleRequest={() => onScheduleRequest?.(engagement)}
+            onComplete={onCloseContactLog}
+          />
+        </li>
+      )}
+    </>
   );
 }
 
@@ -679,7 +707,18 @@ function DeliverableRow({ row, onOpen, onLog }) {
   );
 }
 
-function AtRiskRow({ row, onOpen, onLogContact, onVisitDone }) {
+function AtRiskRow({
+  row,
+  engagement,
+  contactLoggingOpen,
+  onOpen,
+  onLogContact,
+  onVisitDone,
+  onCloseContactLog,
+  onApplyContactLog,
+  onScheduleRequest,
+  onContactLogError,
+}) {
   const flagText = row.flagDetail ? `${row.flag} · ${row.flagDetail}` : row.flag;
   const action =
     row.action === 'visit_done' ? (
@@ -689,22 +728,33 @@ function AtRiskRow({ row, onOpen, onLogContact, onVisitDone }) {
     );
 
   return (
-    <DashboardListRow
-      engagementId={row.engagementId}
-      onOpen={onOpen}
-      actions={action}
-    >
-      <DashboardRowIdentity
-        row={row}
-        subtitle={(
-          <>
-            {row.campaignName}
-            <span className="text-ink-tertiary/60"> · </span>
-            <span className="text-health-amber">{flagText}</span>
-          </>
-        )}
-      />
-    </DashboardListRow>
+    <>
+      <DashboardListRow engagementId={row.engagementId} onOpen={onOpen} actions={action}>
+        <DashboardRowIdentity
+          row={row}
+          subtitle={(
+            <>
+              {row.campaignName}
+              <span className="text-ink-tertiary/60"> · </span>
+              <span className="text-health-amber">{flagText}</span>
+            </>
+          )}
+        />
+      </DashboardListRow>
+      {contactLoggingOpen && engagement && (
+        <li className="border-t border-line/30 px-4 py-3">
+          <InConversationCardLogging
+            engagement={engagement}
+            alwaysShowActions
+            embedded
+            onApply={onApplyContactLog}
+            onError={onContactLogError}
+            onScheduleRequest={() => onScheduleRequest?.(engagement)}
+            onComplete={onCloseContactLog}
+          />
+        </li>
+      )}
+    </>
   );
 }
 

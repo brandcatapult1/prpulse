@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Modal } from '../ui/Primitives.jsx';
+import { Drawer } from '../ui/Primitives.jsx';
 import { VisitCaptureForm } from './VisitCaptureForm.jsx';
 import { emptyVisitFields } from '../../lib/visitFields.js';
 
-export function VisitModal({
+/** Side drawer for visit capture (replaces VisitModal). */
+export function VisitDrawer({
   open,
   onClose,
   contactName,
@@ -18,14 +19,14 @@ export function VisitModal({
 
   useEffect(() => {
     if (open) setFields(initialValues ?? emptyVisitFields());
-  }, [open]);
+  }, [open, initialValues]);
 
-  const modalTitle = title ?? `Plan visit · ${contactName}`;
+  const drawerTitle = title ?? `Plan visit · ${contactName}`;
 
   return (
-    <Modal
+    <Drawer
       open={open}
-      title={modalTitle}
+      title={drawerTitle}
       onClose={onClose}
       footer={
         <div className="flex justify-end gap-2">
@@ -49,6 +50,6 @@ export function VisitModal({
         value={fields}
         onChange={setFields}
       />
-    </Modal>
+    </Drawer>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Modal } from '../ui/Primitives.jsx';
+import { Drawer } from '../ui/Primitives.jsx';
 import { BRAND_CATEGORIES } from '../../lib/brandCategories.js';
 import { brandsApi } from '../../lib/api.js';
 
@@ -46,7 +46,7 @@ export function AddBrandModal({ open, onClose, onCreated, managers = [] }) {
   }
 
   return (
-    <Modal
+    <Drawer
       open={open}
       title="New brand"
       onClose={onClose}
@@ -135,6 +135,6 @@ export function AddBrandModal({ open, onClose, onCreated, managers = [] }) {
           </label>
         )}
       </div>
-    </Modal>
+    </Drawer>
   );
 }

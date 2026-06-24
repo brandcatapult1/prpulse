@@ -9,7 +9,7 @@ import {
 
 /**
  * In-conversation contact log flow (Replied / No reply → stage transitions).
- * Always render inside ContactLoggingPanel so dashboard and board stay aligned.
+ * Renders inline on kanban cards and dashboard task rows.
  */
 export function InConversationCardLogging({
   engagement,

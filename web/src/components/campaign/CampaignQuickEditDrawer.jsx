@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Drawer, Modal, Toast } from '../ui/Primitives.jsx';
+import { Drawer, Toast } from '../ui/Primitives.jsx';
 import { DeliverableTypeButtons, deliverableTypeLabel } from '../deliverables/DeliverableTypeButtons.jsx';
 import { formatDate, formatStatus, Pill } from '../../lib/format.jsx';
 import { COLLABORATION_REASONS } from '../../lib/collaborationReasons.js';
@@ -333,6 +333,7 @@ export function CampaignQuickEditDrawer({
   const [deliverables, setDeliverables] = useState([]);
   const [scheduleFlow, setScheduleFlow] = useState(false);
   const [followUpOpen, setFollowUpOpen] = useState(false);
+  const [followUpDraft, setFollowUpDraft] = useState('');
   const [dropOpen, setDropOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(null);
   const [pendingMove, setPendingMove] = useState(null);
@@ -517,6 +518,7 @@ export function CampaignQuickEditDrawer({
 
     if (target.needsPrompt === 'follow_up_date') {
       setPendingMove(target);
+      setFollowUpDraft('');
       setFollowUpOpen(true);
       return;
     }
@@ -697,6 +699,121 @@ export function CampaignQuickEditDrawer({
             onEmailSaved={() => setIdentityRevision((r) => r + 1)}
             onToast={setToast}
           />
+
+          {followUpOpen && pendingMove && (
+            <section className="py-3">
+              <SectionBlock tone="accent">
+                <SectionLabel className="mb-2 text-brand/70">
+                  {pendingMove.logFirstOutreach ? 'First outreach' : 'Next follow-up'}
+                </SectionLabel>
+                <label className="block text-2xs text-ink-secondary">
+                  Follow-up date
+                  <input
+                    type="date"
+                    className="input-field mt-1 h-8 w-full"
+                    value={followUpDraft}
+                    onChange={(e) => setFollowUpDraft(e.target.value)}
+                    autoFocus
+                  />
+                </label>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary flex-1"
+                    onClick={() => {
+                      setFollowUpOpen(false);
+                      setPendingMove(null);
+                      setMoveSelectKey((k) => k + 1);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary flex-1"
+                    disabled={!followUpDraft}
+                    onClick={() => handleFollowUpSave(followUpDraft)}
+                  >
+                    Save
+                  </button>
+                </div>
+              </SectionBlock>
+            </section>
+          )}
+
+          {dropOpen && pendingMove && (
+            <section className="py-3">
+              <SectionBlock tone="accent">
+                <SectionLabel className="mb-2 text-brand/70">Drop reason</SectionLabel>
+                <div className="space-y-1">
+                  {dropReasonOptions.map((o) => (
+                    <button
+                      key={o.value}
+                      type="button"
+                      className="btn-ghost w-full justify-start text-2xs text-health-red"
+                      onClick={() => handleDropReason(o.value)}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="btn-secondary mt-2 w-full"
+                  onClick={() => {
+                    setDropOpen(false);
+                    setPendingMove(null);
+                    setMoveSelectKey((k) => k + 1);
+                  }}
+                >
+                  Cancel
+                </button>
+              </SectionBlock>
+            </section>
+          )}
+
+          {confirmOpen && pendingMove && (
+            <section className="py-3">
+              <SectionBlock tone="accent">
+                <SectionLabel className="mb-2 text-brand/70">
+                  {confirmOpen === 'complete'
+                    ? 'Mark collaboration complete?'
+                    : confirmOpen === 'didnt_deliver'
+                      ? "Mark as didn't deliver?"
+                      : 'Reopen engagement?'}
+                </SectionLabel>
+                <p className="text-2xs text-ink-secondary">
+                  {confirmOpen === 'complete' && 'All deliverables are posted with proof.'}
+                  {confirmOpen === 'didnt_deliver' && 'This will drop the engagement and can blacklist the creator.'}
+                  {confirmOpen === 'reopen' && (
+                    <>
+                      Return to{' '}
+                      <span className="font-medium text-ink">
+                        {droppedFromLabel(resolveDroppedFrom(engagement))}
+                      </span>
+                      ?
+                    </>
+                  )}
+                </p>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary flex-1"
+                    onClick={() => {
+                      setConfirmOpen(null);
+                      setPendingMove(null);
+                      setMoveSelectKey((k) => k + 1);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button type="button" className="btn-primary flex-1" onClick={handleConfirmMove}>
+                    Confirm
+                  </button>
+                </div>
+              </SectionBlock>
+            </section>
+          )}
 
           {scheduleFlow && (
             <section id="campaign-drawer-schedule" className="py-3">
@@ -911,152 +1028,7 @@ export function CampaignQuickEditDrawer({
         </div>
       </Drawer>
 
-      <FollowUpModal
-        open={followUpOpen}
-        title={
-          pendingMove?.logFirstOutreach
-            ? `First outreach · ${engagement.contact_name}`
-            : `Next follow-up · ${engagement.contact_name}`
-        }
-        onClose={() => {
-          setFollowUpOpen(false);
-          setPendingMove(null);
-          setMoveSelectKey((k) => k + 1);
-        }}
-        onSave={handleFollowUpSave}
-      />
-
-      <DropReasonModal
-        open={dropOpen}
-        contactName={engagement.contact_name}
-        options={dropReasonOptions}
-        onClose={() => {
-          setDropOpen(false);
-          setPendingMove(null);
-          setMoveSelectKey((k) => k + 1);
-        }}
-        onSelect={handleDropReason}
-      />
-
-      <Modal
-        open={Boolean(confirmOpen)}
-        title={
-          confirmOpen === 'complete'
-            ? 'Mark collaboration complete?'
-            : confirmOpen === 'didnt_deliver'
-              ? "Mark as didn't deliver?"
-              : 'Reopen engagement?'
-        }
-        onClose={() => {
-          setConfirmOpen(null);
-          setPendingMove(null);
-          setMoveSelectKey((k) => k + 1);
-        }}
-        footer={
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => {
-                setConfirmOpen(null);
-                setPendingMove(null);
-                setMoveSelectKey((k) => k + 1);
-              }}
-            >
-              Cancel
-            </button>
-            <button type="button" className="btn-primary" onClick={handleConfirmMove}>
-              Confirm
-            </button>
-          </div>
-        }
-      >
-        <p className="text-2xs text-ink-secondary">
-          {confirmOpen === 'complete' && 'All deliverables are posted with proof.'}
-          {confirmOpen === 'didnt_deliver' && 'This will drop the engagement and can blacklist the creator.'}
-          {confirmOpen === 'reopen' && (
-            <>
-              Return to{' '}
-              <span className="font-medium text-ink">
-                {droppedFromLabel(resolveDroppedFrom(engagement))}
-              </span>
-              ?
-            </>
-          )}
-        </p>
-      </Modal>
-
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </>
-  );
-}
-
-function FollowUpModal({ open, title, onClose, onSave }) {
-  const [followUpDate, setFollowUpDate] = useState('');
-
-  useEffect(() => {
-    if (open) setFollowUpDate('');
-  }, [open]);
-
-  return (
-    <Modal
-      open={open}
-      title={title}
-      onClose={onClose}
-      footer={
-        <div className="flex justify-end gap-2">
-          <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={!followUpDate}
-            onClick={() => onSave(followUpDate)}
-          >
-            Save
-          </button>
-        </div>
-      }
-    >
-      <label className="block text-2xs text-ink-secondary">
-        Follow-up date
-        <input
-          type="date"
-          className="input-field mt-1"
-          required
-          value={followUpDate}
-          onChange={(e) => setFollowUpDate(e.target.value)}
-          autoFocus
-        />
-      </label>
-    </Modal>
-  );
-}
-
-function DropReasonModal({ open, contactName, options, onClose, onSelect }) {
-  return (
-    <Modal
-      open={open}
-      title={`Drop · ${contactName}`}
-      onClose={onClose}
-      footer={
-        <button type="button" className="btn-secondary" onClick={onClose}>
-          Cancel
-        </button>
-      }
-    >
-      <p className="mb-3 text-2xs text-ink-secondary">Select a reason</p>
-      <div className="space-y-1">
-        {options.map((o) => (
-          <button
-            key={o.value}
-            type="button"
-            className="btn-ghost w-full justify-start text-health-red"
-            onClick={() => onSelect(o.value)}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
-    </Modal>
   );
 }

@@ -1,3 +1,5 @@
+import { findContactByMobile, normalizeMobileToE164 } from './phone.js';
+
 /** Parse a single CSV line respecting quoted fields. */
 function parseCsvLine(line) {
   const out = [];
@@ -54,10 +56,6 @@ Winter Glow,GlowCo,10,planning`;
 
 export function validateContactRows(rows, existingContacts, { skipDuplicates = true } = {}) {
   const seenMobiles = new Map();
-  const existingByMobile = new Map();
-  for (const c of existingContacts) {
-    if (c.mobile_number) existingByMobile.set(normalizeMobileKey(c.mobile_number), c);
-  }
 
   return rows.map((row) => {
     const full_name = row.full_name?.trim();
@@ -77,7 +75,19 @@ export function validateContactRows(rows, existingContacts, { skipDuplicates = t
       };
     }
 
-    const mobileKey = normalizeMobileKey(mobile_number);
+    const mobileKey = normalizeMobileToE164(mobile_number);
+    if (!mobileKey) {
+      return {
+        ...row,
+        full_name,
+        mobile_number,
+        city,
+        instagram_url,
+        status: 'error',
+        message: 'Enter a valid mobile number',
+      };
+    }
+
     if (seenMobiles.has(mobileKey)) {
       return {
         ...row,
@@ -91,12 +101,12 @@ export function validateContactRows(rows, existingContacts, { skipDuplicates = t
     }
     seenMobiles.set(mobileKey, row._line);
 
-    const match = existingByMobile.get(mobileKey);
+    const match = findContactByMobile(mobile_number, existingContacts);
     if (match) {
       return {
         ...row,
         full_name,
-        mobile_number,
+        mobile_number: mobileKey,
         city,
         instagram_url,
         status: skipDuplicates ? 'duplicate' : 'warning',
@@ -109,7 +119,7 @@ export function validateContactRows(rows, existingContacts, { skipDuplicates = t
     return {
       ...row,
       full_name,
-      mobile_number,
+      mobile_number: mobileKey,
       city,
       instagram_url,
       status: 'ok',
@@ -163,12 +173,6 @@ export function validateCampaignRows(rows, brands) {
       message: 'Ready to import',
     };
   });
-}
-
-function normalizeMobileKey(value) {
-  const digits = String(value).replace(/\D/g, '');
-  if (digits.length >= 10) return digits.slice(-10);
-  return digits;
 }
 
 export function rowsReadyToImport(validated) {

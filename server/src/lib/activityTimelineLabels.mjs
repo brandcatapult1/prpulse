@@ -9,7 +9,6 @@ const CONVERSATION_STATUS_LABELS = {
   dropped_not_interested: 'Dropped – Not Interested',
   dropped_terms_disagreement: 'Dropped – Terms Disagreement',
   dropped: 'Dropped',
-  dropped_didnt_deliver: "Dropped – Didn't Deliver",
   awaiting_final_deliverables: 'Awaiting Final Deliverables',
   collaboration_complete: 'Collaboration Complete',
 };
@@ -77,9 +76,6 @@ export function formatDeliverableType(type) {
  */
 export function formatEngagementStatus(status, { dropReason = null } = {}) {
   if (!status) return '—';
-  if (status === 'dropped_didnt_deliver') {
-    return CONVERSATION_STATUS_LABELS.dropped_didnt_deliver;
-  }
   if (status === 'dropped') {
     if (dropReason === 'didnt_deliver') return "Dropped – Didn't Deliver";
     if (dropReason) return `Dropped – ${formatDropReason(dropReason)}`;

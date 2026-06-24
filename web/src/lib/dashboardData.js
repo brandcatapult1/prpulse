@@ -4,6 +4,7 @@ import {
   formatVisitTimeForDisplay,
   resolveEngagementOutletName,
 } from './visitFields.js';
+import { isTerminalEngagement } from './contactProfile.js';
 
 export const MODULE_ROW_LIMIT = 8;
 
@@ -80,6 +81,7 @@ function hasOpenDeliverables(engagementId, getDeliverables) {
 }
 
 function qualifiesAtRisk(engagement, today) {
+  if (isTerminalEngagement(engagement.conversation_status)) return false;
   if (engagement.no_reply_count >= 3 || engagement.conversation_status === 'no_response') {
     return true;
   }

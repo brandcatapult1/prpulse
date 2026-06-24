@@ -102,7 +102,8 @@ export function PublicRegistrationPage() {
 
     const payload = {
       full_name: fullName,
-      mobile_number: parsedPhone.number.replace(/\D/g, ''),
+      mobile_number: parsedPhone.format('E.164'),
+      country_code: form.country_code,
       email: emailRaw || null,
       city: form.city.trim() || null,
       instagram_link: form.instagram_link.trim() || null,

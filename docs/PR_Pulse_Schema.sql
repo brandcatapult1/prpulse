@@ -46,15 +46,30 @@ CREATE TYPE campaign_status AS ENUM ('draft','active','paused','completed','arch
 
 CREATE TYPE campaign_health AS ENUM ('green','amber','red','not_set');
 
+-- conversation_status: PRD Module 5 lists nine named stages (three funnel drops as distinct
+-- enum values). The database has a tenth value, 'dropped', added in migration 007 for
+-- operational drops whose reason is not encoded in the status slug — notably Didn't Deliver
+-- (Senior Manager / Admin only, from awaiting_final_deliverables).
+--
+--   PRD funnel drops (reason = status slug):
+--     dropped_profile_rejected | dropped_not_interested | dropped_terms_disagreement
+--   Generic dropped stage (reason in engagements.drop_reason):
+--     conversation_status = 'dropped'
+--     drop_reason         = 'didnt_deliver'   -- display: "Didn't Deliver"
+--     dropped_from        = prior stage slug  -- reopen routing
+--
+-- Never use a phantom status such as dropped_didnt_deliver; it is not in this enum.
+-- Dashboard / follow-up queries must exclude conversation_status = 'dropped' alongside
+-- the three named drop values and collaboration_complete.
 CREATE TYPE conversation_status AS ENUM (
   'not_contacted',
   'in_conversation',
   'scheduled',
   'no_response',
-  'dropped_profile_rejected',     -- Dropped – Profile Rejected
-  'dropped_not_interested',       -- Dropped – Not Interested
-  'dropped_terms_disagreement',   -- Dropped – Terms Disagreement
-  'dropped',                      -- Dropped stage; reason in drop_reason (e.g. didnt_deliver)
+  'dropped_profile_rejected',     -- Dropped – Profile Rejected (PRD)
+  'dropped_not_interested',       -- Dropped – Not Interested (PRD)
+  'dropped_terms_disagreement',   -- Dropped – Terms Disagreement (PRD)
+  'dropped',                      -- generic dropped; see drop_reason (migration 007)
   'awaiting_final_deliverables',
   'collaboration_complete'
 );
@@ -723,18 +738,22 @@ FROM engagements e;
 -- 18. Application-layer responsibilities (NOT enforced here)
 -- =====================================================================
 -- 1. Mobile dedup: before INSERT on contacts / on registration approval /
---    bulk import, query idx_contacts_mobile; if a match exists, WARN and let
---    the user Cancel or Continue (continue = create anyway). Hence no DB unique.
+--    bulk import, query by E.164 (normalizeMobileToE164). If a match exists, WARN
+--    or flag Duplicate; user may Cancel or Continue (continue may still create).
+--    Store contacts.mobile_number as E.164 (e.g. +919876543210). Legacy rows may
+--    match via national suffix fallback until backfilled. Hence no DB unique.
 -- 2. Set the actor each transaction:  SET LOCAL app.current_user_id = '<uuid>';
 --    (audit_logs and timeline_entries read it; null = system action).
 -- 3. Follow-up suggestions (today+3 / today+7 / =visit_date / cleared) and the
 --    "open visit modal on Scheduled" UX are app-driven; the DB only enforces
 --    that visit_date exists while status = scheduled (ck_visit_when_scheduled).
--- 4. Default query scope should exclude status = 'archived' unless explicitly
+-- 4. conversation_status = 'dropped' is intentional (migration 007): reason lives
+--    in engagements.drop_reason (e.g. didnt_deliver). Do not invent extra enum values.
+-- 5. Default query scope should exclude status = 'archived' unless explicitly
 --    requested; exclude is_blacklisted = true from campaign population by default.
--- 5. Client-facing report exports must omit agreed_fee, internal_rating, and
+-- 6. Client-facing report exports must omit agreed_fee, internal_rating, and
 --    internal_notes; shareable links carry an expiry + revocation (app-managed).
--- 6. Dashboard widgets read stored rollups (campaigns.*, contacts.*) and the
+-- 7. Dashboard widgets read stored rollups (campaigns.*, contacts.*) and the
 --    v_deliverables / v_engagements views; avoid ad-hoc aggregation in the
 --    request path. Stalled = now() - last_status_change_at > 7/14/30 days.
 -- =====================================================================

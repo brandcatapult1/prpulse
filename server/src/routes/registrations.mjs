@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool, withUserTransaction } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
 import { requireSeniorOrAdmin } from '../middleware/permissions.mjs';
+import { findContactByMobile, normalizeMobileToE164 } from '../lib/mobileNumber.mjs';
 
 export const registrationsRouter = Router();
 
@@ -27,10 +28,16 @@ registrationsRouter.post('/', async (req, res) => {
     story_rate,
     portfolio_links,
     notes,
+    country_code,
   } = req.body ?? {};
 
   if (!full_name?.trim() || !mobile_number?.trim()) {
     return res.status(400).json({ error: 'Full name and mobile number are required' });
+  }
+
+  const e164 = normalizeMobileToE164(mobile_number, country_code ?? undefined);
+  if (!e164) {
+    return res.status(400).json({ error: 'Enter a valid mobile number' });
   }
 
   try {
@@ -43,7 +50,7 @@ registrationsRouter.post('/', async (req, res) => {
       RETURNING ${SELECT_FIELDS}`,
       [
         full_name.trim(),
-        mobile_number.trim(),
+        e164,
         email ?? null,
         city ?? null,
         instagram_link ?? null,
@@ -75,7 +82,7 @@ registrationsRouter.get('/', requireAuth, async (_req, res) => {
     res.json(rows);
   } catch (err) {
     console.warn('Registration list failed:', err.message ?? err);
-    res.json([]);
+    res.status(503).json({ error: 'Registration list unavailable' });
   }
 });
 
@@ -88,6 +95,52 @@ registrationsRouter.patch('/:id', requireAuth, requireSeniorOrAdmin, async (req,
 
   try {
     const row = await withUserTransaction(req.user.id, async (client) => {
+      const current = await client.query(
+        `SELECT * FROM registration_submissions WHERE id = $1`,
+        [req.params.id],
+      );
+      if (!current.rows[0]) return null;
+
+      const sub = current.rows[0];
+      let finalStatus = status;
+      let finalLinkedId = linked_contact_id ?? null;
+
+      if (status === 'approved') {
+        const e164 = normalizeMobileToE164(sub.mobile_number);
+        if (!e164) {
+          throw Object.assign(new Error('Invalid mobile number on registration'), { status: 400 });
+        }
+
+        if (finalLinkedId) {
+          const linked = await client.query('SELECT id FROM contacts WHERE id = $1', [finalLinkedId]);
+          if (!linked.rows[0]) {
+            throw Object.assign(new Error('Linked contact not found'), { status: 404 });
+          }
+        } else {
+          const { contact: dup } = await findContactByMobile(client, sub.mobile_number);
+          if (dup) {
+            finalStatus = 'duplicate';
+            finalLinkedId = dup.id;
+          } else {
+            const { rows: created } = await client.query(
+              `INSERT INTO contacts (
+                full_name, mobile_number, email, city, instagram_url, source, created_by
+              ) VALUES ($1,$2,$3,$4,$5,'signup_form',$6)
+              RETURNING id`,
+              [
+                sub.full_name,
+                e164,
+                sub.email,
+                sub.city,
+                sub.instagram_link,
+                req.user.id,
+              ],
+            );
+            finalLinkedId = created[0].id;
+          }
+        }
+      }
+
       const { rows: updated } = await client.query(
         `UPDATE registration_submissions
          SET status = $1,
@@ -96,40 +149,15 @@ registrationsRouter.patch('/:id', requireAuth, requireSeniorOrAdmin, async (req,
              reviewed_at = now()
          WHERE id = $4
          RETURNING ${SELECT_FIELDS}`,
-        [status, linked_contact_id ?? null, req.user.id, req.params.id],
+        [finalStatus, finalLinkedId, req.user.id, req.params.id],
       );
-      if (!updated[0]) return null;
-
-      if (status === 'approved' && !linked_contact_id) {
-        const sub = updated[0];
-        const { rows: created } = await client.query(
-          `INSERT INTO contacts (
-            full_name, mobile_number, email, city, instagram_url, source, created_by
-          ) VALUES ($1,$2,$3,$4,$5,'signup_form',$6)
-          RETURNING id`,
-          [
-            sub.full_name,
-            sub.mobile_number,
-            sub.email,
-            sub.city,
-            sub.instagram_link,
-            req.user.id,
-          ],
-        );
-        await client.query(
-          'UPDATE registration_submissions SET linked_contact_id = $1 WHERE id = $2',
-          [created[0].id, sub.id],
-        );
-        updated[0].linked_contact_id = created[0].id;
-      }
-
       return updated[0];
     });
 
     if (!row) return res.status(404).json({ error: 'Registration not found' });
     res.json(row);
   } catch (err) {
-    console.warn('Registration update failed:', err.message ?? err);
-    res.status(503).json({ error: 'Update failed' });
+    const httpStatus = err.status ?? 503;
+    res.status(httpStatus).json({ error: err.message ?? 'Update failed' });
   }
 });

@@ -4,8 +4,18 @@ import {
   assertStaffUser,
   assertUserManagesCampaign,
   assertUserManagesEngagement,
+  forbidUnlessAdmin,
   forbidUnlessSeniorOrAdmin,
 } from '../lib/permissions.mjs';
+
+export function requireAdmin(req, res, next) {
+  try {
+    forbidUnlessAdmin(req.user);
+    next();
+  } catch (err) {
+    res.status(err.status ?? 403).json({ error: err.message });
+  }
+}
 
 export function requireSeniorOrAdmin(req, res, next) {
   try {
@@ -31,7 +41,7 @@ export function requireCampaignWriteAccess(param = 'id') {
       await assertUserManagesCampaign(pool, req.user, req.params[param]);
       next();
     } catch (err) {
-      res.status(err.status ?? 500).json({ error: err.message });
+      res.status(err.status ?? 403).json({ error: err.message });
     }
   };
 }
@@ -42,7 +52,7 @@ export function requireEngagementWriteAccess(param = 'id') {
       await assertUserManagesEngagement(pool, req.user, req.params[param]);
       next();
     } catch (err) {
-      res.status(err.status ?? 500).json({ error: err.message });
+      res.status(err.status ?? 403).json({ error: err.message });
     }
   };
 }

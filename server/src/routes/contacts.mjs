@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { pool, withUserTransaction } from '../db.mjs';
 import { requireAuth, scopeArchived, scopeBlacklisted } from '../middleware/auth.mjs';
-import { requireSeniorOrAdmin } from '../middleware/permissions.mjs';
+import { requireSeniorOrAdmin, requireAdmin } from '../middleware/permissions.mjs';
+import { findContactByMobile, normalizeMobileToE164 } from '../lib/mobileNumber.mjs';
 
 export const contactsRouter = Router();
 
@@ -41,39 +42,43 @@ contactsRouter.get('/:id', requireAuth, async (req, res) => {
 
 contactsRouter.post('/quick-add', requireAuth, async (req, res) => {
   const { full_name, mobile_number, instagram_url, city } = req.body;
-  if (!full_name || !mobile_number) {
+  if (!full_name?.trim() || !mobile_number?.trim()) {
     return res.status(400).json({ error: 'Full name and mobile are required' });
   }
 
-  const dup = await pool.query(
-    'SELECT id, full_name FROM contacts WHERE mobile_number = $1 LIMIT 1',
-    [mobile_number],
-  );
+  const e164 = normalizeMobileToE164(mobile_number);
+  if (!e164) {
+    return res.status(400).json({ error: 'Enter a valid mobile number' });
+  }
 
-  const contact = await withUserTransaction(req.user.id, async (client) => {
-    const { rows } = await client.query(
-      `INSERT INTO contacts (full_name, mobile_number, instagram_url, city, source, created_by)
-       VALUES ($1, $2, $3, $4, 'quick_add', $5)
-       RETURNING *`,
-      [full_name, mobile_number, instagram_url ?? null, city ?? null, req.user.id],
-    );
-    return rows[0];
-  });
+  const { contact: dup } = await findContactByMobile(pool, mobile_number);
 
-  res.status(201).json({
-    contact,
-    duplicate_warning: dup.rows[0]
-      ? { id: dup.rows[0].id, full_name: dup.rows[0].full_name }
-      : null,
-  });
+  try {
+    const contact = await withUserTransaction(req.user.id, async (client) => {
+      const { rows } = await client.query(
+        `INSERT INTO contacts (full_name, mobile_number, instagram_url, city, source, created_by)
+         VALUES ($1, $2, $3, $4, 'quick_add', $5)
+         RETURNING *`,
+        [full_name.trim(), e164, instagram_url ?? null, city ?? null, req.user.id],
+      );
+      return rows[0];
+    });
+
+    res.status(201).json({
+      contact,
+      duplicate_warning: dup
+        ? { id: dup.id, full_name: dup.full_name, mobile_number: dup.mobile_number }
+        : null,
+    });
+  } catch (err) {
+    res.status(err.status ?? 503).json({ error: err.message ?? 'Could not save contact' });
+  }
 });
 
 contactsRouter.get('/lookup/mobile/:mobile', requireAuth, async (req, res) => {
-  const { rows } = await pool.query(
-    'SELECT id, full_name FROM contacts WHERE mobile_number = $1 LIMIT 1',
-    [req.params.mobile],
-  );
-  res.json(rows[0] ?? null);
+  const raw = decodeURIComponent(req.params.mobile ?? '');
+  const { contact } = await findContactByMobile(pool, raw);
+  res.json(contact ?? null);
 });
 
 contactsRouter.patch('/:id', requireAuth, async (req, res) => {
@@ -149,6 +154,24 @@ contactsRouter.delete('/:id/blacklist', requireAuth, requireSeniorOrAdmin, async
     });
     res.status(204).end();
   } catch (err) {
+    res.status(err.status ?? 500).json({ error: err.message });
+  }
+});
+
+/** Hard delete — Admin only (PRD). Fails when engagements still reference the contact. */
+contactsRouter.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    await withUserTransaction(req.user.id, async (client) => {
+      const { rowCount } = await client.query('DELETE FROM contacts WHERE id = $1', [req.params.id]);
+      if (rowCount === 0) throw Object.assign(new Error('Contact not found'), { status: 404 });
+    });
+    res.status(204).end();
+  } catch (err) {
+    if (err.code === '23503') {
+      return res.status(409).json({
+        error: 'Contact cannot be deleted while engagements or other records reference it',
+      });
+    }
     res.status(err.status ?? 500).json({ error: err.message });
   }
 });

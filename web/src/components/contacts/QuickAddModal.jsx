@@ -4,7 +4,7 @@ import { Drawer, Toast } from '../ui/Primitives.jsx';
 import { contactsApi, campaignsApi } from '../../lib/api.js';
 import { populateCampaign } from '../../lib/persistence.js';
 import { mergeContactsCache } from '../../lib/contactsCache.js';
-import { normalizeMobile } from '../../lib/phone.js';
+import { normalizeMobileToE164 } from '../../lib/phone.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 const EMPTY = { full_name: '', mobile_number: '', instagram_url: '', city: '' };
@@ -41,15 +41,15 @@ export function QuickAddModal({ open, onClose, onSaved, defaultCampaignId = '' }
   }
 
   async function checkDuplicate(mobile) {
-    const norm = normalizeMobile(mobile);
-    if (norm.length < 10) {
+    const e164 = normalizeMobileToE164(mobile);
+    if (!e164) {
       setDuplicate(null);
       setContinueAnyway(false);
       return;
     }
 
     try {
-      const match = await contactsApi.lookupMobile(mobile);
+      const match = await contactsApi.lookupMobile(e164);
       setDuplicate(match ?? null);
       if (!match) setContinueAnyway(false);
     } catch {
@@ -57,7 +57,7 @@ export function QuickAddModal({ open, onClose, onSaved, defaultCampaignId = '' }
     }
   }
 
-  const mobileValid = normalizeMobile(form.mobile_number).length >= 10;
+  const mobileValid = Boolean(normalizeMobileToE164(form.mobile_number));
   const canSave = form.full_name.trim() && mobileValid && (!duplicate || continueAnyway);
 
   async function persistContact() {

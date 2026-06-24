@@ -85,7 +85,11 @@ export function RegistrationsPage() {
     try {
       const updated = await registrationsApi.update(id, patch);
       setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...updated } : r)));
-      setToast(message);
+      if (updated.status === 'duplicate' && patch.status === 'approved') {
+        setToast('Marked as duplicate — linked to existing contact');
+      } else {
+        setToast(message);
+      }
       setSelected(null);
       setApproveChoice(null);
     } catch (err) {

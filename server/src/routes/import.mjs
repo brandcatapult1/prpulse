@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool, withUserTransaction } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
 import { requireSeniorOrAdmin } from '../middleware/permissions.mjs';
+import { findContactByMobile, normalizeMobileToE164 } from '../lib/mobileNumber.mjs';
 
 export const importRouter = Router();
 
@@ -22,17 +23,17 @@ importRouter.post('/contacts', requireAuth, requireImportRole, async (req, res) 
         const { full_name, mobile_number, city, instagram_url } = row;
         if (!full_name?.trim() || !mobile_number?.trim()) continue;
 
-        const dup = await client.query(
-          'SELECT id FROM contacts WHERE mobile_number = $1 LIMIT 1',
-          [mobile_number.trim()],
-        );
-        if (dup.rows[0]) continue;
+        const e164 = normalizeMobileToE164(mobile_number);
+        if (!e164) continue;
+
+        const { contact: dup } = await findContactByMobile(client, mobile_number);
+        if (dup) continue;
 
         const { rows: inserted } = await client.query(
           `INSERT INTO contacts (full_name, mobile_number, city, instagram_url, source, created_by)
            VALUES ($1, $2, $3, $4, 'bulk_upload', $5)
            RETURNING id, full_name, mobile_number, city, status`,
-          [full_name.trim(), mobile_number.trim(), city ?? null, instagram_url ?? null, req.user.id],
+          [full_name.trim(), e164, city ?? null, instagram_url ?? null, req.user.id],
         );
         if (inserted[0]) results.push(inserted[0]);
       }

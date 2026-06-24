@@ -51,10 +51,9 @@ export function isDroppedStatus(status) {
   return status === DROPPED_STAGE_STATUS || status?.startsWith('dropped_');
 }
 
-/** Legacy demo rows may still carry conversation_status = dropped_didnt_deliver. */
+/** Didn't Deliver: conversation_status=dropped + drop_reason=didnt_deliver (see migration 007). */
 export function isDidntDeliverDrop(engagement) {
-  return engagement?.drop_reason === DIDNT_DELIVER_REASON
-    || engagement?.conversation_status === 'dropped_didnt_deliver';
+  return engagement?.drop_reason === DIDNT_DELIVER_REASON;
 }
 
 export function canReopenDropped(role, engagement) {

@@ -4,6 +4,7 @@ import {
   isFollowUpOverdue,
   isVisitOverdue,
 } from './campaignKanban.js';
+import { isTerminal } from './engagementRules.js';
 
 export const CAMPAIGN_RISK_FILTERS = [
   { value: 'any', label: 'Any flag' },
@@ -20,10 +21,7 @@ export const CAMPAIGN_EMPTY_FILTERS = {
 };
 
 function isTerminalStatus(status) {
-  return (
-    status === 'collaboration_complete'
-    || status?.startsWith('dropped_')
-  );
+  return isTerminal(status);
 }
 
 /** Follow-up date past due — active engagements only. */

@@ -63,7 +63,6 @@ export function droppedReasonLabel(engagementOrStatus) {
     dropped_not_interested: 'Not interested',
     dropped_terms_disagreement: 'Terms disagreement',
     dropped: 'Dropped',
-    dropped_didnt_deliver: "Didn't Deliver",
   };
   return labels[status] ?? 'Dropped';
 }

@@ -10,6 +10,18 @@ export function isBroadRole(role) {
   return role === ROLES.SENIOR_MANAGER || role === ROLES.ADMIN;
 }
 
+export function isAdmin(role) {
+  return role === ROLES.ADMIN;
+}
+
+export function forbidUnlessAdmin(user) {
+  if (!user?.id || !isAdmin(user.role)) {
+    const err = new Error('Admin access required');
+    err.status = 403;
+    throw err;
+  }
+}
+
 export function forbidUnlessSeniorOrAdmin(user) {
   if (!user?.id || !isBroadRole(user.role)) {
     const err = new Error('Senior Manager or Admin access required');

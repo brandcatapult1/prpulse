@@ -1,14 +1,40 @@
-/** Normalize mobile for dedup comparison (last 10 digits). */
-export function normalizeMobile(value) {
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
+
+/** Default territory for numbers entered without a country prefix (Brand Catapult = India). */
+export const DEFAULT_MOBILE_COUNTRY = 'IN';
+
+/**
+ * Normalize a raw phone string to E.164 for storage and dedup (e.g. +919876543210).
+ * Returns empty string when the number cannot be parsed as valid.
+ */
+export function normalizeMobileToE164(raw, defaultCountry = DEFAULT_MOBILE_COUNTRY) {
+  const text = String(raw ?? '').trim();
+  if (!text) return '';
+  const parsed = parsePhoneNumberFromString(text, defaultCountry);
+  if (!parsed?.isValid()) return '';
+  return parsed.format('E.164');
+}
+
+/** @deprecated Use normalizeMobileToE164 — kept for call sites migrating from last-10 dedup. */
+export function normalizeMobile(raw, defaultCountry = DEFAULT_MOBILE_COUNTRY) {
+  return normalizeMobileToE164(raw, defaultCountry);
+}
+
+function mobileNationalSuffix(value) {
   const digits = String(value ?? '').replace(/\D/g, '');
   if (digits.length >= 10) return digits.slice(-10);
   return digits;
 }
 
-export function findContactByMobile(mobile, contacts) {
-  const norm = normalizeMobile(mobile);
+/** Client-side dedup against a loaded contact list (server is source of truth on write). */
+export function findContactByMobile(mobile, contacts, defaultCountry = DEFAULT_MOBILE_COUNTRY) {
+  const norm = normalizeMobileToE164(mobile, defaultCountry);
   if (!norm) return null;
-  return contacts.find(
-    (c) => c.mobile_number && normalizeMobile(c.mobile_number) === norm,
-  ) ?? null;
+  const suffix = mobileNationalSuffix(norm);
+  return contacts.find((c) => {
+    if (!c.mobile_number) return false;
+    const stored = normalizeMobileToE164(c.mobile_number, defaultCountry);
+    if (stored && stored === norm) return true;
+    return suffix.length >= 10 && mobileNationalSuffix(c.mobile_number) === suffix;
+  }) ?? null;
 }

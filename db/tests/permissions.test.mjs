@@ -1,6 +1,6 @@
 /**
- * API permission rules — Campaign Manager must be rejected where PRD restricts.
- * Run after migrations: npm run db:test:permissions
+ * API permission enforcement — each PRD rule must reject the disallowed role with 403.
+ * Run: npm run db:test:permissions
  */
 import pg from 'pg';
 import dotenv from 'dotenv';
@@ -9,8 +9,14 @@ import {
   assertCreatorAssignedForCampaignManager,
   assertUserManagesCampaign,
   assertUserManagesEngagement,
+  forbidUnlessAdmin,
   forbidUnlessSeniorOrAdmin,
 } from '../../server/src/lib/permissions.mjs';
+import {
+  requireAdmin,
+  requireDidntDeliverPermission,
+  requireSeniorOrAdmin,
+} from '../../server/src/middleware/permissions.mjs';
 
 dotenv.config();
 
@@ -38,6 +44,26 @@ async function expectForbidden(fn, expectedStatus = 403) {
   }
 }
 
+/** Invoke sync Express middleware; returns { statusCode, body, allowed }. */
+function invokeMiddleware(middleware, req) {
+  return new Promise((resolve) => {
+    const res = {
+      statusCode: 200,
+      body: null,
+      status(code) {
+        this.statusCode = code;
+        return this;
+      },
+      json(payload) {
+        this.body = payload;
+        resolve({ statusCode: this.statusCode, body: payload, allowed: false });
+      },
+    };
+    const next = () => resolve({ statusCode: 200, body: null, allowed: true });
+    middleware(req, res, next);
+  });
+}
+
 async function seedPermissionFixtures(client) {
   const cm = await client.query(
     `INSERT INTO users (email, full_name, role)
@@ -52,6 +78,11 @@ async function seedPermissionFixtures(client) {
   const sm = await client.query(
     `INSERT INTO users (email, full_name, role)
      VALUES ('perm-sm@brandcatapult.com', 'Perm SM', 'senior_manager')
+     RETURNING id, role`,
+  );
+  const admin = await client.query(
+    `INSERT INTO users (email, full_name, role)
+     VALUES ('perm-admin@brandcatapult.com', 'Perm Admin', 'admin')
      RETURNING id, role`,
   );
 
@@ -98,21 +129,15 @@ async function seedPermissionFixtures(client) {
     [contact.rows[0].id, otherCampaign.rows[0].id, otherCm.rows[0].id],
   );
 
-  const registration = await client.query(
-    `INSERT INTO registration_submissions (full_name, mobile_number, status)
-     VALUES ('Reg Applicant', '+919777777702', 'new')
-     RETURNING id`,
-  );
-
   return {
     cm: cm.rows[0],
     sm: sm.rows[0],
+    admin: admin.rows[0],
     assignedCampaignId: assignedCampaign.rows[0].id,
     otherCampaignId: otherCampaign.rows[0].id,
     assignedEngagementId: assignedEngagement.rows[0].id,
     otherEngagementId: otherEngagement.rows[0].id,
     contactId: contact.rows[0].id,
-    registrationId: registration.rows[0].id,
   };
 }
 
@@ -138,47 +163,71 @@ async function runTests() {
   };
 
   try {
-    await test('CM rejected for blacklist (senior/admin only)', async () => {
+    await test('rule 1 — CM rejected for blacklist / un-blacklist (403)', async () => {
       const fx = await seedPermissionFixtures(client);
       await expectForbidden(() => forbidUnlessSeniorOrAdmin(fx.cm));
+      const blocked = await invokeMiddleware(requireSeniorOrAdmin, { user: fx.cm });
+      assert(blocked.statusCode === 403, `middleware expected 403, got ${blocked.statusCode}`);
+      assert(!blocked.allowed, 'middleware should not call next()');
       forbidUnlessSeniorOrAdmin(fx.sm);
+      const allowed = await invokeMiddleware(requireSeniorOrAdmin, { user: fx.sm });
+      assert(allowed.allowed, 'senior manager should pass middleware');
     });
 
-    await test('CM rejected for registration approve/reject', async () => {
+    await test('rule 2 — CM rejected for registration approve/reject (403)', async () => {
       const fx = await seedPermissionFixtures(client);
       await expectForbidden(() => forbidUnlessSeniorOrAdmin(fx.cm));
+      const blocked = await invokeMiddleware(requireSeniorOrAdmin, { user: fx.cm });
+      assert(blocked.statusCode === 403, `middleware expected 403, got ${blocked.statusCode}`);
     });
 
-    await test('CM rejected for engagement write on unassigned campaign', async () => {
+    await test('rule 3 — CM rejected for engagement write on unassigned campaign (403)', async () => {
       const fx = await seedPermissionFixtures(client);
       await expectForbidden(() =>
         assertUserManagesEngagement(client, fx.cm, fx.otherEngagementId),
       );
       await assertUserManagesEngagement(client, fx.cm, fx.assignedEngagementId);
+      await expectForbidden(() =>
+        assertUserManagesCampaign(client, fx.cm, fx.otherCampaignId),
+      );
     });
 
-    await test('CM rejected for campaign populate on unassigned campaign', async () => {
+    await test('rule 4 — CM rejected for campaign populate on unassigned campaign (403)', async () => {
       const fx = await seedPermissionFixtures(client);
       await expectForbidden(() =>
         assertUserManagesCampaign(client, fx.cm, fx.otherCampaignId),
       );
-      await assertUserManagesCampaign(client, fx.cm, fx.assignedCampaignId);
-    });
-
-    await test('CM rejected for didnt_deliver drop_reason', async () => {
-      const fx = await seedPermissionFixtures(client);
-      await expectForbidden(() =>
-        assertCanApplyDidntDeliver(fx.cm, { drop_reason: 'didnt_deliver' }),
-      );
-      assertCanApplyDidntDeliver(fx.sm, { drop_reason: 'didnt_deliver' });
-    });
-
-    await test('CM rejected when campaign create omits self from managers', async () => {
-      const fx = await seedPermissionFixtures(client);
       await expectForbidden(() =>
         assertCreatorAssignedForCampaignManager(fx.cm, [fx.sm.id]),
       );
       assertCreatorAssignedForCampaignManager(fx.cm, [fx.cm.id, fx.sm.id]);
+    });
+
+    await test('rule 5 — CM rejected for didnt_deliver drop_reason (403)', async () => {
+      const fx = await seedPermissionFixtures(client);
+      await expectForbidden(() =>
+        assertCanApplyDidntDeliver(fx.cm, { drop_reason: 'didnt_deliver' }),
+      );
+      const blocked = await invokeMiddleware(requireDidntDeliverPermission, {
+        user: fx.cm,
+        body: { drop_reason: 'didnt_deliver' },
+      });
+      assert(blocked.statusCode === 403, `middleware expected 403, got ${blocked.statusCode}`);
+      assertCanApplyDidntDeliver(fx.sm, { drop_reason: 'didnt_deliver' });
+    });
+
+    await test('rule 6 — CM and SM rejected for delete contact; Admin allowed', async () => {
+      const fx = await seedPermissionFixtures(client);
+      await expectForbidden(() => forbidUnlessAdmin(fx.cm));
+      await expectForbidden(() => forbidUnlessAdmin(fx.sm));
+      forbidUnlessAdmin(fx.admin);
+
+      const cmBlocked = await invokeMiddleware(requireAdmin, { user: fx.cm });
+      assert(cmBlocked.statusCode === 403, `CM delete middleware expected 403, got ${cmBlocked.statusCode}`);
+      const smBlocked = await invokeMiddleware(requireAdmin, { user: fx.sm });
+      assert(smBlocked.statusCode === 403, `SM delete middleware expected 403, got ${smBlocked.statusCode}`);
+      const adminAllowed = await invokeMiddleware(requireAdmin, { user: fx.admin });
+      assert(adminAllowed.allowed, 'admin should pass delete middleware');
     });
 
     console.log(`\n${passed} permission tests passed.`);

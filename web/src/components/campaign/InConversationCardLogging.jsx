@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { formatDate } from '../../lib/format.jsx';
-import { logNoReplyAttempt, logRepliedContact } from '../../lib/contactLogging.js';
+import {
+  buildRepliedContactLogPatch,
+  logNoReplyAttempt,
+  repliedContactToastMessage,
+} from '../../lib/contactLogging.js';
 import {
   DROP_REASON_OPTIONS,
   STAGE,
@@ -32,10 +36,6 @@ export function InConversationCardLogging({
     setFollowUpDate('');
   }
 
-  function repliedContactPatch() {
-    return logRepliedContact().patch;
-  }
-
   function apply(patch, message) {
     onApply(patch, message, Object.keys(patch));
     reset();
@@ -62,8 +62,8 @@ export function InConversationCardLogging({
     });
     if (!result.ok) return;
     apply(
-      { ...repliedContactPatch(), ...result.patch },
-      `Logged — next follow-up ${formatDate(followUpDate)}`,
+      { ...buildRepliedContactLogPatch(), ...result.patch },
+      repliedContactToastMessage(`next follow-up ${formatDate(followUpDate)}`),
     );
   }
 
@@ -82,8 +82,8 @@ export function InConversationCardLogging({
     if (!result.ok) return;
     const label = DROP_REASON_OPTIONS.find((o) => o.value === reason)?.label ?? 'Dropped';
     apply(
-      { ...repliedContactPatch(), ...result.patch },
-      `Moved to Dropped — ${label}`,
+      { ...buildRepliedContactLogPatch(), ...result.patch },
+      repliedContactToastMessage(`moved to Dropped — ${label}`),
     );
   }
 
@@ -234,10 +234,6 @@ function ActionButton({ label, onClick, variant = 'primary' }) {
       onClick={onClick}
     >
       {label}
-    </button>
-  );
-}
-el}
     </button>
   );
 }

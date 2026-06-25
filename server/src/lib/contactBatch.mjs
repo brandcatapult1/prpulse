@@ -13,7 +13,9 @@ export async function batchToggleContactStatus(client, contactIds) {
 
   const { rows } = await client.query(
     `UPDATE contacts
-     SET status = CASE WHEN status = 'active' THEN 'inactive' ELSE 'active' END
+     SET status = (
+           CASE WHEN status = 'active' THEN 'inactive' ELSE 'active' END
+         )::contact_status
      WHERE id = ANY($1::uuid[])
        AND status IN ('active', 'inactive')
      RETURNING id, status`,

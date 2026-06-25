@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FilterBar, DataTable } from '../components/ui/DataKit.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
-import { QuickAddModal } from '../components/contacts/QuickAddModal.jsx';
+import { AddContactDrawer } from '../components/contacts/AddContactDrawer.jsx';
+import { ContactBatchActionBar } from '../components/contacts/ContactBatchActionBar.jsx';
 import { Pill, statusTone } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
 import { contactsApi } from '../lib/api.js';
@@ -16,7 +17,8 @@ export function ContactsPage() {
   const canImport = canBulkImport(user?.role);
   const [rows, setRows] = useState([]);
   const [loadError, setLoadError] = useState(null);
-  const [quickOpen, setQuickOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
   const [query, setQuery] = useState('');
   const [activeFilters, setActiveFilters] = useState([]);
 
@@ -72,6 +74,28 @@ export function ContactsPage() {
     return result;
   }, [rows, query, activeFilters]);
 
+  const selectableIds = useMemo(
+    () => filteredRows.map((r) => r.id),
+    [filteredRows],
+  );
+
+  const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selectedIds.includes(id));
+  const someSelected = selectableIds.some((id) => selectedIds.includes(id));
+
+  function toggleSelect(id) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !selectableIds.includes(id)));
+    } else {
+      setSelectedIds((prev) => [...new Set([...prev, ...selectableIds])]);
+    }
+  }
+
   const columns = [
     { key: 'full_name', label: 'Name', render: (r) => <span className="font-medium">{r.full_name}</span> },
     { key: 'city', label: 'City' },
@@ -89,7 +113,7 @@ export function ContactsPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4 pb-24">
       <PageHeader
         title={MODULES.contactDatabase.pageTitle}
         subtitle={MODULES.contactDatabase.subtitle}
@@ -98,8 +122,9 @@ export function ContactsPage() {
             {canImport && (
               <Link to="/import" className="btn-secondary">Bulk Import</Link>
             )}
-            <button type="button" className="btn-secondary" onClick={() => setQuickOpen(true)}>Quick Add</button>
-            <button type="button" className="btn-primary" onClick={() => setQuickOpen(true)}>+ Contact</button>
+            <button type="button" className="btn-primary" onClick={() => setAddOpen(true)}>
+              Add Contact
+            </button>
           </>
         }
       />
@@ -128,12 +153,28 @@ export function ContactsPage() {
           No contacts match these filters.
         </div>
       ) : (
-        <DataTable columns={columns} rows={filteredRows} onRowClick={(row) => navigate(`/contacts/${row.id}`)} />
+        <DataTable
+          columns={columns}
+          rows={filteredRows}
+          selectable
+          selected={selectedIds}
+          onSelect={toggleSelect}
+          onSelectAll={toggleSelectAll}
+          allSelected={allSelected}
+          someSelected={someSelected}
+          onRowClick={(row) => navigate(`/contacts/${row.id}`)}
+        />
       )}
 
-      <QuickAddModal
-        open={quickOpen}
-        onClose={() => setQuickOpen(false)}
+      <ContactBatchActionBar
+        selectedIds={selectedIds}
+        onClear={() => setSelectedIds([])}
+        onComplete={loadContacts}
+      />
+
+      <AddContactDrawer
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
         onSaved={() => loadContacts()}
       />
     </div>

@@ -31,7 +31,18 @@ export const contactsApi = {
   get: (id) => api(`/contacts/${id}`),
   engagements: (id) => api(`/contacts/${id}/engagements`),
   update: (id, body) => api(`/contacts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  create: (body) => api('/contacts/quick-add', { method: 'POST', body: JSON.stringify(body) }),
   quickAdd: (body) => api('/contacts/quick-add', { method: 'POST', body: JSON.stringify(body) }),
+  batchToggleStatus: (contactIds) =>
+    api('/contacts/batch/toggle-status', {
+      method: 'POST',
+      body: JSON.stringify({ contact_ids: contactIds }),
+    }),
+  batchAddTag: (contactIds, tagId) =>
+    api('/contacts/batch/add-tag', {
+      method: 'POST',
+      body: JSON.stringify({ contact_ids: contactIds, tag_id: tagId }),
+    }),
   lookupMobile: (mobile) =>
     api(`/contacts/lookup/mobile/${encodeURIComponent(mobile)}`),
   populationForCampaign: (campaignId) =>

@@ -51,9 +51,10 @@ export async function createContactDeduped(client, fields) {
     const { rows } = await client.query(
       `INSERT INTO contacts (
          full_name, mobile_number, email, city, state, country,
-         instagram_url, youtube_url, source, created_by
+         instagram_url, youtube_url, classification,
+         open_to_paid, open_to_barter, source, created_by
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
       [
         fullName,
@@ -64,6 +65,9 @@ export async function createContactDeduped(client, fields) {
         fields.country ?? null,
         fields.instagram_url ?? null,
         fields.youtube_url ?? null,
+        fields.classification ?? null,
+        fields.open_to_paid ?? false,
+        fields.open_to_barter ?? false,
         fields.source,
         fields.created_by ?? null,
       ],

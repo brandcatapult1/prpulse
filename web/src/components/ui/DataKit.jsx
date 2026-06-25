@@ -5,6 +5,9 @@ export function DataTable({
   selectable = false,
   selected = [],
   onSelect,
+  onSelectAll,
+  allSelected = false,
+  someSelected = false,
   isRowDisabled,
 }) {
   if (!rows.length) {
@@ -20,7 +23,21 @@ export function DataTable({
       <table className="min-w-full text-left text-sm">
         <thead>
           <tr className="border-b border-line bg-canvas/60">
-            {selectable && <th className="w-10 px-4 py-2.5" />}
+            {selectable && (
+              <th className="w-10 px-4 py-2.5">
+                {onSelectAll && (
+                  <input
+                    type="checkbox"
+                    className="rounded border-line text-brand focus:ring-brand/30"
+                    checked={allSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = someSelected && !allSelected;
+                    }}
+                    onChange={() => onSelectAll?.()}
+                  />
+                )}
+              </th>
+            )}
             {columns.map((col) => (
               <th key={col.key} className="px-4 py-2.5 text-2xs font-medium uppercase tracking-wide text-ink-tertiary">
                 {col.label}

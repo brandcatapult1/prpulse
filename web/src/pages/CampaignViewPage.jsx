@@ -8,7 +8,7 @@ import { CampaignQuickEditDrawer } from '../components/campaign/CampaignQuickEdi
 import { CampaignMetricTiles } from '../components/campaign/CampaignMetricTiles.jsx';
 import { CampaignEditDrawer, CampaignTagSummary } from '../components/campaign/CampaignEditDrawer.jsx';
 import { CampaignFilterBar, CAMPAIGN_EMPTY_FILTERS } from '../components/campaign/CampaignFilterBar.jsx';
-import { QuickAddModal } from '../components/contacts/QuickAddModal.jsx';
+import { AddContactDrawer } from '../components/contacts/AddContactDrawer.jsx';
 import { filterCampaignEngagements } from '../lib/campaignBoardFilters.js';
 import { Pill, formatStatus, formatDate, formatFee, statusTone } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
@@ -537,7 +537,7 @@ function AddCreatorsDrawer({
             </span>
             <div className="flex gap-2">
               <button type="button" className="btn-secondary" onClick={() => setQuickOpen(true)}>
-                Quick Add
+                Add Contact
               </button>
               <button
                 type="button"
@@ -553,7 +553,7 @@ function AddCreatorsDrawer({
       >
         <div className="mt-4">
           {contacts.length === 0 ? (
-            <p className="text-2xs text-ink-tertiary">No eligible contacts — try Quick Add.</p>
+            <p className="text-2xs text-ink-tertiary">No eligible contacts — add a new contact first.</p>
           ) : (
             <DataTable
               selectable
@@ -584,13 +584,12 @@ function AddCreatorsDrawer({
         </div>
       </Drawer>
 
-      <QuickAddModal
+      <AddContactDrawer
         open={quickOpen}
-        defaultCampaignId={campaignId}
         onClose={() => setQuickOpen(false)}
         onSaved={() => {
           fetchPopulationContacts(campaignId).then(setContacts).catch(() => {});
-          setToast('Contact saved — select them above to add to campaign');
+          setToast('Contact added — select them above to add to campaign');
         }}
       />
 

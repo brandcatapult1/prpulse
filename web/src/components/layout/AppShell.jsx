@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { roleLabel } from '../../lib/format.jsx';
 import { NAV_ITEMS } from '../../lib/modules.js';
@@ -6,9 +6,11 @@ import { canAccessAdmin } from '../../lib/adminPermissions.js';
 import { SidebarBrand } from './SidebarBrand.jsx';
 import { useOrgLogo } from '../../hooks/useOrgLogo.js';
 
-export function AppShell({ onQuickAdd }) {
+export function AppShell({ onAddContact }) {
   const { user, logout, devMode } = useAuth();
   const { logoUrl, loading } = useOrgLogo();
+  const location = useLocation();
+  const showAddContact = location.pathname !== '/contacts';
 
   return (
     <div className="bg-canvas">
@@ -52,9 +54,11 @@ export function AppShell({ onQuickAdd }) {
         <header className="sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-line bg-white px-4 md:px-5">
           <div className="text-sm font-semibold text-ink md:hidden">PR Pulse</div>
           <div className="ml-auto flex items-center gap-2">
-            <button type="button" className="btn-secondary" onClick={onQuickAdd}>
-              Quick Add
-            </button>
+            {showAddContact && (
+              <button type="button" className="btn-secondary" onClick={onAddContact}>
+                Add Contact
+              </button>
+            )}
           </div>
         </header>
         <main className="p-4 md:p-5">

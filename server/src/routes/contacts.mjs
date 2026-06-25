@@ -3,8 +3,10 @@ import { pool, withUserTransaction } from '../db.mjs';
 import { requireAuth, scopeArchived, scopeBlacklisted } from '../middleware/auth.mjs';
 import { requireSeniorOrAdmin, requireAdmin } from '../middleware/permissions.mjs';
 import { findContactByMobile } from '../lib/mobileNumber.mjs';
-import { applyContactPatch, loadContactDetail } from '../lib/contactDetail.mjs';
+import { applyContactPatch, loadContactDetail, CLASSIFICATION_VALUES } from '../lib/contactDetail.mjs';
 import { createContactDeduped } from '../lib/contactCreate.mjs';
+import { batchAddTagToContacts, batchToggleContactStatus } from '../lib/contactBatch.mjs';
+import { syncContactTags } from '../lib/contactTags.mjs';
 
 export const contactsRouter = Router();
 
@@ -51,10 +53,47 @@ contactsRouter.get('/:id', requireAuth, async (req, res) => {
   res.json(contact);
 });
 
+contactsRouter.post('/batch/toggle-status', requireAuth, async (req, res) => {
+  try {
+    const result = await withUserTransaction(req.user.id, async (client) =>
+      batchToggleContactStatus(client, req.body?.contact_ids),
+    );
+    res.json(result);
+  } catch (err) {
+    res.status(err.status ?? 503).json({ error: err.message ?? 'Batch update failed' });
+  }
+});
+
+contactsRouter.post('/batch/add-tag', requireAuth, async (req, res) => {
+  try {
+    const result = await withUserTransaction(req.user.id, async (client) =>
+      batchAddTagToContacts(client, req.body?.contact_ids, req.body?.tag_id, {
+        userId: req.user.id,
+      }),
+    );
+    res.json(result);
+  } catch (err) {
+    res.status(err.status ?? 503).json({ error: err.message ?? 'Batch tag failed' });
+  }
+});
+
 contactsRouter.post('/quick-add', requireAuth, async (req, res) => {
-  const { full_name, mobile_number, instagram_url, city } = req.body;
+  const {
+    full_name,
+    mobile_number,
+    instagram_url,
+    city,
+    classification,
+    open_to_paid,
+    open_to_barter,
+    tag_ids,
+  } = req.body;
   if (!full_name?.trim() || !mobile_number?.trim()) {
     return res.status(400).json({ error: 'Full name and mobile are required' });
+  }
+
+  if (classification != null && classification !== '' && !CLASSIFICATION_VALUES.includes(classification)) {
+    return res.status(400).json({ error: 'Invalid classification' });
   }
 
   try {
@@ -64,9 +103,17 @@ contactsRouter.post('/quick-add', requireAuth, async (req, res) => {
         mobile_number,
         instagram_url: instagram_url ?? null,
         city: city ?? null,
+        classification: classification || null,
+        open_to_paid: Boolean(open_to_paid),
+        open_to_barter: Boolean(open_to_barter),
         source: 'quick_add',
         created_by: req.user.id,
       });
+
+      if (Array.isArray(tag_ids) && tag_ids.length > 0) {
+        await syncContactTags(client, created.id, tag_ids, { userId: req.user.id });
+      }
+
       return loadContactDetail(client, created.id);
     });
 

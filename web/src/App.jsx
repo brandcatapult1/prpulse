@@ -16,10 +16,10 @@ import { BrandsPage } from './pages/BrandsPage.jsx';
 import { BulkImportPage } from './pages/BulkImportPage.jsx';
 import { AdminPage } from './pages/AdminPage.jsx';
 import { PublicRegistrationPage } from './pages/PublicRegistrationPage.jsx';
-import { QuickAddModal } from './components/contacts/QuickAddModal.jsx';
+import { AddContactDrawer } from './components/contacts/AddContactDrawer.jsx';
 
 export default function App() {
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [addContactOpen, setAddContactOpen] = useState(false);
 
   return (
     <AuthProvider>
@@ -27,7 +27,7 @@ export default function App() {
         <Route path="/signup" element={<PublicRegistrationPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route element={<RequireAuth />}>
-          <Route element={<AppShell onQuickAdd={() => setQuickAddOpen(true)} />}>
+          <Route element={<AppShell onAddContact={() => setAddContactOpen(true)} />}>
             <Route index element={<DashboardPage />} />
             <Route path="contacts" element={<ContactsPage />} />
             <Route path="contacts/:id" element={<ContactProfilePage />} />
@@ -43,7 +43,7 @@ export default function App() {
         </Route>
       </Routes>
 
-      <QuickAddModal open={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
+      <AddContactDrawer open={addContactOpen} onClose={() => setAddContactOpen(false)} />
     </AuthProvider>
   );
 }

@@ -1,15 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FilterBar, DataTable } from '../components/ui/DataKit.jsx';
+import { DataTable } from '../components/ui/DataKit.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { AddContactDrawer } from '../components/contacts/AddContactDrawer.jsx';
 import { ContactBatchActionBar } from '../components/contacts/ContactBatchActionBar.jsx';
+import { ContactFilters } from '../components/contacts/ContactFilters.jsx';
 import { Pill, statusTone } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
-import { contactsApi } from '../lib/api.js';
+import { contactsApi, lookupApi } from '../lib/api.js';
 import { setContactsCache } from '../lib/contactsCache.js';
 import { canBulkImport } from '../lib/csvImport.js';
 import { useAuth } from '../context/AuthContext.jsx';
+
+const EMPTY_FILTERS = {
+  status: '',
+  classification: '',
+  city: '',
+  openToPaid: false,
+  openToBarter: false,
+  tagIds: [],
+};
 
 export function ContactsPage() {
   const navigate = useNavigate();
@@ -20,15 +30,22 @@ export function ContactsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [query, setQuery] = useState('');
-  const [activeFilters, setActiveFilters] = useState([]);
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [tagOptions, setTagOptions] = useState([]);
+
+  const includeArchived = filters.status === 'archived' || filters.status === 'all';
 
   useEffect(() => {
-    loadContacts();
+    loadContacts(includeArchived);
+  }, [includeArchived]);
+
+  useEffect(() => {
+    lookupApi.tags().then((data) => setTagOptions(Array.isArray(data) ? data : [])).catch(() => setTagOptions([]));
   }, []);
 
-  function loadContacts() {
+  function loadContacts(withArchived = includeArchived) {
     contactsApi
-      .list()
+      .list({ includeArchived: withArchived })
       .then((data) => {
         const list = Array.isArray(data) ? data : [];
         setRows(list);
@@ -41,11 +58,29 @@ export function ContactsPage() {
       });
   }
 
-  function toggleFilter(name) {
-    setActiveFilters((prev) =>
-      prev.includes(name) ? prev.filter((f) => f !== name) : [...prev, name],
-    );
+  function updateFilters(patch) {
+    setFilters((prev) => ({ ...prev, ...patch }));
   }
+
+  function clearAll() {
+    setQuery('');
+    setFilters(EMPTY_FILTERS);
+  }
+
+  const cityOptions = useMemo(() => {
+    const cities = new Set();
+    rows.forEach((r) => {
+      if (r.city?.trim()) cities.add(r.city.trim());
+    });
+    return [...cities].sort((a, b) => a.localeCompare(b));
+  }, [rows]);
+
+  const selectedTagNames = useMemo(
+    () => filters.tagIds
+      .map((id) => tagOptions.find((t) => t.id === id)?.name)
+      .filter(Boolean),
+    [filters.tagIds, tagOptions],
+  );
 
   const filteredRows = useMemo(() => {
     let result = rows;
@@ -59,20 +94,32 @@ export function ContactsPage() {
           || r.tags?.some((t) => t.toLowerCase().includes(q)),
       );
     }
-    if (activeFilters.includes('Status')) {
-      result = result.filter((r) => r.status === 'active');
+
+    if (filters.status === 'active' || filters.status === 'inactive' || filters.status === 'archived') {
+      result = result.filter((r) => r.status === filters.status);
+    } else if (filters.status === '') {
+      result = result.filter((r) => r.status !== 'archived');
     }
-    if (activeFilters.includes('Classification')) {
-      result = result.filter((r) => r.classification);
+
+    if (filters.classification) {
+      result = result.filter((r) => r.classification === filters.classification);
     }
-    if (activeFilters.includes('Open to Paid')) {
+    if (filters.city) {
+      result = result.filter((r) => r.city === filters.city);
+    }
+    if (filters.openToPaid) {
       result = result.filter((r) => r.open_to_paid);
     }
-    if (activeFilters.includes('Open to Barter')) {
+    if (filters.openToBarter) {
       result = result.filter((r) => r.open_to_barter);
     }
+    if (selectedTagNames.length > 0) {
+      result = result.filter((r) =>
+        selectedTagNames.every((name) => r.tags?.includes(name)),
+      );
+    }
     return result;
-  }, [rows, query, activeFilters]);
+  }, [rows, query, filters, selectedTagNames]);
 
   const selectableIds = useMemo(
     () => filteredRows.map((r) => r.id),
@@ -133,20 +180,15 @@ export function ContactsPage() {
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-2xs text-red-800">{loadError}</div>
       )}
 
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <input
-          className="input-field max-w-xs"
-          placeholder="Search name, mobile, city, tags…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <FilterBar
-          filters={['Status', 'Classification', 'Open to Paid', 'Open to Barter']}
-          active={activeFilters}
-          onToggle={toggleFilter}
-          onClear={() => setActiveFilters([])}
-        />
-      </div>
+      <ContactFilters
+        query={query}
+        onQueryChange={setQuery}
+        filters={filters}
+        onChange={updateFilters}
+        cityOptions={cityOptions}
+        tagOptions={tagOptions}
+        onClear={clearAll}
+      />
 
       {filteredRows.length === 0 ? (
         <div className="panel px-4 py-10 text-center text-2xs text-ink-secondary">

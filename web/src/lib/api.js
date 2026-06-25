@@ -27,7 +27,8 @@ export const dashboardApi = {
 };
 
 export const contactsApi = {
-  list: () => api('/contacts'),
+  list: ({ includeArchived = false } = {}) =>
+    api(`/contacts${includeArchived ? '?include_archived=true' : ''}`),
   get: (id) => api(`/contacts/${id}`),
   engagements: (id) => api(`/contacts/${id}/engagements`),
   update: (id, body) => api(`/contacts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),

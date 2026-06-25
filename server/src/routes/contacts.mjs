@@ -2,8 +2,9 @@ import { Router } from 'express';
 import { pool, withUserTransaction } from '../db.mjs';
 import { requireAuth, scopeArchived, scopeBlacklisted } from '../middleware/auth.mjs';
 import { requireSeniorOrAdmin, requireAdmin } from '../middleware/permissions.mjs';
-import { findContactByMobile, normalizeMobileToE164 } from '../lib/mobileNumber.mjs';
+import { findContactByMobile } from '../lib/mobileNumber.mjs';
 import { applyContactPatch, loadContactDetail } from '../lib/contactDetail.mjs';
+import { createContactDeduped } from '../lib/contactCreate.mjs';
 
 export const contactsRouter = Router();
 
@@ -56,31 +57,27 @@ contactsRouter.post('/quick-add', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'Full name and mobile are required' });
   }
 
-  const e164 = normalizeMobileToE164(mobile_number);
-  if (!e164) {
-    return res.status(400).json({ error: 'Enter a valid mobile number' });
-  }
-
-  const { contact: dup } = await findContactByMobile(pool, mobile_number);
-
   try {
     const contact = await withUserTransaction(req.user.id, async (client) => {
-      const { rows } = await client.query(
-        `INSERT INTO contacts (full_name, mobile_number, instagram_url, city, source, created_by)
-         VALUES ($1, $2, $3, $4, 'quick_add', $5)
-         RETURNING *`,
-        [full_name.trim(), e164, instagram_url ?? null, city ?? null, req.user.id],
-      );
-      return loadContactDetail(client, rows[0].id);
+      const created = await createContactDeduped(client, {
+        full_name,
+        mobile_number,
+        instagram_url: instagram_url ?? null,
+        city: city ?? null,
+        source: 'quick_add',
+        created_by: req.user.id,
+      });
+      return loadContactDetail(client, created.id);
     });
 
-    res.status(201).json({
-      contact,
-      duplicate_warning: dup
-        ? { id: dup.id, full_name: dup.full_name, mobile_number: dup.mobile_number }
-        : null,
-    });
+    res.status(201).json({ contact });
   } catch (err) {
+    if (err.code === 'duplicate_contact') {
+      return res.status(409).json({
+        error: 'A contact with this mobile number already exists',
+        existing: err.existing,
+      });
+    }
     res.status(err.status ?? 503).json({ error: err.message ?? 'Could not save contact' });
   }
 });

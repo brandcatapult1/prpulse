@@ -8,6 +8,7 @@ export async function api(path, options = {}) {
     const body = await res.json().catch(() => ({}));
     const err = new Error(body.error ?? res.statusText);
     err.status = res.status;
+    err.data = body;
     throw err;
   }
   if (res.status === 204) return null;

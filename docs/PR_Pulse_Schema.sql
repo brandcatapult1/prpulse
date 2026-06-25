@@ -726,8 +726,13 @@ CREATE TRIGGER trg_audit_blacklist    AFTER INSERT OR UPDATE OR DELETE ON blackl
 -- =====================================================================
 -- 16. Indexes
 -- =====================================================================
--- Contacts: dedup lookup (NON-unique — app warns, may still create), filters
-CREATE INDEX idx_contacts_mobile        ON contacts (mobile_number);
+-- Contacts: one record per normalized (E.164) mobile number. Creation routes a
+-- detected match to the existing contact instead of minting a duplicate.
+-- Applied conditionally (see ensureCriticalSchema / migration 011): deferred
+-- while legacy duplicates exist so a dirty DB still boots.
+CREATE UNIQUE INDEX uq_contacts_mobile_number ON contacts (mobile_number) WHERE mobile_number IS NOT NULL;
+CREATE INDEX idx_contacts_status        ON contacts (status);
+CREATE INDEX idx_contacts_city          ON contacts (city);
 CREATE INDEX idx_contacts_status        ON contacts (status);
 CREATE INDEX idx_contacts_city          ON contacts (city);
 CREATE INDEX idx_contacts_classification ON contacts (classification);

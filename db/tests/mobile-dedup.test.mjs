@@ -8,6 +8,10 @@ import {
   findContactByMobile,
   normalizeMobileToE164,
 } from '../../server/src/lib/mobileNumber.mjs';
+import {
+  createContactDeduped,
+  DuplicateContactError,
+} from '../../server/src/lib/contactCreate.mjs';
 
 dotenv.config();
 
@@ -95,6 +99,84 @@ async function runTests() {
       const finalStatus = dup ? 'duplicate' : 'approved';
       const finalLinked = dup?.id ?? null;
       assert(finalStatus === 'duplicate' && finalLinked === existing.rows[0].id, 'approve path should duplicate-link');
+    });
+
+    await test('createContactDeduped rejects a duplicate and routes to the existing record', async () => {
+      const user = await client.query(
+        `INSERT INTO users (email, full_name, role) VALUES ('mobile-create@test.com', 'Creator', 'admin') RETURNING id`,
+      );
+      const existing = await client.query(
+        `INSERT INTO contacts (full_name, mobile_number, source, created_by)
+         VALUES ('First Record', '+919955544433', 'manual_entry', $1)
+         RETURNING id`,
+        [user.rows[0].id],
+      );
+
+      let thrown = null;
+      try {
+        await createContactDeduped(client, {
+          full_name: 'Second Record',
+          mobile_number: '9955544433',
+          source: 'quick_add',
+          created_by: user.rows[0].id,
+        });
+      } catch (err) {
+        thrown = err;
+      }
+
+      assert(thrown instanceof DuplicateContactError, 'expected DuplicateContactError');
+      assert(thrown.status === 409, 'expected 409 status');
+      assert(thrown.existing?.id === existing.rows[0].id, 'should surface the existing contact');
+
+      const count = await client.query('SELECT count(*)::int AS n FROM contacts');
+      assert(count.rows[0].n === 1, 'no duplicate contact should have been created');
+    });
+
+    await test('createContactDeduped inserts when no mobile match exists', async () => {
+      const user = await client.query(
+        `INSERT INTO users (email, full_name, role) VALUES ('mobile-create2@test.com', 'Creator', 'admin') RETURNING id`,
+      );
+      const created = await createContactDeduped(client, {
+        full_name: 'Fresh Contact',
+        mobile_number: '9900011122',
+        source: 'quick_add',
+        created_by: user.rows[0].id,
+      });
+      assert(created.mobile_number === '+919900011122', 'stored as E.164');
+
+      const { contact } = await findContactByMobile(client, '+919900011122');
+      assert(contact?.id === created.id, 'created contact is now discoverable by dedup');
+    });
+
+    await test('unique mobile index blocks two contacts sharing a normalized number', async () => {
+      const present = await client.query(
+        `SELECT 1 FROM pg_indexes WHERE indexname = 'uq_contacts_mobile_number'`,
+      );
+      if (!present.rows[0]) {
+        console.log('  (skipped — uq_contacts_mobile_number not present in this DB)');
+        return;
+      }
+
+      const user = await client.query(
+        `INSERT INTO users (email, full_name, role) VALUES ('mobile-uniq@test.com', 'Creator', 'admin') RETURNING id`,
+      );
+      await client.query(
+        `INSERT INTO contacts (full_name, mobile_number, source, created_by)
+         VALUES ('Holder', '+919800022211', 'manual_entry', $1)`,
+        [user.rows[0].id],
+      );
+
+      let violated = false;
+      try {
+        await client.query(
+          `INSERT INTO contacts (full_name, mobile_number, source, created_by)
+           VALUES ('Collider', '+919800022211', 'manual_entry', $1)`,
+          [user.rows[0].id],
+        );
+      } catch (err) {
+        violated = err.code === '23505';
+      }
+      assert(violated, 'expected a unique-violation on duplicate mobile insert');
     });
 
     console.log(`\n${passed} mobile dedup tests passed.`);

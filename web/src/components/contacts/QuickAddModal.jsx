@@ -14,7 +14,6 @@ export function QuickAddModal({ open, onClose, onSaved, defaultCampaignId = '' }
   const { user } = useAuth();
   const [form, setForm] = useState(EMPTY);
   const [duplicate, setDuplicate] = useState(null);
-  const [continueAnyway, setContinueAnyway] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
   const [campaignId, setCampaignId] = useState('');
@@ -24,7 +23,6 @@ export function QuickAddModal({ open, onClose, onSaved, defaultCampaignId = '' }
     if (!open) return;
     setForm(EMPTY);
     setDuplicate(null);
-    setContinueAnyway(false);
     setCampaignId(defaultCampaignId || '');
     campaignsApi
       .list()
@@ -36,7 +34,6 @@ export function QuickAddModal({ open, onClose, onSaved, defaultCampaignId = '' }
     setForm((prev) => ({ ...prev, [key]: value }));
     if (key === 'mobile_number') {
       setDuplicate(null);
-      setContinueAnyway(false);
     }
   }
 
@@ -44,21 +41,25 @@ export function QuickAddModal({ open, onClose, onSaved, defaultCampaignId = '' }
     const e164 = normalizeMobileToE164(mobile);
     if (!e164) {
       setDuplicate(null);
-      setContinueAnyway(false);
       return;
     }
 
     try {
       const match = await contactsApi.lookupMobile(e164);
       setDuplicate(match ?? null);
-      if (!match) setContinueAnyway(false);
     } catch {
       setDuplicate(null);
     }
   }
 
+  function openExisting() {
+    if (!duplicate) return;
+    onClose();
+    navigate(`/contacts/${duplicate.id}`);
+  }
+
   const mobileValid = Boolean(normalizeMobileToE164(form.mobile_number));
-  const canSave = form.full_name.trim() && mobileValid && (!duplicate || continueAnyway);
+  const canSave = form.full_name.trim() && mobileValid && !duplicate;
 
   async function persistContact() {
     const body = {
@@ -105,7 +106,13 @@ export function QuickAddModal({ open, onClose, onSaved, defaultCampaignId = '' }
       onSaved?.(contact);
       onClose();
     } catch (err) {
-      setToast(err.message ?? 'Could not save contact');
+      if (err.status === 409) {
+        const existing = err.data?.existing ?? null;
+        if (existing) setDuplicate(existing);
+        setToast('That mobile number already belongs to an existing contact');
+      } else {
+        setToast(err.message ?? 'Could not save contact');
+      }
     } finally {
       setSaving(false);
     }
@@ -147,14 +154,15 @@ export function QuickAddModal({ open, onClose, onSaved, defaultCampaignId = '' }
           </label>
           {duplicate && (
             <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-2xs text-amber-900">
-              Matches existing contact: <strong>{duplicate.full_name}</strong>
-              <label className="mt-2 flex items-center gap-2">
-                <input type="checkbox" checked={continueAnyway} onChange={(e) => setContinueAnyway(e.target.checked)} />
-                Continue anyway
-              </label>
-              <button type="button" className="mt-2 text-brand hover:underline" onClick={() => navigate(`/contacts/${duplicate.id}`)}>
-                View profile →
-              </button>
+              <p>
+                This mobile number already belongs to <strong>{duplicate.full_name}</strong>. To keep
+                one record per number, open the existing contact instead of creating a new one.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button type="button" className="btn-primary" onClick={openExisting}>
+                  Use existing contact →
+                </button>
+              </div>
             </div>
           )}
           <label className="block text-2xs text-ink-secondary">

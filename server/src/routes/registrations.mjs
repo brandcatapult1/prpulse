@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { pool, withUserTransaction } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
 import { requireSeniorOrAdmin } from '../middleware/permissions.mjs';
-import { findContactByMobile, normalizeMobileToE164 } from '../lib/mobileNumber.mjs';
+import { normalizeMobileToE164 } from '../lib/mobileNumber.mjs';
+import { createContactDeduped } from '../lib/contactCreate.mjs';
 
 export const registrationsRouter = Router();
 
@@ -117,26 +118,26 @@ registrationsRouter.patch('/:id', requireAuth, requireSeniorOrAdmin, async (req,
             throw Object.assign(new Error('Linked contact not found'), { status: 404 });
           }
         } else {
-          const { contact: dup } = await findContactByMobile(client, sub.mobile_number);
-          if (dup) {
-            finalStatus = 'duplicate';
-            finalLinkedId = dup.id;
-          } else {
-            const { rows: created } = await client.query(
-              `INSERT INTO contacts (
-                full_name, mobile_number, email, city, instagram_url, source, created_by
-              ) VALUES ($1,$2,$3,$4,$5,'signup_form',$6)
-              RETURNING id`,
-              [
-                sub.full_name,
-                e164,
-                sub.email,
-                sub.city,
-                sub.instagram_link,
-                req.user.id,
-              ],
-            );
-            finalLinkedId = created[0].id;
+          // Approve never mints a duplicate: a mobile match links to the existing
+          // record (status 'duplicate'); otherwise a new contact is created.
+          try {
+            const created = await createContactDeduped(client, {
+              full_name: sub.full_name,
+              mobile_number: sub.mobile_number,
+              email: sub.email,
+              city: sub.city,
+              instagram_url: sub.instagram_link,
+              source: 'signup_form',
+              created_by: req.user.id,
+            });
+            finalLinkedId = created.id;
+          } catch (dupErr) {
+            if (dupErr.code === 'duplicate_contact' && dupErr.existing) {
+              finalStatus = 'duplicate';
+              finalLinkedId = dupErr.existing.id;
+            } else {
+              throw dupErr;
+            }
           }
         }
       }

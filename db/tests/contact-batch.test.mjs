@@ -1,10 +1,10 @@
 /**
- * Batch contact actions — status toggle (enum cast) and tag add.
+ * Batch contact actions — explicit status set (enum cast) and tag add.
  * Run: npm run db:test:batch
  */
 import pg from 'pg';
 import dotenv from 'dotenv';
-import { batchToggleContactStatus, batchAddTagToContacts } from '../../server/src/lib/contactBatch.mjs';
+import { batchSetContactStatus, batchAddTagToContacts } from '../../server/src/lib/contactBatch.mjs';
 import { ensureReferenceData } from '../../server/src/lib/referenceData.mjs';
 
 dotenv.config();
@@ -57,19 +57,37 @@ async function main() {
     const inactiveId = inactive.rows[0].id;
     const archivedId = archived.rows[0].id;
 
-    // Toggle must run with no enum type error and flip active<->inactive.
-    const result = await batchToggleContactStatus(client, [activeId, inactiveId, archivedId]);
-    assert(result.updated === 2, `expected 2 updated, got ${result.updated}`);
-    assert(result.skipped === 1, `expected 1 skipped (archived), got ${result.skipped}`);
+    // Explicit set-status must run with no enum type error; archived is skipped.
+    const toInactive = await batchSetContactStatus(client, [activeId, inactiveId, archivedId], 'inactive');
+    assert(toInactive.updated === 2, `expected 2 updated, got ${toInactive.updated}`);
+    assert(toInactive.skipped === 1, `expected 1 skipped (archived), got ${toInactive.skipped}`);
 
-    const { rows } = await client.query(
+    let { rows } = await client.query(
       `SELECT id, status FROM contacts WHERE id = ANY($1::uuid[])`,
       [[activeId, inactiveId, archivedId]],
     );
-    const byId = Object.fromEntries(rows.map((r) => [r.id, r.status]));
+    let byId = Object.fromEntries(rows.map((r) => [r.id, r.status]));
     assert(byId[activeId] === 'inactive', 'active should become inactive');
+    assert(byId[inactiveId] === 'inactive', 'inactive stays inactive when target is inactive');
+    assert(byId[archivedId] === 'archived', 'archived must NOT be changed');
+
+    const toActive = await batchSetContactStatus(client, [activeId, inactiveId], 'active');
+    assert(toActive.updated === 2, `expected 2 set active, got ${toActive.updated}`);
+
+    ({ rows } = await client.query(
+      `SELECT id, status FROM contacts WHERE id = ANY($1::uuid[])`,
+      [[activeId, inactiveId]],
+    ));
+    byId = Object.fromEntries(rows.map((r) => [r.id, r.status]));
+    assert(byId[activeId] === 'active', 'should be active');
     assert(byId[inactiveId] === 'active', 'inactive should become active');
-    assert(byId[archivedId] === 'archived', 'archived must NOT be toggled');
+
+    try {
+      await batchSetContactStatus(client, [activeId], 'archived');
+      throw new Error('expected archived status to be rejected');
+    } catch (err) {
+      assert(err.message.includes('active or inactive'), 'archived target rejected');
+    }
 
     // Batch tag add is additive + idempotent.
     await ensureReferenceData(client);

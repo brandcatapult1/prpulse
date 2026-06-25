@@ -2,9 +2,15 @@ import { useEffect, useState } from 'react';
 import { Toast } from '../ui/Primitives.jsx';
 import { contactsApi, campaignsApi, lookupApi } from '../../lib/api.js';
 
+const EMPTY_DRAFT = {
+  campaignId: '',
+  statusTarget: '',
+  tagId: '',
+};
+
 /**
- * Extensible batch action bar for the contacts list.
- * Each action runs as a single API request for the whole selection.
+ * Configure-then-Apply batch bar. Each armed action commits as one batched request
+ * when the user clicks Apply — never one write per contact.
  */
 export function ContactBatchActionBar({
   selectedIds,
@@ -13,147 +19,178 @@ export function ContactBatchActionBar({
 }) {
   const [campaigns, setCampaigns] = useState([]);
   const [tags, setTags] = useState([]);
-  const [campaignId, setCampaignId] = useState('');
-  const [tagId, setTagId] = useState('');
+  const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
-    if (selectedIds.length === 0) return;
+    if (selectedIds.length === 0) {
+      setDraft(EMPTY_DRAFT);
+      return;
+    }
     campaignsApi.list().then((data) => setCampaigns(Array.isArray(data) ? data : [])).catch(() => setCampaigns([]));
     lookupApi.tags().then((data) => setTags(Array.isArray(data) ? data : [])).catch(() => setTags([]));
   }, [selectedIds.length]);
 
   if (selectedIds.length === 0) return null;
 
-  async function runAction(label, fn) {
-    if (busy) return;
+  const armedCampaign = Boolean(draft.campaignId);
+  const armedStatus = draft.statusTarget === 'active' || draft.statusTarget === 'inactive';
+  const armedTag = Boolean(draft.tagId);
+  const armedCount = [armedCampaign, armedStatus, armedTag].filter(Boolean).length;
+  const canApply = armedCount > 0 && !busy;
+
+  function updateDraft(patch) {
+    setDraft((prev) => ({ ...prev, ...patch }));
+  }
+
+  function handleClearSelection() {
+    setDraft(EMPTY_DRAFT);
+    onClear?.();
+  }
+
+  async function handleApply() {
+    if (!canApply) return;
+
     setBusy(true);
+    const messages = [];
+
     try {
-      const message = await fn();
-      setToast(message);
+      const tasks = [];
+
+      if (armedCampaign) {
+        tasks.push(
+          campaignsApi.populate(draft.campaignId, { contact_ids: selectedIds }).then((result) => {
+            const created = result?.created?.length ?? 0;
+            const skipped = result?.skipped?.length ?? 0;
+            const campaign = campaigns.find((c) => c.id === draft.campaignId);
+            messages.push(
+              `${created} added to ${campaign?.campaign_name ?? 'campaign'}${skipped ? ` · ${skipped} already on campaign` : ''}`,
+            );
+          }),
+        );
+      }
+
+      if (armedStatus) {
+        tasks.push(
+          contactsApi.batchSetStatus(selectedIds, draft.statusTarget).then((result) => {
+            const updated = result?.updated ?? 0;
+            const skipped = result?.skipped ?? 0;
+            const label = draft.statusTarget === 'active' ? 'Active' : 'Inactive';
+            messages.push(
+              `${updated} set to ${label}${skipped ? ` · ${skipped} skipped (archived)` : ''}`,
+            );
+          }),
+        );
+      }
+
+      if (armedTag) {
+        tasks.push(
+          contactsApi.batchAddTag(selectedIds, draft.tagId).then((result) => {
+            const tagged = result?.tagged ?? 0;
+            const skipped = result?.skipped ?? 0;
+            const tagName = result?.tag?.name ?? 'tag';
+            messages.push(
+              `${tagName} applied to ${tagged}${skipped ? ` · ${skipped} already had tag` : ''}`,
+            );
+          }),
+        );
+      }
+
+      await Promise.all(tasks);
+
+      setToast(messages.join(' · '));
+      setDraft(EMPTY_DRAFT);
       onComplete?.();
       onClear?.();
     } catch (err) {
-      setToast(err.message ?? `${label} failed`);
+      setToast(err.message ?? 'Batch apply failed');
     } finally {
       setBusy(false);
     }
   }
 
-  async function addToCampaign() {
-    if (!campaignId) {
-      setToast('Pick a campaign first');
-      return;
-    }
-    await runAction('Add to campaign', async () => {
-      const result = await campaignsApi.populate(campaignId, { contact_ids: selectedIds });
-      const created = result?.created?.length ?? 0;
-      const skipped = result?.skipped?.length ?? 0;
-      const campaign = campaigns.find((c) => c.id === campaignId);
-      return `${created} added to ${campaign?.campaign_name ?? 'campaign'}${skipped ? ` · ${skipped} already on campaign` : ''}`;
-    });
-  }
-
-  async function toggleStatus() {
-    await runAction('Status update', async () => {
-      const result = await contactsApi.batchToggleStatus(selectedIds);
-      const updated = result?.updated ?? 0;
-      const skipped = result?.skipped ?? 0;
-      return `${updated} updated${skipped ? ` · ${skipped} skipped (archived)` : ''}`;
-    });
-  }
-
-  async function addTag() {
-    if (!tagId) {
-      setToast('Pick a tag first');
-      return;
-    }
-    await runAction('Add tag', async () => {
-      const result = await contactsApi.batchAddTag(selectedIds, tagId);
-      const tagged = result?.tagged ?? 0;
-      const skipped = result?.skipped ?? 0;
-      const tagName = result?.tag?.name ?? 'tag';
-      return `${tagName} applied to ${tagged}${skipped ? ` · ${skipped} already had tag` : ''}`;
-    });
-  }
-
-  const actions = [
-    {
-      id: 'campaign',
-      label: 'Add to campaign',
-      control: (
-        <div className="flex items-center gap-2">
-          <select
-            className="input-field h-8 min-w-[160px]"
-            value={campaignId}
-            disabled={busy}
-            onChange={(e) => setCampaignId(e.target.value)}
-          >
-            <option value="">Select campaign…</option>
-            {campaigns.map((c) => (
-              <option key={c.id} value={c.id}>{c.campaign_name}</option>
-            ))}
-          </select>
-          <button type="button" className="btn-secondary" disabled={busy || !campaignId} onClick={addToCampaign}>
-            Apply
-          </button>
-        </div>
-      ),
-    },
-    {
-      id: 'status',
-      label: 'Set Active / Inactive',
-      control: (
-        <button type="button" className="btn-secondary" disabled={busy} onClick={toggleStatus}>
-          Toggle status
-        </button>
-      ),
-    },
-    {
-      id: 'tag',
-      label: 'Add tag',
-      control: (
-        <div className="flex items-center gap-2">
-          <select
-            className="input-field h-8 min-w-[140px]"
-            value={tagId}
-            disabled={busy}
-            onChange={(e) => setTagId(e.target.value)}
-          >
-            <option value="">Select tag…</option>
-            {tags.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-          <button type="button" className="btn-secondary" disabled={busy || !tagId} onClick={addTag}>
-            Apply
-          </button>
-        </div>
-      ),
-    },
-  ];
+  const selectClass = (armed) =>
+    `input-field h-8 min-w-[140px] py-0 text-2xs ${armed ? 'border-brand/40 bg-brand-soft/30' : ''}`;
 
   return (
     <>
       <div className="sticky bottom-4 z-10 mx-auto max-w-6xl">
-        <div className="panel flex flex-col gap-3 border-brand/20 bg-white/95 px-4 py-3 shadow-lg backdrop-blur sm:flex-row sm:flex-wrap sm:items-center">
-          <div className="text-sm font-medium text-ink">
-            {selectedIds.length} selected
-          </div>
-          <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-            {actions.map((action) => (
-              <div key={action.id} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-                <span className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">
-                  {action.label}
+        <div className="panel flex flex-col gap-3 border-brand/20 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-sm font-medium text-ink">
+              {selectedIds.length} selected
+              {armedCount > 0 && (
+                <span className="ml-2 text-2xs font-normal text-ink-tertiary">
+                  · {armedCount} action{armedCount === 1 ? '' : 's'} ready
                 </span>
-                {action.control}
-              </div>
-            ))}
+              )}
+            </div>
+            <button type="button" className="btn-ghost text-2xs" disabled={busy} onClick={handleClearSelection}>
+              Clear selection
+            </button>
           </div>
-          <button type="button" className="btn-ghost text-2xs" disabled={busy} onClick={onClear}>
-            Clear selection
-          </button>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+            <label className="flex flex-col gap-1">
+              <span className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">
+                Add to campaign
+              </span>
+              <select
+                className={selectClass(armedCampaign)}
+                value={draft.campaignId}
+                disabled={busy}
+                onChange={(e) => updateDraft({ campaignId: e.target.value })}
+              >
+                <option value="">— Skip —</option>
+                {campaigns.map((c) => (
+                  <option key={c.id} value={c.id}>{c.campaign_name}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">
+                Set status
+              </span>
+              <select
+                className={selectClass(armedStatus)}
+                value={draft.statusTarget}
+                disabled={busy}
+                onChange={(e) => updateDraft({ statusTarget: e.target.value })}
+              >
+                <option value="">— Skip —</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">
+                Add tag
+              </span>
+              <select
+                className={selectClass(armedTag)}
+                value={draft.tagId}
+                disabled={busy}
+                onChange={(e) => updateDraft({ tagId: e.target.value })}
+              >
+                <option value="">— Skip —</option>
+                {tags.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </label>
+
+            <button
+              type="button"
+              className="btn-primary h-8 sm:ml-auto"
+              disabled={!canApply}
+              onClick={handleApply}
+            >
+              {busy ? 'Applying…' : `Apply${armedCount ? ` (${armedCount})` : ''}`}
+            </button>
+          </div>
         </div>
       </div>
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}

@@ -5,7 +5,7 @@ import { requireSeniorOrAdmin, requireAdmin } from '../middleware/permissions.mj
 import { findContactByMobile } from '../lib/mobileNumber.mjs';
 import { applyContactPatch, loadContactDetail, CLASSIFICATION_VALUES } from '../lib/contactDetail.mjs';
 import { createContactDeduped } from '../lib/contactCreate.mjs';
-import { batchAddTagToContacts, batchToggleContactStatus } from '../lib/contactBatch.mjs';
+import { batchAddTagToContacts, batchSetContactStatus } from '../lib/contactBatch.mjs';
 import { syncContactTags } from '../lib/contactTags.mjs';
 
 export const contactsRouter = Router();
@@ -53,10 +53,10 @@ contactsRouter.get('/:id', requireAuth, async (req, res) => {
   res.json(contact);
 });
 
-contactsRouter.post('/batch/toggle-status', requireAuth, async (req, res) => {
+contactsRouter.post('/batch/set-status', requireAuth, async (req, res) => {
   try {
     const result = await withUserTransaction(req.user.id, async (client) =>
-      batchToggleContactStatus(client, req.body?.contact_ids),
+      batchSetContactStatus(client, req.body?.contact_ids, req.body?.status),
     );
     res.json(result);
   } catch (err) {

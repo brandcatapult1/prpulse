@@ -34,10 +34,10 @@ export const contactsApi = {
   update: (id, body) => api(`/contacts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   create: (body) => api('/contacts/quick-add', { method: 'POST', body: JSON.stringify(body) }),
   quickAdd: (body) => api('/contacts/quick-add', { method: 'POST', body: JSON.stringify(body) }),
-  batchToggleStatus: (contactIds) =>
-    api('/contacts/batch/toggle-status', {
+  batchSetStatus: (contactIds, status) =>
+    api('/contacts/batch/set-status', {
       method: 'POST',
-      body: JSON.stringify({ contact_ids: contactIds }),
+      body: JSON.stringify({ contact_ids: contactIds, status }),
     }),
   batchAddTag: (contactIds, tagId) =>
     api('/contacts/batch/add-tag', {

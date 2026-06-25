@@ -7,24 +7,27 @@ function parseContactIds(value) {
   return [...new Set(value.filter(Boolean))];
 }
 
-/** Toggle active↔inactive for each selected contact; archived rows are skipped. */
-export async function batchToggleContactStatus(client, contactIds) {
+/** Set explicit active/inactive on selected contacts; archived rows are skipped. */
+export async function batchSetContactStatus(client, contactIds, status) {
+  if (!['active', 'inactive'].includes(status)) {
+    throw Object.assign(new Error('status must be active or inactive'), { status: 400 });
+  }
+
   const ids = parseContactIds(contactIds);
 
   const { rows } = await client.query(
     `UPDATE contacts
-     SET status = (
-           CASE WHEN status = 'active' THEN 'inactive' ELSE 'active' END
-         )::contact_status
+     SET status = $2::contact_status
      WHERE id = ANY($1::uuid[])
-       AND status IN ('active', 'inactive')
+       AND status <> 'archived'
      RETURNING id, status`,
-    [ids],
+    [ids, status],
   );
 
   return {
     updated: rows.length,
     skipped: ids.length - rows.length,
+    status,
     contacts: rows,
   };
 }

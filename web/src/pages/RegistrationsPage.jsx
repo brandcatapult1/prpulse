@@ -297,8 +297,8 @@ function ReviewDrawer({ registration, contacts, onClose, onApprove, onReject, on
         <Detail
           label="Preferences"
           value={[
-            registration.paid_preference && 'Paid',
             registration.barter_preference && 'Barter',
+            registration.paid_preference && 'Paid',
           ].filter(Boolean).join(' · ') || '—'}
         />
         <Detail label="Reel rate" value={registration.reel_rate != null ? `₹${registration.reel_rate}` : '—'} />

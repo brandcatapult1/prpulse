@@ -165,17 +165,17 @@ export function ContactFilters({
       />
 
       <ToggleChip
-        active={filters.openToPaid}
-        onClick={() => onChange({ openToPaid: !filters.openToPaid })}
-      >
-        Open to Paid
-      </ToggleChip>
-
-      <ToggleChip
         active={filters.openToBarter}
         onClick={() => onChange({ openToBarter: !filters.openToBarter })}
       >
         Open to Barter
+      </ToggleChip>
+
+      <ToggleChip
+        active={filters.openToPaid}
+        onClick={() => onChange({ openToPaid: !filters.openToPaid })}
+      >
+        Open to Paid
       </ToggleChip>
 
       {(hasActiveFilters || query) && (

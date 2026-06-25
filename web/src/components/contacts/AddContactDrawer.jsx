@@ -215,18 +215,18 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
             <label className="flex items-center gap-2 text-2xs text-ink-secondary">
               <input
                 type="checkbox"
-                checked={form.open_to_paid}
-                onChange={(e) => updateField('open_to_paid', e.target.checked)}
-              />
-              Open to paid
-            </label>
-            <label className="flex items-center gap-2 text-2xs text-ink-secondary">
-              <input
-                type="checkbox"
                 checked={form.open_to_barter}
                 onChange={(e) => updateField('open_to_barter', e.target.checked)}
               />
               Open to barter
+            </label>
+            <label className="flex items-center gap-2 text-2xs text-ink-secondary">
+              <input
+                type="checkbox"
+                checked={form.open_to_paid}
+                onChange={(e) => updateField('open_to_paid', e.target.checked)}
+              />
+              Open to paid
             </label>
           </div>
 

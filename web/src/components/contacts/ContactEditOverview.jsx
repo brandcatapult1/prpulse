@@ -295,21 +295,6 @@ export function ContactEditOverview({
             </dd>
           </div>
           <ProfileField
-            label="Open to paid"
-            editing={editing}
-            value={boolLabel(extras.open_to_paid ?? contact.open_to_paid)}
-            input={
-              <label className="mt-1 flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={Boolean(draft.open_to_paid)}
-                  onChange={(e) => setField('open_to_paid', e.target.checked)}
-                />
-                Open to paid collaborations
-              </label>
-            }
-          />
-          <ProfileField
             label="Open to barter"
             editing={editing}
             value={boolLabel(extras.open_to_barter ?? contact.open_to_barter)}
@@ -321,6 +306,21 @@ export function ContactEditOverview({
                   onChange={(e) => setField('open_to_barter', e.target.checked)}
                 />
                 Open to barter collaborations
+              </label>
+            }
+          />
+          <ProfileField
+            label="Open to paid"
+            editing={editing}
+            value={boolLabel(extras.open_to_paid ?? contact.open_to_paid)}
+            input={
+              <label className="mt-1 flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={Boolean(draft.open_to_paid)}
+                  onChange={(e) => setField('open_to_paid', e.target.checked)}
+                />
+                Open to paid collaborations
               </label>
             }
           />

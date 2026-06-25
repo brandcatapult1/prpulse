@@ -6,6 +6,7 @@ import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { CampaignKanbanBoard } from '../components/campaign/CampaignKanbanBoard.jsx';
 import { CampaignQuickEditDrawer } from '../components/campaign/CampaignQuickEditDrawer.jsx';
 import { CampaignMetricTiles } from '../components/campaign/CampaignMetricTiles.jsx';
+import { CampaignEditDrawer, CampaignTagSummary } from '../components/campaign/CampaignEditDrawer.jsx';
 import { CampaignFilterBar, CAMPAIGN_EMPTY_FILTERS } from '../components/campaign/CampaignFilterBar.jsx';
 import { QuickAddModal } from '../components/contacts/QuickAddModal.jsx';
 import { filterCampaignEngagements } from '../lib/campaignBoardFilters.js';
@@ -67,6 +68,7 @@ export function CampaignViewPage() {
   const [feedbackEngagement, setFeedbackEngagement] = useState(null);
   const [toast, setToast] = useState(null);
   const [boardRevision, setBoardRevision] = useState(0);
+  const [editOpen, setEditOpen] = useState(false);
 
   const reload = useCallback(async () => {
     if (!id) return;
@@ -262,8 +264,20 @@ export function CampaignViewPage() {
       <PageHeader
         title={campaign.campaign_name}
         subtitle={`${MODULES.campaignView.pageTitle} · ${campaign.brand_name}`}
-        actions={<button type="button" className="btn-primary" onClick={() => setAddOpen(true)}>Add Creators</button>}
+        actions={
+          <>
+            <button type="button" className="btn-secondary" onClick={() => setEditOpen(true)}>Edit</button>
+            <button type="button" className="btn-primary" onClick={() => setAddOpen(true)}>Add Creators</button>
+          </>
+        }
       />
+
+      {(campaign.tags?.length ?? 0) > 0 && (
+        <div className="flex flex-wrap items-center gap-2 px-0.5">
+          <span className="text-[10px] font-medium uppercase tracking-wide text-ink-tertiary">Tags</span>
+          <CampaignTagSummary tags={campaign.tags} />
+        </div>
+      )}
 
       <CampaignMetricTiles campaign={campaign} />
 
@@ -383,6 +397,16 @@ export function CampaignViewPage() {
             message: contactFeedbackToastMessage(rating, wouldWorkAgain),
           });
           setFeedbackEngagement(null);
+        }}
+      />
+
+      <CampaignEditDrawer
+        campaign={campaign}
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSaved={(saved) => {
+          setCampaign(saved);
+          setEditOpen(false);
         }}
       />
 

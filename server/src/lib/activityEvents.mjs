@@ -71,6 +71,7 @@ const ACTION_LABELS = {
   [ACTIVITY_ACTION.BLACKLIST_SET]: 'Contact blacklisted',
   [ACTIVITY_ACTION.BLACKLIST_CLEARED]: 'Blacklist cleared',
   [ACTIVITY_ACTION.FEEDBACK_LOGGED]: 'Feedback logged',
+  contact_tags_added: 'Contact tag added',
   visit_reminded: 'Visit reminder sent',
 };
 
@@ -91,6 +92,9 @@ function formatStatusChangeForRow(row, details) {
     const label = formatDeliverableType(details.deliverableType);
     const qty = details.quantity > 1 ? ` ×${details.quantity}` : '';
     return label ? `${label}${qty}` : null;
+  }
+  if (row.action === 'contact_tags_added' && details.tag_name) {
+    return details.tag_name;
   }
   return null;
 }

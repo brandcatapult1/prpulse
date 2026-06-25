@@ -1,4 +1,5 @@
 import { findContactByMobile, normalizeMobileToE164 } from './mobileNumber.mjs';
+import { syncContactTags } from './contactTags.mjs';
 
 export const CLASSIFICATION_VALUES = [
   'nano',
@@ -238,7 +239,7 @@ async function assertIdsExist(client, table, ids, label) {
   }
 }
 
-export async function applyContactPatch(client, contactId, body) {
+export async function applyContactPatch(client, contactId, body, { userId } = {}) {
   const patch = parseContactPatch(body);
 
   const existing = await client.query('SELECT id, mobile_number FROM contacts WHERE id = $1', [contactId]);
@@ -298,13 +299,7 @@ export async function applyContactPatch(client, contactId, body) {
   }
 
   if (patch.tag_ids !== undefined) {
-    await client.query('DELETE FROM contact_tags WHERE contact_id = $1', [contactId]);
-    for (const tagId of patch.tag_ids) {
-      await client.query(
-        `INSERT INTO contact_tags (contact_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-        [contactId, tagId],
-      );
-    }
+    await syncContactTags(client, contactId, patch.tag_ids, { userId });
   }
 
   if (patch.secondary_category_ids !== undefined) {

@@ -4,6 +4,11 @@ import { requireAuth } from '../middleware/auth.mjs';
 import { requireCampaignWriteAccess, requireStaffRole } from '../middleware/permissions.mjs';
 import { assertCreatorAssignedForCampaignManager } from '../lib/permissions.mjs';
 import { listActivityEventsForCampaign } from '../lib/activityEvents.mjs';
+import {
+  applyCampaignPatch,
+  assignCampaignTagsOnCreate,
+  loadCampaignDetail,
+} from '../lib/campaignDetail.mjs';
 
 export const campaignsRouter = Router();
 
@@ -135,7 +140,10 @@ campaignsRouter.post('/', requireAuth, requireStaffRole, async (req, res) => {
         );
       }
 
-      return { ...rows[0], brand_name: brand.rows[0].brand_name };
+      const tagIds = Array.isArray(req.body?.tag_ids) ? req.body.tag_ids.filter(Boolean) : [];
+      await assignCampaignTagsOnCreate(client, rows[0].id, tagIds);
+
+      return loadCampaignDetail(client, rows[0].id);
     });
 
     res.status(201).json(row);
@@ -145,15 +153,20 @@ campaignsRouter.post('/', requireAuth, requireStaffRole, async (req, res) => {
 });
 
 campaignsRouter.get('/:id', requireAuth, async (req, res) => {
-  const { rows } = await pool.query(
-    `SELECT cam.*, b.brand_name
-     FROM campaigns cam
-     JOIN brands b ON b.id = cam.brand_id
-     WHERE cam.id = $1`,
-    [req.params.id],
-  );
-  if (!rows[0]) return res.status(404).json({ error: 'Campaign not found' });
-  res.json(rows[0]);
+  const campaign = await loadCampaignDetail(pool, req.params.id);
+  if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+  res.json(campaign);
+});
+
+campaignsRouter.patch('/:id', requireAuth, requireCampaignWriteAccess('id'), async (req, res) => {
+  try {
+    const campaign = await withUserTransaction(req.user.id, async (client) =>
+      applyCampaignPatch(client, req.params.id, req.body),
+    );
+    res.json(campaign);
+  } catch (err) {
+    res.status(err.status ?? 503).json({ error: err.message ?? 'Update failed' });
+  }
 });
 
 campaignsRouter.get('/:id/activity-events', requireAuth, async (req, res) => {

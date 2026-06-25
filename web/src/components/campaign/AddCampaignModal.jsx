@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Drawer } from '../ui/Primitives.jsx';
-import { brandsApi, campaignsApi } from '../../lib/api.js';
+import { brandsApi, campaignsApi, lookupApi } from '../../lib/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { TagSelectChips } from '../tags/TagSelectChips.jsx';
 import {
   CAMPAIGN_TYPES,
   campaignSchedulePayload,
@@ -19,6 +20,7 @@ function emptyForm(defaultManagerIds = []) {
     target_collaborations: '',
     status: 'draft',
     manager_ids: defaultManagerIds,
+    tag_ids: [],
   };
 }
 
@@ -34,6 +36,7 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [tagOptions, setTagOptions] = useState([]);
 
   const isMonthly = form.campaign_type === 'monthly';
   const scheduleError = validateCampaignSchedule(form);
@@ -54,9 +57,11 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
     Promise.all([
       brandsApi.list().catch(() => []),
       campaignsApi.assignableManagers().catch(() => []),
+      lookupApi.tags().catch(() => []),
     ])
-      .then(([brandData, managerData]) => {
+      .then(([brandData, managerData, tags]) => {
         setBrands(Array.isArray(brandData) ? brandData : []);
+        setTagOptions(Array.isArray(tags) ? tags : []);
         const list = Array.isArray(managerData) ? managerData : [];
         setManagers(list);
         setForm((f) => {
@@ -105,6 +110,7 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
           : null,
         status: form.status,
         manager_ids: form.manager_ids,
+        tag_ids: form.tag_ids,
         ...campaignSchedulePayload(form),
       });
       onCreated?.(created);
@@ -278,6 +284,20 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
             <option value="active">Active</option>
           </select>
         </label>
+
+        <div>
+          <FieldLabel>Campaign tags</FieldLabel>
+          <p className="mt-0.5 text-[10px] text-ink-tertiary">
+            Propagate to creators when they complete a counted collaboration.
+          </p>
+          <div className="mt-1.5">
+            <TagSelectChips
+              tags={tagOptions}
+              selectedIds={form.tag_ids}
+              onChange={(tag_ids) => setForm((f) => ({ ...f, tag_ids }))}
+            />
+          </div>
+        </div>
       </div>
     </Drawer>
   );

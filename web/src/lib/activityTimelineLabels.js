@@ -41,6 +41,7 @@ const ACTION_LABELS = {
   blacklist_set: 'Contact blacklisted',
   blacklist_cleared: 'Blacklist cleared',
   feedback_logged: 'Feedback logged',
+  contact_tags_added: 'Contact tag added',
   visit_reminded: 'Visit reminder sent',
   status_change: 'Status changed',
 };

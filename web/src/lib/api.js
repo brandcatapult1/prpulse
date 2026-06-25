@@ -45,6 +45,7 @@ export const campaignsApi = {
   assignableManagers: () => api('/campaigns/assignable-managers'),
   create: (body) => api('/campaigns', { method: 'POST', body: JSON.stringify(body) }),
   get: (id) => api(`/campaigns/${id}`),
+  update: (id, body) => api(`/campaigns/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   populate: (id, body) =>
     api(`/campaigns/${id}/populate`, { method: 'POST', body: JSON.stringify(body) }),
 };

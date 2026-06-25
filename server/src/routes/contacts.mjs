@@ -94,7 +94,7 @@ contactsRouter.get('/lookup/mobile/:mobile', requireAuth, async (req, res) => {
 contactsRouter.patch('/:id', requireAuth, async (req, res) => {
   try {
     const contact = await withUserTransaction(req.user.id, async (client) =>
-      applyContactPatch(client, req.params.id, req.body),
+      applyContactPatch(client, req.params.id, req.body, { userId: req.user.id }),
     );
     res.json(contact);
   } catch (err) {

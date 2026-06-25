@@ -43,6 +43,7 @@ const DELIVERABLE_TYPE_LABELS = {
 
 const LEGACY_ACTION_LABELS = {
   status_change: 'Status changed',
+  contact_tags_added: 'Contact tag added',
 };
 
 function titleCaseSlug(value) {
@@ -141,6 +142,10 @@ export function formatTimelineNotes(row, details, { statusChange } = {}) {
 
   if (details.priorDroppedFrom) {
     return `Previously at: ${formatStageSlug(details.priorDroppedFrom)}`;
+  }
+
+  if (row.action === 'contact_tags_added') {
+    return 'Applied after collaboration completed';
   }
 
   return null;

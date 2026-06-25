@@ -117,3 +117,8 @@ export const reportsApi = {
     api(`/reports/campaign/${campaignId}?period=${encodeURIComponent(period)}`),
   periods: () => api('/reports/periods'),
 };
+
+export const lookupApi = {
+  tags: () => api('/lookup/tags'),
+  categories: () => api('/lookup/categories'),
+};

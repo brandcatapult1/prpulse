@@ -24,9 +24,25 @@ export function getContactProfileExtras(contact) {
   return {
     instagram_url: row.instagram_url ?? null,
     youtube_url: row.youtube_url ?? null,
+    other_platform_links: row.other_platform_links ?? [],
     notes: row.notes ?? null,
     open_to_paid: row.open_to_paid ?? null,
     open_to_barter: row.open_to_barter ?? null,
+    reel_rate: row.reel_rate ?? null,
+    story_rate: row.story_rate ?? null,
+    post_rate: row.post_rate ?? null,
+    other_rate: row.other_rate ?? null,
+    email: row.email ?? null,
+    state: row.state ?? null,
+    country: row.country ?? null,
+    primary_category: row.primary_category ?? null,
+    secondary_categories: row.secondary_categories ?? [],
+    total_collaborations: row.total_collaborations,
+    last_collaboration_date: row.last_collaboration_date,
+    avg_rating: row.avg_content_quality != null
+      ? ((row.avg_content_quality ?? 0) + (row.avg_professionalism ?? 0) + (row.avg_timeliness ?? 0)) / 3
+      : null,
+    would_work_again_pct: row.would_work_again_pct,
   };
 }
 

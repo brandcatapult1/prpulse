@@ -3,6 +3,7 @@ import { pool, withUserTransaction } from '../db.mjs';
 import { requireAuth, scopeArchived, scopeBlacklisted } from '../middleware/auth.mjs';
 import { requireSeniorOrAdmin, requireAdmin } from '../middleware/permissions.mjs';
 import { findContactByMobile, normalizeMobileToE164 } from '../lib/mobileNumber.mjs';
+import { applyContactPatch, loadContactDetail } from '../lib/contactDetail.mjs';
 
 export const contactsRouter = Router();
 
@@ -11,7 +12,16 @@ contactsRouter.get('/', requireAuth, async (req, res) => {
   const { rows } = await pool.query(
     `SELECT c.id, c.full_name, c.city, c.classification, c.status,
             c.is_blacklisted, c.mobile_number, c.contact_type,
-            c.open_to_paid, c.open_to_barter
+            c.open_to_paid, c.open_to_barter,
+            COALESCE(
+              (
+                SELECT array_agg(t.name ORDER BY t.name)
+                FROM contact_tags ct
+                JOIN tags t ON t.id = ct.tag_id
+                WHERE ct.contact_id = c.id
+              ),
+              ARRAY[]::text[]
+            ) AS tags
      FROM contacts c
      WHERE 1=1 ${scopeArchived(includeArchived)}
      ORDER BY c.full_name
@@ -35,9 +45,9 @@ contactsRouter.get('/:id/engagements', requireAuth, async (req, res) => {
 });
 
 contactsRouter.get('/:id', requireAuth, async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM contacts WHERE id = $1', [req.params.id]);
-  if (!rows[0]) return res.status(404).json({ error: 'Contact not found' });
-  res.json(rows[0]);
+  const contact = await loadContactDetail(pool, req.params.id);
+  if (!contact) return res.status(404).json({ error: 'Contact not found' });
+  res.json(contact);
 });
 
 contactsRouter.post('/quick-add', requireAuth, async (req, res) => {
@@ -61,7 +71,7 @@ contactsRouter.post('/quick-add', requireAuth, async (req, res) => {
          RETURNING *`,
         [full_name.trim(), e164, instagram_url ?? null, city ?? null, req.user.id],
       );
-      return rows[0];
+      return loadContactDetail(client, rows[0].id);
     });
 
     res.status(201).json({
@@ -82,34 +92,19 @@ contactsRouter.get('/lookup/mobile/:mobile', requireAuth, async (req, res) => {
 });
 
 contactsRouter.patch('/:id', requireAuth, async (req, res) => {
-  const allowed = ['full_name', 'email', 'city', 'instagram_url', 'youtube_url', 'notes'];
-  const patch = {};
-  for (const key of allowed) {
-    if (Object.prototype.hasOwnProperty.call(req.body ?? {}, key)) {
-      patch[key] = req.body[key];
-    }
-  }
-  if (Object.keys(patch).length === 0) {
-    return res.status(400).json({ error: 'No valid fields to update' });
-  }
-
   try {
-    const sets = [];
-    const params = [req.params.id];
-    let idx = 2;
-    for (const [key, value] of Object.entries(patch)) {
-      sets.push(`${key} = $${idx}`);
-      params.push(value);
-      idx += 1;
-    }
-    const { rows } = await pool.query(
-      `UPDATE contacts SET ${sets.join(', ')}, updated_at = now() WHERE id = $1 RETURNING *`,
-      params,
+    const contact = await withUserTransaction(req.user.id, async (client) =>
+      applyContactPatch(client, req.params.id, req.body),
     );
-    if (!rows[0]) return res.status(404).json({ error: 'Contact not found' });
-    res.json(rows[0]);
+    res.json(contact);
   } catch (err) {
-    res.status(503).json({ error: err.message ?? 'Update failed' });
+    if (err.duplicate) {
+      return res.status(409).json({
+        error: err.message,
+        duplicate: err.duplicate,
+      });
+    }
+    res.status(err.status ?? 503).json({ error: err.message ?? 'Update failed' });
   }
 });
 

@@ -10,6 +10,7 @@ import { isMobileValid } from '../../lib/phone.js';
 import { e164FromDraft } from '../../lib/contactDraft.js';
 import { CLASSIFICATION_OPTIONS, classificationSelectLabel } from '../../lib/classifications.js';
 import { citiesForCountry } from '../../lib/locations.js';
+import { hasCollaborationPreference, COLLABORATION_PREFERENCE_ERROR } from '../../lib/collaborationPrefs.js';
 
 const EMPTY = {
   full_name: '',
@@ -89,10 +90,16 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
   }
 
   const mobileValid = isMobileValid(form.mobile_number, form.mobile_country_code);
-  const canSave = form.full_name.trim() && mobileValid && !duplicate;
+  const preferenceValid = hasCollaborationPreference(form.open_to_paid, form.open_to_barter);
+  const canSave = form.full_name.trim() && mobileValid && !duplicate && preferenceValid;
 
   async function handleSave() {
-    if (!canSave || saving) return;
+    if (saving) return;
+    if (!form.full_name.trim() || !mobileValid || duplicate) return;
+    if (!preferenceValid) {
+      setToast(COLLABORATION_PREFERENCE_ERROR);
+      return;
+    }
 
     setSaving(true);
     try {
@@ -248,6 +255,9 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
               Open to paid
             </label>
           </div>
+          {!preferenceValid && (
+            <p className="text-2xs text-red-700">{COLLABORATION_PREFERENCE_ERROR}</p>
+          )}
 
           <div>
             <div className="text-2xs text-ink-secondary">Tags</div>

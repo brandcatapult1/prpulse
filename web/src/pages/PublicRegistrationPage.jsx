@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { registrationsApi } from '../lib/api.js';
+import {
+  formWithPaidPreference,
+  registrationRatesPayload,
+  showIndicativeRates,
+  hasCollaborationPreference,
+  COLLABORATION_PREFERENCE_ERROR,
+} from '../lib/collaborationPrefs.js';
 import { MobileNumberField } from '../components/contacts/MobileNumberField.jsx';
 import { CityCountryField } from '../components/contacts/CityCountryField.jsx';
 import { normalizeMobileToE164, isMobileValid } from '../lib/phone.js';
@@ -44,11 +51,10 @@ export function PublicRegistrationPage() {
   const set = (field) => (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     setForm((f) => {
-      const next = { ...f, [field]: value };
-      if (field === 'paid_preference' && !value) {
-        next.reel_rate = '';
-        next.story_rate = '';
+      if (field === 'paid_preference') {
+        return formWithPaidPreference(f, value);
       }
+      const next = { ...f, [field]: value };
       if (field === 'country_code') {
         const stillValid = citiesForCountry(cityOptions, value).some((c) => c.name === f.city);
         if (!stillValid) next.city = '';
@@ -94,6 +100,11 @@ export function PublicRegistrationPage() {
       return;
     }
 
+    if (!hasCollaborationPreference(form.paid_preference, form.barter_preference)) {
+      setError(COLLABORATION_PREFERENCE_ERROR);
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
@@ -110,8 +121,7 @@ export function PublicRegistrationPage() {
       primary_category_id: form.primary_category_id,
       paid_preference: form.paid_preference,
       barter_preference: form.barter_preference,
-      reel_rate: form.paid_preference && form.reel_rate ? Number(form.reel_rate) : null,
-      story_rate: form.paid_preference && form.story_rate ? Number(form.story_rate) : null,
+      ...registrationRatesPayload(form.paid_preference, form),
       portfolio_links: [],
       notes: form.notes.trim() || null,
     };
@@ -213,7 +223,7 @@ export function PublicRegistrationPage() {
           </Field>
 
           <div className="space-y-3 rounded-lg border border-line bg-canvas px-4 py-3">
-            <p className="text-2xs font-medium text-ink-secondary">Collaboration preferences</p>
+            <p className="text-2xs font-medium text-ink-secondary">Collaboration preferences *</p>
             <label className="flex items-center gap-2 text-sm text-ink-secondary">
               <input
                 type="checkbox"
@@ -232,9 +242,12 @@ export function PublicRegistrationPage() {
               />
               Open to paid
             </label>
+            {!hasCollaborationPreference(form.paid_preference, form.barter_preference) && (
+              <p className="text-2xs text-red-700">{COLLABORATION_PREFERENCE_ERROR}</p>
+            )}
           </div>
 
-          {form.paid_preference && (
+          {showIndicativeRates(form.paid_preference) && (
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Reel rate (₹)">
                 <input className="input-field" type="number" min={0} value={form.reel_rate} onChange={set('reel_rate')} placeholder="15000" />

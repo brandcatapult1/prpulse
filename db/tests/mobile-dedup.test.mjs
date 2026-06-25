@@ -141,11 +141,38 @@ async function runTests() {
         mobile_number: '9900011122',
         source: 'quick_add',
         created_by: user.rows[0].id,
+        open_to_barter: true,
       });
       assert(created.mobile_number === '+919900011122', 'stored as E.164');
 
       const { contact } = await findContactByMobile(client, '+919900011122');
       assert(contact?.id === created.id, 'created contact is now discoverable by dedup');
+    });
+
+    await test('createContactDeduped rejects a contact open to neither paid nor barter', async () => {
+      const user = await client.query(
+        `INSERT INTO users (email, full_name, role) VALUES ('mobile-create3@test.com', 'Creator', 'admin') RETURNING id`,
+      );
+
+      let thrown = null;
+      try {
+        await createContactDeduped(client, {
+          full_name: 'No Terms',
+          mobile_number: '9900011133',
+          source: 'quick_add',
+          created_by: user.rows[0].id,
+          open_to_paid: false,
+          open_to_barter: false,
+        });
+      } catch (err) {
+        thrown = err;
+      }
+
+      assert(thrown?.status === 400, 'expected 400 status for missing collaboration preference');
+      assert(
+        /open to paid and\/or barter/i.test(thrown?.message ?? ''),
+        'expected collaboration-preference error message',
+      );
     });
 
     await test('unique mobile index blocks two contacts sharing a normalized number', async () => {

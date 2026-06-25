@@ -7,6 +7,14 @@ import { MobileNumberField } from './MobileNumberField.jsx';
 import { CityCountryField } from './CityCountryField.jsx';
 import { countryLabel, citiesForCountry } from '../../lib/locations.js';
 import { isMobileValid } from '../../lib/phone.js';
+import {
+  draftWithOpenToPaid,
+  draftWithPrimaryCategory,
+  showIndicativeRates,
+  hasCollaborationPreference,
+  COLLABORATION_PREFERENCE_ERROR,
+} from '../../lib/collaborationPrefs.js';
+import { incompletePlatformLinkIndexes } from '../../lib/contactDraft.js';
 
 export function ContactEditOverview({
   contact,
@@ -44,6 +52,19 @@ export function ContactEditOverview({
   const secondaryNames = (contact.secondary_categories ?? extras.secondary_categories ?? [])
     .map((c) => c.name)
     .filter(Boolean);
+
+  const openToPaid = editing
+    ? Boolean(draft.open_to_paid)
+    : Boolean(extras.open_to_paid ?? contact.open_to_paid);
+  const indicativeRatesVisible = showIndicativeRates(openToPaid);
+  const missingPreference =
+    editing && !hasCollaborationPreference(draft.open_to_paid, draft.open_to_barter);
+  const incompleteLinkIndexes = editing
+    ? incompletePlatformLinkIndexes(draft.other_platform_links)
+    : [];
+  const secondaryCategoryOptions = categoryOptions.filter(
+    (c) => c.id !== (draft.primary_category_id ?? contact.primary_category?.id ?? contact.primary_category_id),
+  );
 
   return (
     <div className="space-y-3">
@@ -167,46 +188,56 @@ export function ContactEditOverview({
           <p className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">Other platforms</p>
           {editing ? (
             <div className="mt-2 space-y-2">
-              {(draft.other_platform_links ?? []).map((link, index) => (
-                <div key={index} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-                  <input
-                    className="input-field"
-                    placeholder="Label"
-                    value={link.label ?? ''}
-                    onChange={(e) => {
-                      onDraftChange((d) => {
-                        const links = [...(d.other_platform_links ?? [])];
-                        links[index] = { ...links[index], label: e.target.value };
-                        return { ...d, other_platform_links: links };
-                      });
-                    }}
-                  />
-                  <input
-                    className="input-field"
-                    placeholder="URL"
-                    value={link.url ?? ''}
-                    onChange={(e) => {
-                      onDraftChange((d) => {
-                        const links = [...(d.other_platform_links ?? [])];
-                        links[index] = { ...links[index], url: e.target.value };
-                        return { ...d, other_platform_links: links };
-                      });
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="btn-secondary text-2xs"
-                    onClick={() => {
-                      onDraftChange((d) => ({
-                        ...d,
-                        other_platform_links: (d.other_platform_links ?? []).filter((_, i) => i !== index),
-                      }));
-                    }}
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
+              {(draft.other_platform_links ?? []).map((link, index) => {
+                const incomplete = incompleteLinkIndexes.includes(index);
+                return (
+                  <div key={index}>
+                    <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                      <input
+                        className={`input-field ${incomplete ? 'border-red-400' : ''}`}
+                        placeholder="Label"
+                        value={link.label ?? ''}
+                        onChange={(e) => {
+                          onDraftChange((d) => {
+                            const links = [...(d.other_platform_links ?? [])];
+                            links[index] = { ...links[index], label: e.target.value };
+                            return { ...d, other_platform_links: links };
+                          });
+                        }}
+                      />
+                      <input
+                        className={`input-field ${incomplete ? 'border-red-400' : ''}`}
+                        placeholder="URL"
+                        value={link.url ?? ''}
+                        onChange={(e) => {
+                          onDraftChange((d) => {
+                            const links = [...(d.other_platform_links ?? [])];
+                            links[index] = { ...links[index], url: e.target.value };
+                            return { ...d, other_platform_links: links };
+                          });
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn-secondary text-2xs"
+                        onClick={() => {
+                          onDraftChange((d) => ({
+                            ...d,
+                            other_platform_links: (d.other_platform_links ?? []).filter((_, i) => i !== index),
+                          }));
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    {incomplete && (
+                      <p className="mt-1 text-2xs text-red-700">
+                        Add both a label and a URL, or remove this row.
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
               <button
                 type="button"
                 className="btn-secondary text-2xs"
@@ -248,7 +279,7 @@ export function ContactEditOverview({
                 <select
                   className="input-field w-full max-w-md"
                   value={draft.primary_category_id ?? ''}
-                  onChange={(e) => setField('primary_category_id', e.target.value)}
+                  onChange={(e) => onDraftChange((d) => draftWithPrimaryCategory(d, e.target.value))}
                 >
                   <option value="">— None —</option>
                   {categoryOptions.map((c) => (
@@ -265,7 +296,7 @@ export function ContactEditOverview({
             <dd className="mt-2">
               {editing ? (
                 <div className="flex flex-wrap gap-2">
-                  {categoryOptions.map((c) => {
+                  {secondaryCategoryOptions.map((c) => {
                     const selected = (draft.secondary_category_ids ?? []).includes(c.id);
                     return (
                       <button
@@ -282,6 +313,11 @@ export function ContactEditOverview({
                       </button>
                     );
                   })}
+                  {secondaryCategoryOptions.length === 0 && draft.primary_category_id && (
+                    <span className="text-2xs text-ink-secondary">
+                      All categories assigned as primary — pick a different primary to add secondaries.
+                    </span>
+                  )}
                 </div>
               ) : secondaryNames.length > 0 ? (
                 <div className="flex flex-wrap gap-1">
@@ -318,40 +354,45 @@ export function ContactEditOverview({
                 <input
                   type="checkbox"
                   checked={Boolean(draft.open_to_paid)}
-                  onChange={(e) => setField('open_to_paid', e.target.checked)}
+                  onChange={(e) => onDraftChange((d) => draftWithOpenToPaid(d, e.target.checked))}
                 />
                 Open to paid collaborations
               </label>
             }
           />
+          {missingPreference && (
+            <p className="sm:col-span-2 text-2xs text-red-700">{COLLABORATION_PREFERENCE_ERROR}</p>
+          )}
         </dl>
       </ExpandableSection>
 
-      <ExpandableSection title="Indicative rates">
-        <p className="mb-3 text-2xs text-ink-tertiary">
-          Current indicative rates only — not historical. Changing these does not alter past engagement fees.
-        </p>
-        <dl className="grid gap-4 sm:grid-cols-2 text-sm">
-          {['reel_rate', 'story_rate', 'post_rate', 'other_rate'].map((key) => (
-            <ProfileField
-              key={key}
-              label={rateLabel(key)}
-              editing={editing}
-              value={extras[key] != null ? formatFee(extras[key]) : '—'}
-              input={
-                <input
-                  className="input-field mt-1 w-full"
-                  type="number"
-                  min={0}
-                  value={draft[key] ?? ''}
-                  onChange={(e) => setField(key, e.target.value)}
-                  placeholder="₹"
-                />
-              }
-            />
-          ))}
-        </dl>
-      </ExpandableSection>
+      {indicativeRatesVisible && (
+        <ExpandableSection title="Indicative rates">
+          <p className="mb-3 text-2xs text-ink-tertiary">
+            Current indicative rates only — not historical. Changing these does not alter past engagement fees.
+          </p>
+          <dl className="grid gap-4 sm:grid-cols-2 text-sm">
+            {['reel_rate', 'story_rate', 'post_rate', 'other_rate'].map((key) => (
+              <ProfileField
+                key={key}
+                label={rateLabel(key)}
+                editing={editing}
+                value={extras[key] != null ? formatFee(extras[key]) : '—'}
+                input={
+                  <input
+                    className="input-field mt-1 w-full"
+                    type="number"
+                    min={0}
+                    value={draft[key] ?? ''}
+                    onChange={(e) => setField(key, e.target.value)}
+                    placeholder="₹"
+                  />
+                }
+              />
+            ))}
+          </dl>
+        </ExpandableSection>
+      )}
 
       <ExpandableSection title="Classification & tags">
         <dl className="grid gap-4 sm:grid-cols-2 text-sm">

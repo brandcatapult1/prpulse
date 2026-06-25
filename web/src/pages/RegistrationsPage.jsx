@@ -301,8 +301,12 @@ function ReviewDrawer({ registration, contacts, onClose, onApprove, onReject, on
             registration.paid_preference && 'Paid',
           ].filter(Boolean).join(' · ') || '—'}
         />
-        <Detail label="Reel rate" value={registration.reel_rate != null ? `₹${registration.reel_rate}` : '—'} />
-        <Detail label="Story rate" value={registration.story_rate != null ? `₹${registration.story_rate}` : '—'} />
+        {registration.paid_preference && (
+          <>
+            <Detail label="Reel rate" value={registration.reel_rate != null ? `₹${registration.reel_rate}` : '—'} />
+            <Detail label="Story rate" value={registration.story_rate != null ? `₹${registration.story_rate}` : '—'} />
+          </>
+        )}
         {registration.portfolio_links?.length > 0 && (
           <div>
             <dt className="text-2xs font-medium text-ink-tertiary">Portfolio</dt>

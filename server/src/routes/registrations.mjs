@@ -6,6 +6,7 @@ import { normalizeMobileToE164 } from '../lib/mobileNumber.mjs';
 import { createContactDeduped } from '../lib/contactCreate.mjs';
 import { assertValidCity, loadCities } from '../lib/cities.mjs';
 import { assertValidCategoryId, loadCategories } from '../lib/categories.mjs';
+import { collaborationPreferenceError } from '../lib/collaborationPrefs.mjs';
 
 export const registrationsRouter = Router();
 
@@ -78,6 +79,11 @@ registrationsRouter.post('/', async (req, res) => {
     return res.status(400).json({ error: 'Primary category is required' });
   }
 
+  const prefError = collaborationPreferenceError(paid_preference, barter_preference);
+  if (prefError) {
+    return res.status(400).json({ error: prefError });
+  }
+
   const e164 = normalizeMobileToE164(mobile_number, country_code ?? undefined);
   if (!e164) {
     return res.status(400).json({ error: 'Enter a valid mobile number for the selected country' });
@@ -121,8 +127,8 @@ registrationsRouter.post('/', async (req, res) => {
         categoryRow.id,
         paid_preference ?? null,
         barter_preference ?? null,
-        reel_rate ?? null,
-        story_rate ?? null,
+        paid_preference ? reel_rate ?? null : null,
+        paid_preference ? story_rate ?? null : null,
         JSON.stringify(Array.isArray(portfolio_links) ? portfolio_links : []),
         notes ?? null,
       ],

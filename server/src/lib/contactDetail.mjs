@@ -1,6 +1,10 @@
 import { findContactByMobile, normalizeMobileToE164 } from './mobileNumber.mjs';
 import { syncContactTags } from './contactTags.mjs';
 import { assertValidCity } from './cities.mjs';
+import {
+  assertCollaborationPreference,
+  effectiveCollaborationPreference,
+} from './collaborationPrefs.mjs';
 
 export const CLASSIFICATION_VALUES = [
   'nano',
@@ -244,9 +248,25 @@ async function assertIdsExist(client, table, ids, label) {
 export async function applyContactPatch(client, contactId, body, { userId } = {}) {
   const patch = parseContactPatch(body);
 
-  const existing = await client.query('SELECT id, mobile_number FROM contacts WHERE id = $1', [contactId]);
+  const existing = await client.query(
+    'SELECT id, mobile_number, open_to_paid, open_to_barter FROM contacts WHERE id = $1',
+    [contactId],
+  );
   if (!existing.rows[0]) {
     throw Object.assign(new Error('Contact not found'), { status: 404 });
+  }
+
+  const bodyInput = body ?? {};
+  const touchesCollaborationPrefs =
+    Object.prototype.hasOwnProperty.call(bodyInput, 'open_to_paid')
+    || Object.prototype.hasOwnProperty.call(bodyInput, 'open_to_barter');
+
+  if (touchesCollaborationPrefs) {
+    const { openToPaid, openToBarter } = effectiveCollaborationPreference(
+      existing.rows[0],
+      patch.scalars,
+    );
+    assertCollaborationPreference(openToPaid, openToBarter);
   }
 
   if (patch.mobile) {
@@ -285,6 +305,27 @@ export async function applyContactPatch(client, contactId, body, { userId } = {}
 
   if (patch.secondary_category_ids !== undefined) {
     await assertIdsExist(client, 'categories', patch.secondary_category_ids, 'category');
+  }
+
+  if (patch.scalars.open_to_paid === false) {
+    patch.scalars.reel_rate = null;
+    patch.scalars.story_rate = null;
+    patch.scalars.post_rate = null;
+    patch.scalars.other_rate = null;
+  }
+
+  if (patch.secondary_category_ids !== undefined) {
+    let primaryId = patch.scalars.primary_category_id;
+    if (primaryId === undefined) {
+      const { rows } = await client.query(
+        'SELECT primary_category_id FROM contacts WHERE id = $1',
+        [contactId],
+      );
+      primaryId = rows[0]?.primary_category_id ?? null;
+    }
+    if (primaryId) {
+      patch.secondary_category_ids = patch.secondary_category_ids.filter((id) => id !== primaryId);
+    }
   }
 
   const sets = [];

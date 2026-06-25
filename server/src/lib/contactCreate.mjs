@@ -1,6 +1,7 @@
 import { findContactByMobile, normalizeMobileToE164 } from './mobileNumber.mjs';
 import { assertValidCity } from './cities.mjs';
 import { assertValidCategoryId } from './categories.mjs';
+import { assertCollaborationPreference } from './collaborationPrefs.mjs';
 
 /**
  * Raised when a create would collide with an existing contact's normalized mobile.
@@ -62,6 +63,8 @@ export async function createContactDeduped(client, fields) {
     const cat = await assertValidCategoryId(client, fields.primary_category_id);
     primaryCategoryId = cat.id;
   }
+
+  assertCollaborationPreference(fields.open_to_paid, fields.open_to_barter);
 
   try {
     const { rows } = await client.query(

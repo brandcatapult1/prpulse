@@ -1,5 +1,11 @@
 import { normalizeMobileToE164, splitMobileForForm, isMobileValid } from './phone.js';
 import { matchCityName, normalizeCountryCode } from './locations.js';
+import {
+  indicativeRatesPayload,
+  secondaryCategoryIdsWithoutPrimary,
+  hasCollaborationPreference,
+  COLLABORATION_PREFERENCE_ERROR,
+} from './collaborationPrefs.js';
 
 function cloneLinks(links) {
   if (!Array.isArray(links) || links.length === 0) return [{ label: '', url: '' }];
@@ -77,13 +83,13 @@ export function buildPatchFromDraft(draft) {
     youtube_url: emptyToNull(draft.youtube_url),
     other_platform_links: links,
     primary_category_id: draft.primary_category_id || null,
-    secondary_category_ids: draft.secondary_category_ids ?? [],
+    secondary_category_ids: secondaryCategoryIdsWithoutPrimary(
+      draft.secondary_category_ids ?? [],
+      draft.primary_category_id || null,
+    ),
     open_to_paid: Boolean(draft.open_to_paid),
     open_to_barter: Boolean(draft.open_to_barter),
-    reel_rate: rateToPayload(draft.reel_rate),
-    story_rate: rateToPayload(draft.story_rate),
-    post_rate: rateToPayload(draft.post_rate),
-    other_rate: rateToPayload(draft.other_rate),
+    ...indicativeRatesPayload(Boolean(draft.open_to_paid), draft, rateToPayload),
     classification: draft.classification || null,
     tag_ids: draft.tag_ids ?? [],
     status: draft.status || 'active',
@@ -95,11 +101,34 @@ export function isDraftMobileValid(draft) {
   return isMobileValid(draft.mobile_number, draft.mobile_country_code ?? 'IN');
 }
 
-export function isDraftSaveable(draft, { duplicateId, contactId } = {}) {
-  if (!draft.full_name?.trim()) return false;
-  if (!isDraftMobileValid(draft)) return false;
-  if (duplicateId && duplicateId !== contactId) return false;
-  return true;
+/** Indexes of platform-link rows that have exactly one of label/url filled. */
+export function incompletePlatformLinkIndexes(links) {
+  return (links ?? [])
+    .map((item, index) => {
+      const label = String(item?.label ?? '').trim();
+      const url = String(item?.url ?? '').trim();
+      const incomplete = (label && !url) || (!label && url);
+      return incomplete ? index : -1;
+    })
+    .filter((index) => index !== -1);
+}
+
+/** First blocking validation message for the draft, or null when saveable. */
+export function getDraftValidationError(draft, { duplicateId, contactId } = {}) {
+  if (!draft.full_name?.trim()) return 'Full name is required';
+  if (!isDraftMobileValid(draft)) return 'Enter a valid mobile number for the selected country';
+  if (duplicateId && duplicateId !== contactId) return 'This mobile number belongs to another contact';
+  if (!hasCollaborationPreference(draft.open_to_paid, draft.open_to_barter)) {
+    return COLLABORATION_PREFERENCE_ERROR;
+  }
+  if (incompletePlatformLinkIndexes(draft.other_platform_links).length > 0) {
+    return 'Each other-platform link needs both a label and a URL — complete or remove the incomplete row';
+  }
+  return null;
+}
+
+export function isDraftSaveable(draft, options = {}) {
+  return getDraftValidationError(draft, options) === null;
 }
 
 export function e164FromDraft(draft) {

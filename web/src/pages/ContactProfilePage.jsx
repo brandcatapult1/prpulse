@@ -19,6 +19,7 @@ import {
   buildDraftFromContact,
   buildPatchFromDraft,
   isDraftSaveable,
+  getDraftValidationError,
   tagNamesFromContact,
   e164FromDraft,
 } from '../lib/contactDraft.js';
@@ -135,8 +136,13 @@ export function ContactProfilePage() {
   }
 
   async function saveEdit() {
-    if (!isDraftSaveable(draft, { duplicateId: duplicate?.id, contactId: contact.id }) || saving) {
-      setToast('Fix required fields before saving');
+    if (saving) return;
+    const validationError = getDraftValidationError(draft, {
+      duplicateId: duplicate?.id,
+      contactId: contact.id,
+    });
+    if (validationError) {
+      setToast(validationError);
       return;
     }
 

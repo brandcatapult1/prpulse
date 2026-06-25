@@ -15,7 +15,7 @@ function ToggleChip({ active, onClick, children }) {
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-md border px-2.5 py-1.5 text-2xs transition-colors ${
+      className={`shrink-0 whitespace-nowrap rounded-md border px-2 py-1 text-2xs transition-colors ${
         active
           ? 'border-brand/30 bg-brand-soft text-brand'
           : 'border-line bg-white text-ink-secondary hover:border-zinc-300 hover:text-ink'
@@ -39,11 +39,11 @@ function TagFilterMenu({ tagOptions, selectedIds, onChange }) {
   }
 
   return (
-    <div className="relative">
+    <div className="relative shrink-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`rounded-md border px-2.5 py-1.5 text-2xs transition-colors ${
+        className={`whitespace-nowrap rounded-md border px-2 py-1 text-2xs transition-colors ${
           count > 0
             ? 'border-brand/30 bg-brand-soft text-brand'
             : 'border-line bg-white text-ink-secondary hover:border-zinc-300 hover:text-ink'
@@ -107,11 +107,11 @@ function CategoryFilterMenu({ categoryOptions, selectedIds, onChange }) {
   }
 
   return (
-    <div className="relative">
+    <div className="relative shrink-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`rounded-md border px-2.5 py-1.5 text-2xs transition-colors ${
+        className={`whitespace-nowrap rounded-md border px-2 py-1 text-2xs transition-colors ${
           count > 0
             ? 'border-brand/30 bg-brand-soft text-brand'
             : 'border-line bg-white text-ink-secondary hover:border-zinc-300 hover:text-ink'
@@ -183,82 +183,84 @@ export function ContactFilters({
     || filters.primaryCategoryIds.length > 0;
 
   const selectClass =
-    'input-field h-8 w-auto min-w-[130px] py-0 text-2xs';
+    'input-field h-8 w-auto min-w-[108px] shrink-0 py-0 text-2xs';
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2">
       <input
-        className="input-field h-8 max-w-xs py-0"
+        className="input-field h-8 w-full min-w-[160px] max-w-xs shrink-0 py-0 sm:w-auto"
         placeholder="Search name, mobile, city, tags…"
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
       />
 
-      <select
-        className={selectClass}
-        value={filters.status}
-        onChange={(e) => onChange({ status: e.target.value })}
-      >
-        {STATUS_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
+      <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+        <select
+          className={selectClass}
+          value={filters.status}
+          onChange={(e) => onChange({ status: e.target.value })}
+        >
+          {STATUS_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
 
-      <select
-        className={selectClass}
-        value={filters.classification}
-        onChange={(e) => onChange({ classification: e.target.value })}
-      >
-        <option value="">All classes</option>
-        {CLASSIFICATION_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>{classificationSelectLabel(opt)}</option>
-        ))}
-      </select>
+        <select
+          className={selectClass}
+          value={filters.classification}
+          onChange={(e) => onChange({ classification: e.target.value })}
+        >
+          <option value="">All classes</option>
+          {CLASSIFICATION_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{classificationSelectLabel(opt)}</option>
+          ))}
+        </select>
 
-      <select
-        className={selectClass}
-        value={filters.city}
-        onChange={(e) => onChange({ city: e.target.value })}
-      >
-        <option value="">All cities</option>
-        {cityOptions.map((city) => (
-          <option key={city.id ?? city.name} value={city.name}>
-            {city.name}{city.country ? ` · ${countryLabel(city.country)}` : ''}
-          </option>
-        ))}
-      </select>
+        <select
+          className={`${selectClass} min-w-[120px]`}
+          value={filters.city}
+          onChange={(e) => onChange({ city: e.target.value })}
+        >
+          <option value="">All cities</option>
+          {cityOptions.map((city) => (
+            <option key={city.id ?? city.name} value={city.name}>
+              {city.name}{city.country ? ` · ${countryLabel(city.country)}` : ''}
+            </option>
+          ))}
+        </select>
 
-      <TagFilterMenu
-        tagOptions={tagOptions}
-        selectedIds={filters.tagIds}
-        onChange={(tagIds) => onChange({ tagIds })}
-      />
+        <TagFilterMenu
+          tagOptions={tagOptions}
+          selectedIds={filters.tagIds}
+          onChange={(tagIds) => onChange({ tagIds })}
+        />
 
-      <CategoryFilterMenu
-        categoryOptions={categoryOptions}
-        selectedIds={filters.primaryCategoryIds}
-        onChange={(primaryCategoryIds) => onChange({ primaryCategoryIds })}
-      />
+        <CategoryFilterMenu
+          categoryOptions={categoryOptions}
+          selectedIds={filters.primaryCategoryIds}
+          onChange={(primaryCategoryIds) => onChange({ primaryCategoryIds })}
+        />
 
-      <ToggleChip
-        active={filters.openToBarter}
-        onClick={() => onChange({ openToBarter: !filters.openToBarter })}
-      >
-        Open to Barter
-      </ToggleChip>
+        <ToggleChip
+          active={filters.openToBarter}
+          onClick={() => onChange({ openToBarter: !filters.openToBarter })}
+        >
+          Barter
+        </ToggleChip>
 
-      <ToggleChip
-        active={filters.openToPaid}
-        onClick={() => onChange({ openToPaid: !filters.openToPaid })}
-      >
-        Open to Paid
-      </ToggleChip>
+        <ToggleChip
+          active={filters.openToPaid}
+          onClick={() => onChange({ openToPaid: !filters.openToPaid })}
+        >
+          Paid
+        </ToggleChip>
 
-      {(hasActiveFilters || query) && (
-        <button type="button" onClick={onClear} className="text-2xs text-ink-tertiary hover:text-ink">
-          Clear all
-        </button>
-      )}
+        {(hasActiveFilters || query) && (
+          <button type="button" onClick={onClear} className="shrink-0 whitespace-nowrap text-2xs text-ink-tertiary hover:text-ink">
+            Clear all
+          </button>
+        )}
+      </div>
     </div>
   );
 }

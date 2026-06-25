@@ -44,6 +44,11 @@ export const contactsApi = {
       method: 'POST',
       body: JSON.stringify({ contact_ids: contactIds, tag_id: tagId }),
     }),
+  batchSetPrimaryCategory: (contactIds, primaryCategoryId) =>
+    api('/contacts/batch/set-primary-category', {
+      method: 'POST',
+      body: JSON.stringify({ contact_ids: contactIds, primary_category_id: primaryCategoryId }),
+    }),
   lookupMobile: (mobile, countryCode) => {
     const q = countryCode ? `?country=${encodeURIComponent(countryCode)}` : '';
     return api(`/contacts/lookup/mobile/${encodeURIComponent(mobile)}${q}`);

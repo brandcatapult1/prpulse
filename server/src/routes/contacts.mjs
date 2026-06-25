@@ -5,7 +5,7 @@ import { requireSeniorOrAdmin, requireAdmin } from '../middleware/permissions.mj
 import { findContactByMobile } from '../lib/mobileNumber.mjs';
 import { applyContactPatch, loadContactDetail, CLASSIFICATION_VALUES } from '../lib/contactDetail.mjs';
 import { createContactDeduped } from '../lib/contactCreate.mjs';
-import { batchAddTagToContacts, batchSetContactStatus } from '../lib/contactBatch.mjs';
+import { batchAddTagToContacts, batchSetContactStatus, batchSetPrimaryCategory } from '../lib/contactBatch.mjs';
 import { syncContactTags } from '../lib/contactTags.mjs';
 
 export const contactsRouter = Router();
@@ -77,6 +77,17 @@ contactsRouter.post('/batch/add-tag', requireAuth, async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(err.status ?? 503).json({ error: err.message ?? 'Batch tag failed' });
+  }
+});
+
+contactsRouter.post('/batch/set-primary-category', requireAuth, async (req, res) => {
+  try {
+    const result = await withUserTransaction(req.user.id, async (client) =>
+      batchSetPrimaryCategory(client, req.body?.contact_ids, req.body?.primary_category_id),
+    );
+    res.json(result);
+  } catch (err) {
+    res.status(err.status ?? 503).json({ error: err.message ?? 'Batch category update failed' });
   }
 });
 

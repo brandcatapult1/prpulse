@@ -1,4 +1,5 @@
 import { logContactTagAudit } from './contactTags.mjs';
+import { assertValidCategoryId } from './categories.mjs';
 
 function parseContactIds(value) {
   if (!Array.isArray(value) || value.length === 0) {
@@ -68,5 +69,38 @@ export async function batchAddTagToContacts(client, contactIds, tagId, { userId 
     tagged: inserted.length,
     skipped: ids.length - inserted.length,
     tag: { id: tagId, name: tagName },
+  };
+}
+
+/** Set primary category on selected contacts in one batched write. */
+export async function batchSetPrimaryCategory(client, contactIds, primaryCategoryId) {
+  const ids = parseContactIds(contactIds);
+  if (!primaryCategoryId) {
+    throw Object.assign(new Error('primary_category_id required'), { status: 400 });
+  }
+
+  const category = await assertValidCategoryId(client, primaryCategoryId);
+
+  const { rows } = await client.query(
+    `UPDATE contacts
+     SET primary_category_id = $2
+     WHERE id = ANY($1::uuid[])
+     RETURNING id`,
+    [ids, category.id],
+  );
+
+  if (rows.length > 0) {
+    await client.query(
+      `DELETE FROM contact_secondary_categories
+       WHERE contact_id = ANY($1::uuid[])
+         AND category_id = $2`,
+      [rows.map((r) => r.id), category.id],
+    );
+  }
+
+  return {
+    updated: rows.length,
+    skipped: ids.length - rows.length,
+    category: { id: category.id, name: category.name },
   };
 }

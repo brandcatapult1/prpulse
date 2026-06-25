@@ -4,7 +4,7 @@
  */
 import pg from 'pg';
 import dotenv from 'dotenv';
-import { batchSetContactStatus, batchAddTagToContacts } from '../../server/src/lib/contactBatch.mjs';
+import { batchSetContactStatus, batchAddTagToContacts, batchSetPrimaryCategory } from '../../server/src/lib/contactBatch.mjs';
 import { ensureReferenceData } from '../../server/src/lib/referenceData.mjs';
 
 dotenv.config();
@@ -100,6 +100,26 @@ async function main() {
     const second = await batchAddTagToContacts(client, [activeId, inactiveId], tagId, { userId });
     assert(second.tagged === 0, 'second apply should be idempotent (0 new)');
     assert(second.skipped === 2, 'both should be skipped on re-apply');
+
+    const { rows: categoryRows } = await client.query('SELECT id, name FROM categories LIMIT 1');
+    const categoryId = categoryRows[0].id;
+    const categoryName = categoryRows[0].name;
+
+    const categoryResult = await batchSetPrimaryCategory(
+      client,
+      [activeId, inactiveId],
+      categoryId,
+    );
+    assert(categoryResult.updated === 2, `expected 2 category updates, got ${categoryResult.updated}`);
+    assert(categoryResult.category.name === categoryName, 'returns category name');
+
+    ({ rows } = await client.query(
+      `SELECT id, primary_category_id FROM contacts WHERE id = ANY($1::uuid[])`,
+      [[activeId, inactiveId]],
+    ));
+    for (const row of rows) {
+      assert(row.primary_category_id === categoryId, 'primary category should be set');
+    }
 
     await client.query('ROLLBACK');
     console.log('✓ contact-batch tests passed');

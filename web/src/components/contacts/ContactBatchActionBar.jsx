@@ -6,6 +6,7 @@ const EMPTY_DRAFT = {
   campaignId: '',
   statusTarget: '',
   tagId: '',
+  primaryCategoryId: '',
 };
 
 /**
@@ -19,6 +20,7 @@ export function ContactBatchActionBar({
 }) {
   const [campaigns, setCampaigns] = useState([]);
   const [tags, setTags] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);
@@ -30,6 +32,7 @@ export function ContactBatchActionBar({
     }
     campaignsApi.list().then((data) => setCampaigns(Array.isArray(data) ? data : [])).catch(() => setCampaigns([]));
     lookupApi.tags().then((data) => setTags(Array.isArray(data) ? data : [])).catch(() => setTags([]));
+    lookupApi.categories().then((data) => setCategories(Array.isArray(data) ? data : [])).catch(() => setCategories([]));
   }, [selectedIds.length]);
 
   if (selectedIds.length === 0) return null;
@@ -37,7 +40,8 @@ export function ContactBatchActionBar({
   const armedCampaign = Boolean(draft.campaignId);
   const armedStatus = draft.statusTarget === 'active' || draft.statusTarget === 'inactive';
   const armedTag = Boolean(draft.tagId);
-  const armedCount = [armedCampaign, armedStatus, armedTag].filter(Boolean).length;
+  const armedPrimaryCategory = Boolean(draft.primaryCategoryId);
+  const armedCount = [armedCampaign, armedStatus, armedTag, armedPrimaryCategory].filter(Boolean).length;
   const canApply = armedCount > 0 && !busy;
 
   function updateDraft(patch) {
@@ -92,6 +96,19 @@ export function ContactBatchActionBar({
             const tagName = result?.tag?.name ?? 'tag';
             messages.push(
               `${tagName} applied to ${tagged}${skipped ? ` · ${skipped} already had tag` : ''}`,
+            );
+          }),
+        );
+      }
+
+      if (armedPrimaryCategory) {
+        tasks.push(
+          contactsApi.batchSetPrimaryCategory(selectedIds, draft.primaryCategoryId).then((result) => {
+            const updated = result?.updated ?? 0;
+            const skipped = result?.skipped ?? 0;
+            const categoryName = result?.category?.name ?? 'category';
+            messages.push(
+              `${categoryName} set on ${updated}${skipped ? ` · ${skipped} not found` : ''}`,
             );
           }),
         );
@@ -178,6 +195,23 @@ export function ContactBatchActionBar({
                 <option value="">— Skip —</option>
                 {tags.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">
+                Set primary category
+              </span>
+              <select
+                className={selectClass(armedPrimaryCategory)}
+                value={draft.primaryCategoryId}
+                disabled={busy}
+                onChange={(e) => updateDraft({ primaryCategoryId: e.target.value })}
+              >
+                <option value="">— Skip —</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
             </label>

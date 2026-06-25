@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { CLASSIFICATION_OPTIONS } from '../../lib/classifications.js';
+import { countryLabel } from '../../lib/locations.js';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Active & inactive' },
@@ -151,7 +152,9 @@ export function ContactFilters({
       >
         <option value="">All cities</option>
         {cityOptions.map((city) => (
-          <option key={city} value={city}>{city}</option>
+          <option key={city.id ?? city.name} value={city.name}>
+            {city.name}{city.country ? ` · ${countryLabel(city.country)}` : ''}
+          </option>
         ))}
       </select>
 

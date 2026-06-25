@@ -81,8 +81,10 @@ contactsRouter.post('/quick-add', requireAuth, async (req, res) => {
   const {
     full_name,
     mobile_number,
+    mobile_country_code,
     instagram_url,
     city,
+    country,
     classification,
     open_to_paid,
     open_to_barter,
@@ -101,8 +103,10 @@ contactsRouter.post('/quick-add', requireAuth, async (req, res) => {
       const created = await createContactDeduped(client, {
         full_name,
         mobile_number,
+        mobile_country_code: mobile_country_code ?? country ?? undefined,
         instagram_url: instagram_url ?? null,
         city: city ?? null,
+        country: country ?? mobile_country_code ?? null,
         classification: classification || null,
         open_to_paid: Boolean(open_to_paid),
         open_to_barter: Boolean(open_to_barter),
@@ -131,7 +135,8 @@ contactsRouter.post('/quick-add', requireAuth, async (req, res) => {
 
 contactsRouter.get('/lookup/mobile/:mobile', requireAuth, async (req, res) => {
   const raw = decodeURIComponent(req.params.mobile ?? '');
-  const { contact } = await findContactByMobile(pool, raw);
+  const country = req.query.country ?? undefined;
+  const { contact } = await findContactByMobile(pool, raw, country);
   res.json(contact ?? null);
 });
 

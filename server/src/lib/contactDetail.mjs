@@ -1,5 +1,6 @@
 import { findContactByMobile, normalizeMobileToE164 } from './mobileNumber.mjs';
 import { syncContactTags } from './contactTags.mjs';
+import { assertValidCity } from './cities.mjs';
 
 export const CLASSIFICATION_VALUES = [
   'nano',
@@ -139,7 +140,8 @@ export function parseContactPatch(body) {
   let mobile;
   if (Object.prototype.hasOwnProperty.call(input, 'mobile_number')) {
     hasChange = true;
-    const e164 = normalizeMobileToE164(input.mobile_number);
+    const country = input.mobile_country_code ?? undefined;
+    const e164 = normalizeMobileToE164(input.mobile_number, country);
     if (!e164) {
       throw Object.assign(new Error('Enter a valid mobile number'), { status: 400 });
     }
@@ -248,12 +250,28 @@ export async function applyContactPatch(client, contactId, body, { userId } = {}
   }
 
   if (patch.mobile) {
-    const { contact: dup } = await findContactByMobile(client, patch.mobile);
+    const country = body?.mobile_country_code ?? undefined;
+    const { contact: dup } = await findContactByMobile(client, patch.mobile, country);
     if (dup && dup.id !== contactId) {
       throw Object.assign(
         new Error('A contact with this mobile number already exists'),
         { status: 409, duplicate: dup },
       );
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body ?? {}, 'city')) {
+    const cityVal = trimOrNull(body.city);
+    if (cityVal) {
+      const row = await assertValidCity(
+        client,
+        cityVal,
+        body.country ?? body.mobile_country_code ?? 'IN',
+      );
+      patch.scalars.city = row.name;
+      patch.scalars.country = row.country;
+    } else {
+      patch.scalars.city = null;
     }
   }
 

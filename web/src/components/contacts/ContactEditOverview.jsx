@@ -3,7 +3,10 @@ import { ExpandableSection } from '../ui/DataKit.jsx';
 import { Pill, formatFee } from '../../lib/format.jsx';
 import { formatClassification, CLASSIFICATION_OPTIONS } from '../../lib/classifications.js';
 import { formatContactStatus, CONTACT_STATUS_OPTIONS } from '../../lib/contactLifecycle.js';
-import { normalizeMobileToE164 } from '../../lib/phone.js';
+import { MobileNumberField } from './MobileNumberField.jsx';
+import { CityCountryField } from './CityCountryField.jsx';
+import { countryLabel, citiesForCountry } from '../../lib/locations.js';
+import { isMobileValid } from '../../lib/phone.js';
 
 export function ContactEditOverview({
   contact,
@@ -13,11 +16,19 @@ export function ContactEditOverview({
   onDraftChange,
   tagOptions = [],
   categoryOptions = [],
+  cityOptions = [],
   duplicate,
   onCheckMobile,
   contactId,
 }) {
   const setField = (field, value) => onDraftChange((d) => ({ ...d, [field]: value }));
+
+  const updateLocationCountry = (countryCode) => {
+    onDraftChange((d) => {
+      const stillValid = citiesForCountry(cityOptions, countryCode).some((c) => c.name === d.city);
+      return { ...d, country: countryCode, city: stillValid ? d.city : '' };
+    });
+  };
 
   const toggleId = (field, id) => {
     onDraftChange((d) => {
@@ -56,14 +67,15 @@ export function ContactEditOverview({
             value={contact.mobile_number ?? '—'}
             input={
               <div>
-                <input
-                  className="input-field mt-1 w-full"
-                  value={draft.mobile_number ?? ''}
-                  onChange={(e) => setField('mobile_number', e.target.value)}
-                  onBlur={(e) => onCheckMobile?.(e.target.value)}
+                <MobileNumberField
+                  countryCode={draft.mobile_country_code ?? 'IN'}
+                  nationalNumber={draft.mobile_number ?? ''}
+                  onCountryChange={(code) => setField('mobile_country_code', code)}
+                  onNumberChange={(value) => setField('mobile_number', value)}
+                  onBlur={() => onCheckMobile?.()}
                 />
-                {editing && draft.mobile_number && !normalizeMobileToE164(draft.mobile_number) && (
-                  <p className="mt-1 text-2xs text-red-700">Enter a valid mobile number</p>
+                {editing && draft.mobile_number && !isMobileValid(draft.mobile_number, draft.mobile_country_code) && (
+                  <p className="mt-1 text-2xs text-red-700">Enter a valid mobile number for the selected country.</p>
                 )}
                 {editing && duplicate && duplicate.id !== contactId && (
                   <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-2xs text-amber-900">
@@ -92,12 +104,18 @@ export function ContactEditOverview({
           <ProfileField
             label="City"
             editing={editing}
-            value={contact.city ?? '—'}
+            value={
+              contact.city
+                ? `${contact.city}${contact.country ? ` · ${countryLabel(contact.country)}` : ''}`
+                : '—'
+            }
             input={
-              <input
-                className="input-field mt-1 w-full"
-                value={draft.city ?? ''}
-                onChange={(e) => setField('city', e.target.value)}
+              <CityCountryField
+                countryCode={draft.country ?? 'IN'}
+                city={draft.city ?? ''}
+                cities={cityOptions}
+                onCountryChange={updateLocationCountry}
+                onCityChange={(value) => setField('city', value)}
               />
             }
           />
@@ -110,18 +128,6 @@ export function ContactEditOverview({
                 className="input-field mt-1 w-full"
                 value={draft.state ?? ''}
                 onChange={(e) => setField('state', e.target.value)}
-              />
-            }
-          />
-          <ProfileField
-            label="Country"
-            editing={editing}
-            value={extras.country ?? contact.country ?? '—'}
-            input={
-              <input
-                className="input-field mt-1 w-full"
-                value={draft.country ?? ''}
-                onChange={(e) => setField('country', e.target.value)}
               />
             }
           />

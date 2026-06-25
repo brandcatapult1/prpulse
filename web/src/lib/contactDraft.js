@@ -1,4 +1,5 @@
-import { normalizeMobileToE164 } from './phone.js';
+import { normalizeMobileToE164, splitMobileForForm, isMobileValid } from './phone.js';
+import { matchCityName, normalizeCountryCode } from './locations.js';
 
 function cloneLinks(links) {
   if (!Array.isArray(links) || links.length === 0) return [{ label: '', url: '' }];
@@ -12,16 +13,21 @@ export function tagNamesFromContact(contact) {
   return (contact?.tags ?? []).map((t) => (typeof t === 'string' ? t : t.name)).filter(Boolean);
 }
 
-export function buildDraftFromContact(contact) {
+export function buildDraftFromContact(contact, { cities = [] } = {}) {
   if (!contact) return {};
+
+  const countryCode = normalizeCountryCode(contact.country);
+  const mobileParts = splitMobileForForm(contact.mobile_number, countryCode);
+  const matchedCity = matchCityName(cities, contact.city, countryCode);
 
   return {
     full_name: contact.full_name ?? '',
-    mobile_number: contact.mobile_number ?? '',
+    mobile_country_code: mobileParts.countryCode,
+    mobile_number: mobileParts.nationalNumber,
     email: contact.email ?? '',
-    city: contact.city ?? '',
+    country: countryCode,
+    city: matchedCity || contact.city || '',
     state: contact.state ?? '',
-    country: contact.country ?? '',
     instagram_url: contact.instagram_url ?? '',
     youtube_url: contact.youtube_url ?? '',
     other_platform_links: cloneLinks(contact.other_platform_links),
@@ -62,10 +68,11 @@ export function buildPatchFromDraft(draft) {
   return {
     full_name: draft.full_name.trim(),
     mobile_number: draft.mobile_number.trim(),
+    mobile_country_code: draft.mobile_country_code ?? 'IN',
     email: emptyToNull(draft.email),
     city: emptyToNull(draft.city),
+    country: draft.country ?? draft.mobile_country_code ?? 'IN',
     state: emptyToNull(draft.state),
-    country: emptyToNull(draft.country),
     instagram_url: emptyToNull(draft.instagram_url),
     youtube_url: emptyToNull(draft.youtube_url),
     other_platform_links: links,
@@ -85,7 +92,7 @@ export function buildPatchFromDraft(draft) {
 }
 
 export function isDraftMobileValid(draft) {
-  return Boolean(normalizeMobileToE164(draft.mobile_number));
+  return isMobileValid(draft.mobile_number, draft.mobile_country_code ?? 'IN');
 }
 
 export function isDraftSaveable(draft, { duplicateId, contactId } = {}) {
@@ -93,4 +100,8 @@ export function isDraftSaveable(draft, { duplicateId, contactId } = {}) {
   if (!isDraftMobileValid(draft)) return false;
   if (duplicateId && duplicateId !== contactId) return false;
   return true;
+}
+
+export function e164FromDraft(draft) {
+  return normalizeMobileToE164(draft.mobile_number, draft.mobile_country_code ?? 'IN');
 }

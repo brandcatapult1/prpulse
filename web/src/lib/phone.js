@@ -1,7 +1,10 @@
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
+import { SUPPORTED_COUNTRIES } from './locations.js';
 
 /** Default territory for numbers entered without a country prefix (Brand Catapult = India). */
 export const DEFAULT_MOBILE_COUNTRY = 'IN';
+
+export { SUPPORTED_COUNTRIES as MOBILE_COUNTRY_OPTIONS };
 
 /**
  * Normalize a raw phone string to E.164 for storage and dedup (e.g. +919876543210).
@@ -13,6 +16,39 @@ export function normalizeMobileToE164(raw, defaultCountry = DEFAULT_MOBILE_COUNT
   const parsed = parsePhoneNumberFromString(text, defaultCountry);
   if (!parsed?.isValid()) return '';
   return parsed.format('E.164');
+}
+
+export function isMobileValid(raw, defaultCountry = DEFAULT_MOBILE_COUNTRY) {
+  return Boolean(normalizeMobileToE164(raw, defaultCountry));
+}
+
+/** Split stored E.164 (or raw input) into country code + national digits for form fields. */
+export function splitMobileForForm(value, fallbackCountry = DEFAULT_MOBILE_COUNTRY) {
+  const text = String(value ?? '').trim();
+  if (!text) {
+    return { countryCode: fallbackCountry, nationalNumber: '' };
+  }
+
+  const parsed = parsePhoneNumberFromString(text);
+  if (parsed?.isValid()) {
+    return {
+      countryCode: parsed.country ?? fallbackCountry,
+      nationalNumber: parsed.nationalNumber,
+    };
+  }
+
+  const withDefault = parsePhoneNumberFromString(text, fallbackCountry);
+  if (withDefault?.isValid()) {
+    return {
+      countryCode: withDefault.country ?? fallbackCountry,
+      nationalNumber: withDefault.nationalNumber,
+    };
+  }
+
+  return {
+    countryCode: fallbackCountry,
+    nationalNumber: text.replace(/\D/g, ''),
+  };
 }
 
 /** @deprecated Use normalizeMobileToE164 — kept for call sites migrating from last-10 dedup. */

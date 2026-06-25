@@ -2,16 +2,22 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Drawer, Toast } from '../ui/Primitives.jsx';
 import { TagSelectChips } from '../tags/TagSelectChips.jsx';
+import { MobileNumberField } from './MobileNumberField.jsx';
+import { CityCountryField } from './CityCountryField.jsx';
 import { contactsApi, lookupApi } from '../../lib/api.js';
 import { mergeContactsCache } from '../../lib/contactsCache.js';
-import { normalizeMobileToE164 } from '../../lib/phone.js';
+import { isMobileValid } from '../../lib/phone.js';
+import { e164FromDraft } from '../../lib/contactDraft.js';
 import { CLASSIFICATION_OPTIONS } from '../../lib/classifications.js';
+import { citiesForCountry } from '../../lib/locations.js';
 
 const EMPTY = {
   full_name: '',
+  mobile_country_code: 'IN',
   mobile_number: '',
-  instagram_url: '',
+  country: 'IN',
   city: '',
+  instagram_url: '',
   classification: '',
   open_to_paid: false,
   open_to_barter: false,
@@ -26,27 +32,46 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
   const [tagOptions, setTagOptions] = useState([]);
+  const [cityOptions, setCityOptions] = useState([]);
 
   useEffect(() => {
     if (!open) return;
     setForm(EMPTY);
     setDuplicate(null);
-    lookupApi.tags().then((data) => setTagOptions(Array.isArray(data) ? data : [])).catch(() => setTagOptions([]));
+    Promise.all([
+      lookupApi.tags().catch(() => []),
+      lookupApi.cities().catch(() => []),
+    ]).then(([tags, cities]) => {
+      setTagOptions(Array.isArray(tags) ? tags : []);
+      setCityOptions(Array.isArray(cities) ? cities : []);
+    });
   }, [open]);
 
   function updateField(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
-    if (key === 'mobile_number') setDuplicate(null);
+    if (key === 'mobile_number' || key === 'mobile_country_code') setDuplicate(null);
   }
 
-  async function checkDuplicate(mobile) {
-    const e164 = normalizeMobileToE164(mobile);
+  function updateCountry(countryCode) {
+    setForm((prev) => {
+      const stillValid = citiesForCountry(cityOptions, countryCode)
+        .some((c) => c.name === prev.city);
+      return {
+        ...prev,
+        country: countryCode,
+        city: stillValid ? prev.city : '',
+      };
+    });
+  }
+
+  async function checkDuplicate() {
+    const e164 = e164FromDraft(form);
     if (!e164) {
       setDuplicate(null);
       return;
     }
     try {
-      const match = await contactsApi.lookupMobile(e164);
+      const match = await contactsApi.lookupMobile(e164, form.mobile_country_code);
       setDuplicate(match ?? null);
     } catch {
       setDuplicate(null);
@@ -59,7 +84,7 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
     navigate(`/contacts/${duplicate.id}`);
   }
 
-  const mobileValid = Boolean(normalizeMobileToE164(form.mobile_number));
+  const mobileValid = isMobileValid(form.mobile_number, form.mobile_country_code);
   const canSave = form.full_name.trim() && mobileValid && !duplicate;
 
   async function handleSave() {
@@ -70,8 +95,10 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
       const body = {
         full_name: form.full_name.trim(),
         mobile_number: form.mobile_number.trim(),
+        mobile_country_code: form.mobile_country_code,
         instagram_url: form.instagram_url.trim() || null,
-        city: form.city.trim() || null,
+        city: form.city || null,
+        country: form.country,
         classification: form.classification || null,
         open_to_paid: form.open_to_paid,
         open_to_barter: form.open_to_barter,
@@ -125,12 +152,15 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
 
           <label className="block text-2xs text-ink-secondary">
             Mobile
-            <input
-              className="input-field mt-1"
-              value={form.mobile_number}
-              onChange={(e) => updateField('mobile_number', e.target.value)}
-              onBlur={(e) => checkDuplicate(e.target.value)}
-            />
+            <div className="mt-1">
+              <MobileNumberField
+                countryCode={form.mobile_country_code}
+                nationalNumber={form.mobile_number}
+                onCountryChange={(code) => updateField('mobile_country_code', code)}
+                onNumberChange={(value) => updateField('mobile_number', value)}
+                onBlur={checkDuplicate}
+              />
+            </div>
           </label>
 
           {duplicate && (
@@ -147,11 +177,15 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
 
           <label className="block text-2xs text-ink-secondary">
             City
-            <input
-              className="input-field mt-1"
-              value={form.city}
-              onChange={(e) => updateField('city', e.target.value)}
-            />
+            <div className="mt-1">
+              <CityCountryField
+                countryCode={form.country}
+                city={form.city}
+                cities={cityOptions}
+                onCountryChange={updateCountry}
+                onCityChange={(value) => updateField('city', value)}
+              />
+            </div>
           </label>
 
           <label className="block text-2xs text-ink-secondary">

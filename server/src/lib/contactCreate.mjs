@@ -1,4 +1,5 @@
 import { findContactByMobile, normalizeMobileToE164 } from './mobileNumber.mjs';
+import { assertValidCity } from './cities.mjs';
 
 /**
  * Raised when a create would collide with an existing contact's normalized mobile.
@@ -29,12 +30,12 @@ export async function createContactDeduped(client, fields) {
     throw Object.assign(new Error('Full name is required'), { status: 400 });
   }
 
-  const e164 = normalizeMobileToE164(fields.mobile_number);
+  const e164 = normalizeMobileToE164(fields.mobile_number, fields.mobile_country_code);
   if (!e164) {
     throw Object.assign(new Error('Enter a valid mobile number'), { status: 400 });
   }
 
-  const { contact: dup } = await findContactByMobile(client, e164);
+  const { contact: dup } = await findContactByMobile(client, e164, fields.mobile_country_code);
   if (dup) {
     throw new DuplicateContactError({
       id: dup.id,
@@ -45,6 +46,14 @@ export async function createContactDeduped(client, fields) {
 
   if (!fields.source) {
     throw Object.assign(new Error('Contact source is required'), { status: 400 });
+  }
+
+  let city = fields.city ?? null;
+  let country = fields.country ?? null;
+  if (city) {
+    const row = await assertValidCity(client, city, fields.country ?? fields.mobile_country_code);
+    city = row.name;
+    country = row.country;
   }
 
   try {
@@ -60,9 +69,9 @@ export async function createContactDeduped(client, fields) {
         fullName,
         e164,
         fields.email ?? null,
-        fields.city ?? null,
+        city,
         fields.state ?? null,
-        fields.country ?? null,
+        country,
         fields.instagram_url ?? null,
         fields.youtube_url ?? null,
         fields.classification ?? null,

@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth.mjs';
 import { requireSeniorOrAdmin } from '../middleware/permissions.mjs';
 import { normalizeMobileToE164 } from '../lib/mobileNumber.mjs';
 import { createContactDeduped } from '../lib/contactCreate.mjs';
+import { assertValidCity, loadCities } from '../lib/cities.mjs';
 
 export const registrationsRouter = Router();
 
@@ -12,6 +13,16 @@ const SELECT_FIELDS = `
   category, paid_preference, barter_preference, reel_rate, story_rate,
   portfolio_links, notes, status, linked_contact_id, created_at, reviewed_at
 `;
+
+/** Public — curated city list for signup (same source as internal lookup). */
+registrationsRouter.get('/cities', async (req, res) => {
+  try {
+    const cities = await loadCities(pool, { country: req.query.country });
+    res.json(cities);
+  } catch (err) {
+    res.status(503).json({ error: err.message ?? 'Could not load cities' });
+  }
+});
 
 /** Public — creator signup (no login). */
 registrationsRouter.post('/', async (req, res) => {
@@ -38,7 +49,17 @@ registrationsRouter.post('/', async (req, res) => {
 
   const e164 = normalizeMobileToE164(mobile_number, country_code ?? undefined);
   if (!e164) {
-    return res.status(400).json({ error: 'Enter a valid mobile number' });
+    return res.status(400).json({ error: 'Enter a valid mobile number for the selected country' });
+  }
+
+  let storedCity = null;
+  if (city?.trim()) {
+    try {
+      const row = await assertValidCity(pool, city, country_code ?? 'IN');
+      storedCity = row.name;
+    } catch (err) {
+      return res.status(err.status ?? 400).json({ error: err.message ?? 'Invalid city' });
+    }
   }
 
   try {
@@ -53,7 +74,7 @@ registrationsRouter.post('/', async (req, res) => {
         full_name.trim(),
         e164,
         email ?? null,
-        city ?? null,
+        storedCity,
         instagram_link ?? null,
         youtube_link ?? null,
         category ?? null,
@@ -118,6 +139,15 @@ registrationsRouter.patch('/:id', requireAuth, requireSeniorOrAdmin, async (req,
             throw Object.assign(new Error('Linked contact not found'), { status: 404 });
           }
         } else {
+          let country = null;
+          if (sub.city) {
+            const cityRow = await client.query(
+              'SELECT country FROM cities WHERE name = $1 LIMIT 1',
+              [sub.city],
+            );
+            country = cityRow.rows[0]?.country ?? null;
+          }
+
           // Approve never mints a duplicate: a mobile match links to the existing
           // record (status 'duplicate'); otherwise a new contact is created.
           try {
@@ -126,6 +156,7 @@ registrationsRouter.patch('/:id', requireAuth, requireSeniorOrAdmin, async (req,
               mobile_number: sub.mobile_number,
               email: sub.email,
               city: sub.city,
+              country,
               instagram_url: sub.instagram_link,
               source: 'signup_form',
               created_by: req.user.id,

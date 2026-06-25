@@ -44,8 +44,10 @@ export const contactsApi = {
       method: 'POST',
       body: JSON.stringify({ contact_ids: contactIds, tag_id: tagId }),
     }),
-  lookupMobile: (mobile) =>
-    api(`/contacts/lookup/mobile/${encodeURIComponent(mobile)}`),
+  lookupMobile: (mobile, countryCode) => {
+    const q = countryCode ? `?country=${encodeURIComponent(countryCode)}` : '';
+    return api(`/contacts/lookup/mobile/${encodeURIComponent(mobile)}${q}`);
+  },
   populationForCampaign: (campaignId) =>
     api(`/contacts/population/campaign/${campaignId}`),
   blacklist: (id, reason) =>
@@ -90,6 +92,8 @@ export const engagementsApi = {
 
 export const registrationsApi = {
   list: () => api('/registrations'),
+  cities: (country) =>
+    api(`/registrations/cities${country ? `?country=${encodeURIComponent(country)}` : ''}`),
   submit: (body) => api('/registrations', { method: 'POST', body: JSON.stringify(body) }),
   update: (id, body) => api(`/registrations/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 };
@@ -117,6 +121,8 @@ export const adminApi = {
   orgBranding: () => api('/admin/org-branding'),
   updateOrgBranding: (body) =>
     api('/admin/org-branding', { method: 'PATCH', body: JSON.stringify(body) }),
+  createCity: (body) => api('/admin/cities', { method: 'POST', body: JSON.stringify(body) }),
+  deleteCity: (id) => api(`/admin/cities/${id}`, { method: 'DELETE' }),
   seedDemo: (reset = false) =>
     api('/admin/seed-demo', { method: 'POST', body: JSON.stringify({ reset }) }),
 };
@@ -135,4 +141,6 @@ export const reportsApi = {
 export const lookupApi = {
   tags: () => api('/lookup/tags'),
   categories: () => api('/lookup/categories'),
+  cities: (country) =>
+    api(`/lookup/cities${country ? `?country=${encodeURIComponent(country)}` : ''}`),
 };

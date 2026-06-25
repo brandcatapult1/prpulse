@@ -1,15 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { registrationsApi } from '../lib/api.js';
 import { CREATOR_CATEGORIES } from '../lib/creatorCategories.js';
-
-const COUNTRY_OPTIONS = [
-  { code: 'IN', dialCode: '+91', label: 'India' },
-  { code: 'AE', dialCode: '+971', label: 'UAE' },
-  { code: 'GB', dialCode: '+44', label: 'UK' },
-  { code: 'US', dialCode: '+1', label: 'USA' },
-];
+import { MobileNumberField } from '../components/contacts/MobileNumberField.jsx';
+import { CityCountryField } from '../components/contacts/CityCountryField.jsx';
+import { normalizeMobileToE164, isMobileValid } from '../lib/phone.js';
+import { citiesForCountry } from '../lib/locations.js';
 
 const EMPTY = {
   full_name: '',
@@ -29,10 +25,17 @@ const EMPTY = {
 
 export function PublicRegistrationPage() {
   const [form, setForm] = useState(EMPTY);
+  const [cityOptions, setCityOptions] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    registrationsApi.cities().then((data) => {
+      setCityOptions(Array.isArray(data) ? data : []);
+    }).catch(() => setCityOptions([]));
+  }, []);
 
   const set = (field) => (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -41,6 +44,10 @@ export function PublicRegistrationPage() {
       if (field === 'paid_preference' && !value) {
         next.reel_rate = '';
         next.story_rate = '';
+      }
+      if (field === 'country_code') {
+        const stillValid = citiesForCountry(cityOptions, value).some((c) => c.name === f.city);
+        if (!stillValid) next.city = '';
       }
       return next;
     });
@@ -72,12 +79,7 @@ export function PublicRegistrationPage() {
 
     if (!mobileRaw) {
       nextFieldErrors.mobile_number = 'Mobile number is required.';
-    }
-
-    const parsedPhone = mobileRaw
-      ? parsePhoneNumberFromString(mobileRaw, form.country_code)
-      : null;
-    if (mobileRaw && (!parsedPhone || !parsedPhone.isValid())) {
+    } else if (!isMobileValid(mobileRaw, form.country_code)) {
       nextFieldErrors.mobile_number = 'Enter a valid mobile number for the selected country.';
     }
 
@@ -100,12 +102,14 @@ export function PublicRegistrationPage() {
     setSubmitting(true);
     setError(null);
 
+    const e164 = normalizeMobileToE164(mobileRaw, form.country_code);
+
     const payload = {
       full_name: fullName,
-      mobile_number: parsedPhone.format('E.164'),
+      mobile_number: e164,
       country_code: form.country_code,
       email: emailRaw || null,
-      city: form.city.trim() || null,
+      city: form.city || null,
       instagram_link: form.instagram_link.trim() || null,
       youtube_link: form.youtube_link.trim() || null,
       category: form.categories.join(', '),
@@ -165,26 +169,14 @@ export function PublicRegistrationPage() {
             <input className="input-field" required value={form.full_name} onChange={set('full_name')} placeholder="Your name" />
           </Field>
           <Field label="Mobile number *">
-            <div className="grid grid-cols-[140px_1fr] gap-2">
-              <select className="input-field" value={form.country_code} onChange={set('country_code')}>
-                {COUNTRY_OPTIONS.map((country) => (
-                  <option key={country.code} value={country.code}>
-                    {country.dialCode} · {country.label}
-                  </option>
-                ))}
-              </select>
-              <input
-                className={`input-field ${fieldErrors.mobile_number ? 'border-red-400 focus:border-red-500 focus:ring-red-100' : ''}`}
-                required
-                type="tel"
-                value={form.mobile_number}
-                onChange={set('mobile_number')}
-                placeholder="98765 43210"
-              />
-            </div>
-            {fieldErrors.mobile_number && (
-              <p className="mt-1 text-2xs text-red-700">{fieldErrors.mobile_number}</p>
-            )}
+            <MobileNumberField
+              countryCode={form.country_code}
+              nationalNumber={form.mobile_number}
+              onCountryChange={(code) => set('country_code')({ target: { value: code } })}
+              onNumberChange={(value) => set('mobile_number')({ target: { value } })}
+              error={fieldErrors.mobile_number}
+              required
+            />
           </Field>
           <Field label="Email">
             <input
@@ -199,7 +191,13 @@ export function PublicRegistrationPage() {
             )}
           </Field>
           <Field label="City">
-            <input className="input-field" value={form.city} onChange={set('city')} placeholder="Delhi" />
+            <CityCountryField
+              countryCode={form.country_code}
+              city={form.city}
+              cities={cityOptions}
+              onCountryChange={(code) => set('country_code')({ target: { value: code } })}
+              onCityChange={(value) => setForm((f) => ({ ...f, city: value }))}
+            />
           </Field>
           <Field label="Instagram link">
             <input className="input-field" type="url" value={form.instagram_link} onChange={set('instagram_link')} placeholder="https://instagram.com/…" />

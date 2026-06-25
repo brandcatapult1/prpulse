@@ -32,6 +32,7 @@ export function ContactsPage() {
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [tagOptions, setTagOptions] = useState([]);
+  const [cityOptions, setCityOptions] = useState([]);
 
   const includeArchived = filters.status === 'archived' || filters.status === 'all';
 
@@ -40,7 +41,13 @@ export function ContactsPage() {
   }, [includeArchived]);
 
   useEffect(() => {
-    lookupApi.tags().then((data) => setTagOptions(Array.isArray(data) ? data : [])).catch(() => setTagOptions([]));
+    Promise.all([
+      lookupApi.tags().catch(() => []),
+      lookupApi.cities().catch(() => []),
+    ]).then(([tags, cities]) => {
+      setTagOptions(Array.isArray(tags) ? tags : []);
+      setCityOptions(Array.isArray(cities) ? cities : []);
+    });
   }, []);
 
   function loadContacts(withArchived = includeArchived) {
@@ -66,14 +73,6 @@ export function ContactsPage() {
     setQuery('');
     setFilters(EMPTY_FILTERS);
   }
-
-  const cityOptions = useMemo(() => {
-    const cities = new Set();
-    rows.forEach((r) => {
-      if (r.city?.trim()) cities.add(r.city.trim());
-    });
-    return [...cities].sort((a, b) => a.localeCompare(b));
-  }, [rows]);
 
   const selectedTagNames = useMemo(
     () => filters.tagIds

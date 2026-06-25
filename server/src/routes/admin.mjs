@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db.mjs';
 import { requireAuth, requireRole } from '../middleware/auth.mjs';
 import { runDemoSeed } from '../../../scripts/seed-demo.mjs';
+import { assertSupportedCountry } from '../lib/cities.mjs';
 
 export const adminRouter = Router();
 
@@ -175,6 +176,42 @@ adminRouter.delete('/categories/:id', async (req, res) => {
     res.status(204).end();
   } catch (err) {
     res.status(503).json({ error: err.message ?? 'Could not delete category' });
+  }
+});
+
+adminRouter.post('/cities', async (req, res) => {
+  const name = req.body?.name?.trim();
+  const country = req.body?.country?.trim();
+  if (!name) return res.status(400).json({ error: 'City name is required' });
+  try {
+    assertSupportedCountry(country);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO cities (name, country) VALUES ($1, $2)
+       ON CONFLICT (country, name) DO UPDATE SET name = EXCLUDED.name
+       RETURNING id, name, country, created_at`,
+      [name, country],
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    if (err.code === '42P01') {
+      return res.status(503).json({ error: 'Cities table is missing — run migrations.' });
+    }
+    res.status(503).json({ error: err.message ?? 'Could not create city' });
+  }
+});
+
+adminRouter.delete('/cities/:id', async (req, res) => {
+  try {
+    const { rowCount } = await pool.query('DELETE FROM cities WHERE id = $1', [req.params.id]);
+    if (rowCount === 0) return res.status(404).json({ error: 'City not found' });
+    res.status(204).end();
+  } catch (err) {
+    res.status(503).json({ error: err.message ?? 'Could not delete city' });
   }
 });
 

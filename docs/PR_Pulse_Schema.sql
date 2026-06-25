@@ -120,6 +120,14 @@ CREATE TABLE categories (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE cities (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       citext NOT NULL,
+  country    text NOT NULL CHECK (country IN ('IN', 'AE', 'US', 'GB')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (country, name)
+);
+
 -- ---------- 4. Contacts (universal relationship record) -------------------
 CREATE TABLE contacts (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),

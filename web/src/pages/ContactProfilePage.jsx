@@ -20,6 +20,7 @@ import {
   buildPatchFromDraft,
   isDraftSaveable,
   tagNamesFromContact,
+  e164FromDraft,
 } from '../lib/contactDraft.js';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { ContactEditOverview } from '../components/contacts/ContactEditOverview.jsx';
@@ -37,6 +38,7 @@ export function ContactProfilePage() {
   const [duplicate, setDuplicate] = useState(null);
   const [tagOptions, setTagOptions] = useState([]);
   const [categoryOptions, setCategoryOptions] = useState([]);
+  const [cityOptions, setCityOptions] = useState([]);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -52,12 +54,14 @@ export function ContactProfilePage() {
       contactsApi.engagements(id),
       lookupApi.tags().catch(() => []),
       lookupApi.categories().catch(() => []),
+      lookupApi.cities().catch(() => []),
     ])
-      .then(async ([row, engs, tags, categories]) => {
+      .then(async ([row, engs, tags, categories, cities]) => {
         setContact(row);
         mergeContactsCache([row]);
         setTagOptions(Array.isArray(tags) ? tags : []);
         setCategoryOptions(Array.isArray(categories) ? categories : []);
+        setCityOptions(Array.isArray(cities) ? cities : []);
         const engagementList = Array.isArray(engs) ? engs : [];
         setEngagements(engagementList);
         const feedbackMap = {};
@@ -111,18 +115,19 @@ export function ContactProfilePage() {
   }
 
   function startEdit() {
-    setDraft(buildDraftFromContact(contact));
+    setDraft(buildDraftFromContact(contact, { cities: cityOptions }));
     setDuplicate(null);
     setEditing(true);
   }
 
-  async function checkDuplicateMobile(mobile) {
-    if (!mobile?.trim()) {
+  async function checkDuplicateMobile() {
+    const e164 = e164FromDraft(draft);
+    if (!e164) {
       setDuplicate(null);
       return;
     }
     try {
-      const match = await contactsApi.lookupMobile(mobile.trim());
+      const match = await contactsApi.lookupMobile(e164, draft.mobile_country_code);
       setDuplicate(match ?? null);
     } catch {
       setDuplicate(null);
@@ -237,6 +242,7 @@ export function ContactProfilePage() {
           onDraftChange={setDraft}
           tagOptions={tagOptions}
           categoryOptions={categoryOptions}
+          cityOptions={cityOptions}
           duplicate={duplicate}
           onCheckMobile={checkDuplicateMobile}
           contactId={contact.id}

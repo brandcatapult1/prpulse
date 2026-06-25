@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ExpandableSection } from '../ui/DataKit.jsx';
 import { Pill, formatFee } from '../../lib/format.jsx';
-import { formatClassification, CLASSIFICATION_OPTIONS } from '../../lib/classifications.js';
+import { formatClassification, CLASSIFICATION_OPTIONS, classificationSelectLabel } from '../../lib/classifications.js';
 import { formatContactStatus, CONTACT_STATUS_OPTIONS } from '../../lib/contactLifecycle.js';
 import { MobileNumberField } from './MobileNumberField.jsx';
 import { CityCountryField } from './CityCountryField.jsx';
@@ -366,8 +366,8 @@ export function ContactEditOverview({
                 onChange={(e) => setField('classification', e.target.value)}
               >
                 <option value="">— None —</option>
-                {CLASSIFICATION_OPTIONS.map(({ value, label }) => (
-                  <option key={value} value={value}>{label}</option>
+                {CLASSIFICATION_OPTIONS.map(({ value }) => (
+                  <option key={value} value={value}>{classificationSelectLabel(value)}</option>
                 ))}
               </select>
             }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CLASSIFICATION_OPTIONS } from '../../lib/classifications.js';
+import { CLASSIFICATION_OPTIONS, classificationSelectLabel } from '../../lib/classifications.js';
 import { countryLabel } from '../../lib/locations.js';
 
 const STATUS_OPTIONS = [
@@ -141,7 +141,7 @@ export function ContactFilters({
       >
         <option value="">All classes</option>
         {CLASSIFICATION_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
+          <option key={opt.value} value={opt.value}>{classificationSelectLabel(opt)}</option>
         ))}
       </select>
 

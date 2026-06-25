@@ -19,6 +19,7 @@ const EMPTY_FILTERS = {
   openToPaid: false,
   openToBarter: false,
   tagIds: [],
+  primaryCategoryIds: [],
 };
 
 export function ContactsPage() {
@@ -33,6 +34,7 @@ export function ContactsPage() {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [tagOptions, setTagOptions] = useState([]);
   const [cityOptions, setCityOptions] = useState([]);
+  const [categoryOptions, setCategoryOptions] = useState([]);
 
   const includeArchived = filters.status === 'archived' || filters.status === 'all';
 
@@ -44,9 +46,11 @@ export function ContactsPage() {
     Promise.all([
       lookupApi.tags().catch(() => []),
       lookupApi.cities().catch(() => []),
-    ]).then(([tags, cities]) => {
+      lookupApi.categories().catch(() => []),
+    ]).then(([tags, cities, categories]) => {
       setTagOptions(Array.isArray(tags) ? tags : []);
       setCityOptions(Array.isArray(cities) ? cities : []);
+      setCategoryOptions(Array.isArray(categories) ? categories : []);
     });
   }, []);
 
@@ -90,6 +94,7 @@ export function ContactsPage() {
           r.full_name?.toLowerCase().includes(q)
           || r.mobile_number?.includes(q)
           || r.city?.toLowerCase().includes(q)
+          || r.primary_category_name?.toLowerCase().includes(q)
           || r.tags?.some((t) => t.toLowerCase().includes(q)),
       );
     }
@@ -115,6 +120,11 @@ export function ContactsPage() {
     if (selectedTagNames.length > 0) {
       result = result.filter((r) =>
         selectedTagNames.every((name) => r.tags?.includes(name)),
+      );
+    }
+    if (filters.primaryCategoryIds.length > 0) {
+      result = result.filter((r) =>
+        filters.primaryCategoryIds.includes(r.primary_category_id),
       );
     }
     return result;
@@ -145,6 +155,7 @@ export function ContactsPage() {
   const columns = [
     { key: 'full_name', label: 'Name', render: (r) => <span className="font-medium">{r.full_name}</span> },
     { key: 'city', label: 'City' },
+    { key: 'primary_category_name', label: 'Category', render: (r) => r.primary_category_name ?? '—' },
     { key: 'classification', label: 'Class', render: (r) => r.classification?.replace('_', ' ') ?? '—' },
     {
       key: 'status',
@@ -186,6 +197,7 @@ export function ContactsPage() {
         onChange={updateFilters}
         cityOptions={cityOptions}
         tagOptions={tagOptions}
+        categoryOptions={categoryOptions}
         onClear={clearAll}
       />
 

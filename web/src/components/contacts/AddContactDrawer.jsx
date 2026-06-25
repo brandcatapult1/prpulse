@@ -19,6 +19,7 @@ const EMPTY = {
   city: '',
   instagram_url: '',
   classification: '',
+  primary_category_id: '',
   open_to_paid: false,
   open_to_barter: false,
   tag_ids: [],
@@ -33,6 +34,7 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
   const [toast, setToast] = useState(null);
   const [tagOptions, setTagOptions] = useState([]);
   const [cityOptions, setCityOptions] = useState([]);
+  const [categoryOptions, setCategoryOptions] = useState([]);
 
   useEffect(() => {
     if (!open) return;
@@ -41,9 +43,11 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
     Promise.all([
       lookupApi.tags().catch(() => []),
       lookupApi.cities().catch(() => []),
-    ]).then(([tags, cities]) => {
+      lookupApi.categories().catch(() => []),
+    ]).then(([tags, cities, categories]) => {
       setTagOptions(Array.isArray(tags) ? tags : []);
       setCityOptions(Array.isArray(cities) ? cities : []);
+      setCategoryOptions(Array.isArray(categories) ? categories : []);
     });
   }, [open]);
 
@@ -100,6 +104,7 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
         city: form.city || null,
         country: form.country,
         classification: form.classification || null,
+        primary_category_id: form.primary_category_id || null,
         open_to_paid: form.open_to_paid,
         open_to_barter: form.open_to_barter,
         tag_ids: form.tag_ids,
@@ -195,6 +200,20 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
               value={form.instagram_url}
               onChange={(e) => updateField('instagram_url', e.target.value)}
             />
+          </label>
+
+          <label className="block text-2xs text-ink-secondary">
+            Primary category
+            <select
+              className="input-field mt-1"
+              value={form.primary_category_id}
+              onChange={(e) => updateField('primary_category_id', e.target.value)}
+            >
+              <option value="">— Not set —</option>
+              {categoryOptions.map((cat) => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
           </label>
 
           <label className="block text-2xs text-ink-secondary">

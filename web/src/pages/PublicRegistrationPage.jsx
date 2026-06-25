@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { registrationsApi } from '../lib/api.js';
-import { CREATOR_CATEGORIES } from '../lib/creatorCategories.js';
 import { MobileNumberField } from '../components/contacts/MobileNumberField.jsx';
 import { CityCountryField } from '../components/contacts/CityCountryField.jsx';
 import { normalizeMobileToE164, isMobileValid } from '../lib/phone.js';
@@ -15,7 +14,7 @@ const EMPTY = {
   city: '',
   instagram_link: '',
   youtube_link: '',
-  categories: [],
+  primary_category_id: '',
   paid_preference: false,
   barter_preference: false,
   reel_rate: '',
@@ -26,15 +25,20 @@ const EMPTY = {
 export function PublicRegistrationPage() {
   const [form, setForm] = useState(EMPTY);
   const [cityOptions, setCityOptions] = useState([]);
+  const [categoryOptions, setCategoryOptions] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    registrationsApi.cities().then((data) => {
-      setCityOptions(Array.isArray(data) ? data : []);
-    }).catch(() => setCityOptions([]));
+    Promise.all([
+      registrationsApi.cities().catch(() => []),
+      registrationsApi.categories().catch(() => []),
+    ]).then(([cities, categories]) => {
+      setCityOptions(Array.isArray(cities) ? cities : []);
+      setCategoryOptions(Array.isArray(categories) ? categories : []);
+    });
   }, []);
 
   const set = (field) => (e) => {
@@ -54,15 +58,6 @@ export function PublicRegistrationPage() {
     if (field === 'mobile_number' || field === 'email' || field === 'country_code') {
       setFieldErrors((prev) => ({ ...prev, [field]: null, mobile_number: null }));
     }
-  };
-
-  const toggleCategory = (name) => {
-    setForm((f) => ({
-      ...f,
-      categories: f.categories.includes(name)
-        ? f.categories.filter((c) => c !== name)
-        : [...f.categories, name],
-    }));
   };
 
   const submit = async (e) => {
@@ -94,8 +89,8 @@ export function PublicRegistrationPage() {
     }
 
     setFieldErrors({});
-    if (form.categories.length === 0) {
-      setError('Pick at least one category.');
+    if (!form.primary_category_id) {
+      setError('Pick a primary category.');
       return;
     }
 
@@ -112,8 +107,7 @@ export function PublicRegistrationPage() {
       city: form.city || null,
       instagram_link: form.instagram_link.trim() || null,
       youtube_link: form.youtube_link.trim() || null,
-      category: form.categories.join(', '),
-      categories: form.categories,
+      primary_category_id: form.primary_category_id,
       paid_preference: form.paid_preference,
       barter_preference: form.barter_preference,
       reel_rate: form.paid_preference && form.reel_rate ? Number(form.reel_rate) : null,
@@ -151,41 +145,40 @@ export function PublicRegistrationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-canvas py-8">
-      <div className="mx-auto w-full max-w-lg px-4">
+    <div className="flex min-h-screen flex-col items-center bg-canvas px-4 py-10">
+      <div className="w-full max-w-lg">
         <div className="mb-6 text-center">
-          <h1 className="text-xl font-semibold tracking-tight text-ink">Creator registration</h1>
+          <h1 className="text-xl font-semibold text-ink">Join our creator network</h1>
           <p className="mt-1 text-sm text-ink-secondary">
-            Tell us about yourself — we&apos;ll review and add you to our roster if it&apos;s a fit.
+            Tell us about yourself — our team will review and reach out.
           </p>
         </div>
 
-        <form onSubmit={submit} className="space-y-4 rounded-xl border border-line bg-white p-6 shadow-sm">
-          {error && (
-            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-2xs text-red-800">{error}</p>
-          )}
+        {error && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-2xs text-red-800">
+            {error}
+          </div>
+        )}
 
+        <form onSubmit={submit} className="space-y-4 rounded-xl border border-line bg-white p-6 shadow-sm">
           <Field label="Full name *">
-            <input className="input-field" required value={form.full_name} onChange={set('full_name')} placeholder="Your name" />
+            <input className="input-field" value={form.full_name} onChange={set('full_name')} placeholder="Your name" />
           </Field>
-          <Field label="Mobile number *">
+
+          <Field label="Mobile *">
             <MobileNumberField
               countryCode={form.country_code}
               nationalNumber={form.mobile_number}
               onCountryChange={(code) => set('country_code')({ target: { value: code } })}
-              onNumberChange={(value) => set('mobile_number')({ target: { value } })}
-              error={fieldErrors.mobile_number}
-              required
+              onNumberChange={(value) => setForm((f) => ({ ...f, mobile_number: value }))}
             />
+            {fieldErrors.mobile_number && (
+              <p className="mt-1 text-2xs text-red-700">{fieldErrors.mobile_number}</p>
+            )}
           </Field>
+
           <Field label="Email">
-            <input
-              className={`input-field ${fieldErrors.email ? 'border-red-400 focus:border-red-500 focus:ring-red-100' : ''}`}
-              type="email"
-              value={form.email}
-              onChange={set('email')}
-              placeholder="you@email.com"
-            />
+            <input className="input-field" type="email" value={form.email} onChange={set('email')} placeholder="you@example.com" />
             {fieldErrors.email && (
               <p className="mt-1 text-2xs text-red-700">{fieldErrors.email}</p>
             )}
@@ -206,27 +199,17 @@ export function PublicRegistrationPage() {
             <input className="input-field" type="url" value={form.youtube_link} onChange={set('youtube_link')} placeholder="https://youtube.com/…" />
           </Field>
 
-          <Field label="Categories *">
-            <p className="mb-2 text-2xs text-ink-tertiary">Select all that apply</p>
-            <div className="flex flex-wrap gap-2">
-              {CREATOR_CATEGORIES.map((name) => {
-                const selected = form.categories.includes(name);
-                return (
-                  <button
-                    key={name}
-                    type="button"
-                    onClick={() => toggleCategory(name)}
-                    className={`rounded-lg border px-3 py-2 text-2xs font-medium transition-colors ${
-                      selected
-                        ? 'border-brand bg-brand-soft text-brand'
-                        : 'border-line bg-white text-ink-secondary hover:border-zinc-300'
-                    }`}
-                  >
-                    {name}
-                  </button>
-                );
-              })}
-            </div>
+          <Field label="Primary category *">
+            <select
+              className="input-field"
+              value={form.primary_category_id}
+              onChange={set('primary_category_id')}
+            >
+              <option value="">Select a category</option>
+              {categoryOptions.map((cat) => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
           </Field>
 
           <div className="space-y-3 rounded-lg border border-line bg-canvas px-4 py-3">

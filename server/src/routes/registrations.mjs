@@ -5,13 +5,21 @@ import { requireSeniorOrAdmin } from '../middleware/permissions.mjs';
 import { normalizeMobileToE164 } from '../lib/mobileNumber.mjs';
 import { createContactDeduped } from '../lib/contactCreate.mjs';
 import { assertValidCity, loadCities } from '../lib/cities.mjs';
+import { assertValidCategoryId, loadCategories } from '../lib/categories.mjs';
 
 export const registrationsRouter = Router();
 
 const SELECT_FIELDS = `
   id, full_name, mobile_number, email, city, instagram_link, youtube_link,
-  category, paid_preference, barter_preference, reel_rate, story_rate,
+  category, primary_category_id, paid_preference, barter_preference, reel_rate, story_rate,
   portfolio_links, notes, status, linked_contact_id, created_at, reviewed_at
+`;
+
+const LIST_SELECT = `
+  r.id, r.full_name, r.mobile_number, r.email, r.city, r.instagram_link, r.youtube_link,
+  r.category, r.primary_category_id, cat.name AS primary_category_name,
+  r.paid_preference, r.barter_preference, r.reel_rate, r.story_rate,
+  r.portfolio_links, r.notes, r.status, r.linked_contact_id, r.created_at, r.reviewed_at
 `;
 
 /** Public — curated city list for signup (same source as internal lookup). */
@@ -24,6 +32,24 @@ registrationsRouter.get('/cities', async (req, res) => {
   }
 });
 
+/** Public — admin-managed category list for signup (same source as internal lookup). */
+registrationsRouter.get('/categories', async (_req, res) => {
+  try {
+    const categories = await loadCategories(pool);
+    res.json(categories);
+  } catch (err) {
+    res.status(503).json({ error: err.message ?? 'Could not load categories' });
+  }
+});
+
+async function applyPrimaryCategoryToContact(client, contactId, primaryCategoryId) {
+  if (!primaryCategoryId || !contactId) return;
+  await client.query(
+    `UPDATE contacts SET primary_category_id = $1 WHERE id = $2`,
+    [primaryCategoryId, contactId],
+  );
+}
+
 /** Public — creator signup (no login). */
 registrationsRouter.post('/', async (req, res) => {
   const {
@@ -34,6 +60,7 @@ registrationsRouter.post('/', async (req, res) => {
     instagram_link,
     youtube_link,
     category,
+    primary_category_id,
     paid_preference,
     barter_preference,
     reel_rate,
@@ -47,9 +74,20 @@ registrationsRouter.post('/', async (req, res) => {
     return res.status(400).json({ error: 'Full name and mobile number are required' });
   }
 
+  if (!primary_category_id) {
+    return res.status(400).json({ error: 'Primary category is required' });
+  }
+
   const e164 = normalizeMobileToE164(mobile_number, country_code ?? undefined);
   if (!e164) {
     return res.status(400).json({ error: 'Enter a valid mobile number for the selected country' });
+  }
+
+  let categoryRow;
+  try {
+    categoryRow = await assertValidCategoryId(pool, primary_category_id);
+  } catch (err) {
+    return res.status(err.status ?? 400).json({ error: err.message ?? 'Invalid category' });
   }
 
   let storedCity = null;
@@ -62,13 +100,15 @@ registrationsRouter.post('/', async (req, res) => {
     }
   }
 
+  const legacyCategoryText = category?.trim() || categoryRow.name;
+
   try {
     const { rows } = await pool.query(
       `INSERT INTO registration_submissions (
         full_name, mobile_number, email, city, instagram_link, youtube_link,
-        category, paid_preference, barter_preference, reel_rate, story_rate,
+        category, primary_category_id, paid_preference, barter_preference, reel_rate, story_rate,
         portfolio_links, notes, status
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'new')
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'new')
       RETURNING ${SELECT_FIELDS}`,
       [
         full_name.trim(),
@@ -77,7 +117,8 @@ registrationsRouter.post('/', async (req, res) => {
         storedCity,
         instagram_link ?? null,
         youtube_link ?? null,
-        category ?? null,
+        legacyCategoryText,
+        categoryRow.id,
         paid_preference ?? null,
         barter_preference ?? null,
         reel_rate ?? null,
@@ -86,7 +127,7 @@ registrationsRouter.post('/', async (req, res) => {
         notes ?? null,
       ],
     );
-    res.status(201).json(rows[0]);
+    res.status(201).json({ ...rows[0], primary_category_name: categoryRow.name });
   } catch (err) {
     console.warn('Registration submit failed:', err.message ?? err);
     res.status(503).json({ error: 'Registration unavailable — try again later' });
@@ -96,9 +137,10 @@ registrationsRouter.post('/', async (req, res) => {
 registrationsRouter.get('/', requireAuth, async (_req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT ${SELECT_FIELDS}
-       FROM registration_submissions
-       ORDER BY created_at DESC
+      `SELECT ${LIST_SELECT}
+       FROM registration_submissions r
+       LEFT JOIN categories cat ON cat.id = r.primary_category_id
+       ORDER BY r.created_at DESC
        LIMIT 200`,
     );
     res.json(rows);
@@ -158,6 +200,9 @@ registrationsRouter.patch('/:id', requireAuth, requireSeniorOrAdmin, async (req,
               city: sub.city,
               country,
               instagram_url: sub.instagram_link,
+              primary_category_id: sub.primary_category_id,
+              open_to_paid: Boolean(sub.paid_preference),
+              open_to_barter: Boolean(sub.barter_preference),
               source: 'signup_form',
               created_by: req.user.id,
             });
@@ -171,6 +216,10 @@ registrationsRouter.patch('/:id', requireAuth, requireSeniorOrAdmin, async (req,
             }
           }
         }
+
+        if (finalLinkedId) {
+          await applyPrimaryCategoryToContact(client, finalLinkedId, sub.primary_category_id);
+        }
       }
 
       const { rows: updated } = await client.query(
@@ -183,7 +232,15 @@ registrationsRouter.patch('/:id', requireAuth, requireSeniorOrAdmin, async (req,
          RETURNING ${SELECT_FIELDS}`,
         [finalStatus, finalLinkedId, req.user.id, req.params.id],
       );
-      return updated[0];
+
+      const enriched = await client.query(
+        `SELECT ${LIST_SELECT}
+         FROM registration_submissions r
+         LEFT JOIN categories cat ON cat.id = r.primary_category_id
+         WHERE r.id = $1`,
+        [req.params.id],
+      );
+      return enriched.rows[0] ?? updated[0];
     });
 
     if (!row) return res.status(404).json({ error: 'Registration not found' });

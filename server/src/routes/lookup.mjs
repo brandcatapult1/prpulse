@@ -3,6 +3,7 @@ import { pool } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
 import { ensureReferenceData } from '../lib/referenceData.mjs';
 import { loadCities } from '../lib/cities.mjs';
+import { loadCategories } from '../lib/categories.mjs';
 
 export const lookupRouter = Router();
 
@@ -22,11 +23,8 @@ lookupRouter.get('/tags', async (_req, res) => {
 
 lookupRouter.get('/categories', async (_req, res) => {
   try {
-    await ensureReferenceData(pool);
-    const { rows } = await pool.query(
-      `SELECT id, name, created_at FROM categories ORDER BY name`,
-    );
-    res.json(rows);
+    const categories = await loadCategories(pool);
+    res.json(categories);
   } catch (err) {
     res.status(503).json({ error: err.message ?? 'Could not load categories' });
   }

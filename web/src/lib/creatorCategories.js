@@ -1,29 +1,12 @@
-/** Admin-configurable creator categories (PRD Module 1 / registration form). */
-export const CREATOR_CATEGORIES = [
-  'Food & Beverage',
-  'Beauty',
-  'Lifestyle',
-  'Luxury',
-  'Travel',
-  'Tech',
-  'Fashion',
-  'Fitness',
-  'Parenting',
-  'Finance',
-  'Auto',
-  'UGC',
-];
-
-/** Format stored category value for display (string or array). */
+/** Format stored category value for display (legacy text or joined name). */
 export function formatCategories(value) {
   if (Array.isArray(value)) return value.join(', ');
   if (!value) return '—';
   return value;
 }
 
-/** Parse legacy single-string category into array. */
-export function parseCategories(value) {
-  if (Array.isArray(value)) return value;
-  if (!value) return [];
-  return value.split(',').map((s) => s.trim()).filter(Boolean);
+/** Primary category label from registration or contact row. */
+export function formatPrimaryCategory(row) {
+  if (row?.primary_category_name) return row.primary_category_name;
+  return formatCategories(row?.category);
 }

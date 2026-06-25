@@ -6,7 +6,7 @@ import { Pill, formatDate } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
 import { contactsApi, registrationsApi } from '../lib/api.js';
 import { findContactByMobile } from '../lib/phone.js';
-import { formatCategories } from '../lib/creatorCategories.js';
+import { formatPrimaryCategory } from '../lib/creatorCategories.js';
 import { todayIso } from '../lib/dates.js';
 
 const PENDING_STATUSES = new Set(['new', 'pending_review']);
@@ -68,7 +68,7 @@ export function RegistrationsPage() {
       ),
     },
     { key: 'city', label: 'City', render: (r) => r.city ?? '—' },
-    { key: 'category', label: 'Categories', render: (r) => formatCategories(r.categories ?? r.category) },
+    { key: 'category', label: 'Category', render: (r) => formatPrimaryCategory(r) },
     {
       key: 'status',
       label: 'Status',
@@ -293,7 +293,7 @@ function ReviewDrawer({ registration, contacts, onClose, onApprove, onReject, on
         <Detail label="City" value={registration.city ?? '—'} />
         <Detail label="Instagram" value={registration.instagram_link ?? '—'} link />
         <Detail label="YouTube" value={registration.youtube_link ?? '—'} link />
-        <Detail label="Categories" value={formatCategories(registration.categories ?? registration.category)} />
+        <Detail label="Primary category" value={formatPrimaryCategory(registration)} />
         <Detail
           label="Preferences"
           value={[

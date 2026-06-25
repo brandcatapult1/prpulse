@@ -94,6 +94,7 @@ export const registrationsApi = {
   list: () => api('/registrations'),
   cities: (country) =>
     api(`/registrations/cities${country ? `?country=${encodeURIComponent(country)}` : ''}`),
+  categories: () => api('/registrations/categories'),
   submit: (body) => api('/registrations', { method: 'POST', body: JSON.stringify(body) }),
   update: (id, body) => api(`/registrations/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 };

@@ -374,6 +374,7 @@ CREATE TABLE registration_submissions (
   instagram_link    text,
   youtube_link      text,
   category          text,
+  primary_category_id uuid REFERENCES categories(id) ON DELETE SET NULL,
   paid_preference   boolean,
   barter_preference boolean,
   reel_rate         numeric(12,2),

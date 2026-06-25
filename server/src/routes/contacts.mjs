@@ -16,6 +16,8 @@ contactsRouter.get('/', requireAuth, async (req, res) => {
     `SELECT c.id, c.full_name, c.city, c.classification, c.status,
             c.is_blacklisted, c.mobile_number, c.contact_type,
             c.open_to_paid, c.open_to_barter,
+            c.primary_category_id,
+            pc.name AS primary_category_name,
             COALESCE(
               (
                 SELECT array_agg(t.name ORDER BY t.name)
@@ -26,6 +28,7 @@ contactsRouter.get('/', requireAuth, async (req, res) => {
               ARRAY[]::text[]
             ) AS tags
      FROM contacts c
+     LEFT JOIN categories pc ON pc.id = c.primary_category_id
      WHERE 1=1 ${scopeArchived(includeArchived)}
      ORDER BY c.full_name
      LIMIT 200`,
@@ -88,6 +91,7 @@ contactsRouter.post('/quick-add', requireAuth, async (req, res) => {
     classification,
     open_to_paid,
     open_to_barter,
+    primary_category_id,
     tag_ids,
   } = req.body;
   if (!full_name?.trim() || !mobile_number?.trim()) {
@@ -108,6 +112,7 @@ contactsRouter.post('/quick-add', requireAuth, async (req, res) => {
         city: city ?? null,
         country: country ?? mobile_country_code ?? null,
         classification: classification || null,
+        primary_category_id: primary_category_id || null,
         open_to_paid: Boolean(open_to_paid),
         open_to_barter: Boolean(open_to_barter),
         source: 'quick_add',

@@ -72,21 +72,3 @@ export function registrationRatesPayload(paidPreference, form) {
     }),
   );
 }
-
-/** Remove primary category id from secondary selections. */
-export function secondaryCategoryIdsWithoutPrimary(secondaryIds, primaryCategoryId) {
-  if (!primaryCategoryId) return secondaryIds ?? [];
-  return (secondaryIds ?? []).filter((id) => id !== primaryCategoryId);
-}
-
-/** Draft patch after primary category change — drops primary from secondaries. */
-export function draftWithPrimaryCategory(draft, primaryCategoryId) {
-  return {
-    ...draft,
-    primary_category_id: primaryCategoryId,
-    secondary_category_ids: secondaryCategoryIdsWithoutPrimary(
-      draft.secondary_category_ids,
-      primaryCategoryId,
-    ),
-  };
-}

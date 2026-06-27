@@ -172,12 +172,6 @@ CREATE TABLE contact_tags (
   PRIMARY KEY (contact_id, tag_id)
 );
 
-CREATE TABLE contact_secondary_categories (
-  contact_id  uuid NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
-  category_id uuid NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
-  PRIMARY KEY (contact_id, category_id)
-);
-
 -- Reversible blacklist; at most one active record per contact.
 CREATE TABLE blacklist_records (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -778,7 +772,6 @@ CREATE INDEX idx_registration_mobile ON registration_submissions (mobile_number)
 -- Tag / category filtering
 CREATE INDEX idx_contact_tags_tag     ON contact_tags (tag_id);
 CREATE INDEX idx_campaign_tags_tag    ON campaign_tags (tag_id);
-CREATE INDEX idx_contact_seccat_cat   ON contact_secondary_categories (category_id);
 
 -- =====================================================================
 -- 17. Views

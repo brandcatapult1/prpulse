@@ -115,7 +115,6 @@ A single universal Contact table backs all relationship records.
 
 **Profile information**
 - `primary_category` *(admin-configurable list)*
-- `secondary_categories` *(multi-select)*
 - `open_to_paid` · `open_to_barter` *(booleans)*
 
 **Commercial information — current indicative rates only**
@@ -456,7 +455,7 @@ The system stays responsive at 10,000+ contacts, 50,000+ engagements, and 250,00
 - **Contact summary** (`total_collaborations`, `last_collaboration_date`, `avg_content_quality`, `avg_professionalism`, `avg_timeliness`, `would_work_again_pct`) is recomputed by `recompute_contact_summary(contact_id)` on feedback create, feedback update, and any engagement reaching `is_counted_collaboration = true`.
 - **Campaign metrics** (`completed_collaborations`, `remaining`, `achievement_pct`, `campaign_health`) are recomputed by `recompute_campaign_metrics(campaign_id)`, which **recounts** engagements where `is_counted_collaboration` is true. It runs **in the same transaction** as, and is triggered by, any of: a deliverable created/deleted, a deliverable status change, an engagement status change, or an engagement deletion/move. Because it recounts rather than increments, reopening a completed engagement self-corrects.
 
-**Indexing (minimum):** Engagement `(campaign_id)`, `(contact_id)`, `(assigned_manager, next_follow_up_date)`, unique `(contact_id, campaign_id)`; Deliverable `(engagement_id, status)`, `(due_date)`; Timeline `(engagement_id, date)`, `(contact_id, date)`; Contact `(mobile_number)`, `(status)`, GIN on tags and secondary categories; AuditLog `(entity_type, entity_id, timestamp)`.
+**Indexing (minimum):** Engagement `(campaign_id)`, `(contact_id)`, `(assigned_manager, next_follow_up_date)`, unique `(contact_id, campaign_id)`; Deliverable `(engagement_id, status)`, `(due_date)`; Timeline `(engagement_id, date)`, `(contact_id, date)`; Contact `(mobile_number)`, `(status)`, GIN on tags; AuditLog `(entity_type, entity_id, timestamp)`.
 
 **Dashboards** read cached/aggregated values only; a daily IST warmup refreshes date-relative snapshots. Profile and dashboard endpoints batch-load (joins/dataloader) — no per-row fetches.
 

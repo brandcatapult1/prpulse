@@ -9,7 +9,6 @@ import { countryLabel, citiesForCountry } from '../../lib/locations.js';
 import { isMobileValid } from '../../lib/phone.js';
 import {
   draftWithOpenToPaid,
-  draftWithPrimaryCategory,
   showIndicativeRates,
   hasCollaborationPreference,
   COLLABORATION_PREFERENCE_ERROR,
@@ -49,9 +48,6 @@ export function ContactEditOverview({
   };
 
   const tagLabels = (contact.tags ?? []).map((t) => (typeof t === 'string' ? t : t.name));
-  const secondaryNames = (contact.secondary_categories ?? extras.secondary_categories ?? [])
-    .map((c) => c.name)
-    .filter(Boolean);
 
   const openToPaid = editing
     ? Boolean(draft.open_to_paid)
@@ -62,9 +58,6 @@ export function ContactEditOverview({
   const incompleteLinkIndexes = editing
     ? incompletePlatformLinkIndexes(draft.other_platform_links)
     : [];
-  const secondaryCategoryOptions = categoryOptions.filter(
-    (c) => c.id !== (draft.primary_category_id ?? contact.primary_category?.id ?? contact.primary_category_id),
-  );
 
   if (!editing) {
     return (
@@ -72,7 +65,6 @@ export function ContactEditOverview({
         contact={contact}
         extras={extras}
         tagLabels={tagLabels}
-        secondaryNames={secondaryNames}
       />
     );
   }
@@ -290,7 +282,7 @@ export function ContactEditOverview({
                 <select
                   className="input-field w-full max-w-md"
                   value={draft.primary_category_id ?? ''}
-                  onChange={(e) => onDraftChange((d) => draftWithPrimaryCategory(d, e.target.value))}
+                  onChange={(e) => setField('primary_category_id', e.target.value)}
                 >
                   <option value="">— None —</option>
                   {categoryOptions.map((c) => (
@@ -299,45 +291,6 @@ export function ContactEditOverview({
                 </select>
               ) : (
                 <span className="text-ink">{contact.primary_category?.name ?? extras.primary_category?.name ?? '—'}</span>
-              )}
-            </dd>
-          </div>
-          <div className="sm:col-span-2">
-            <dt className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">Secondary categories</dt>
-            <dd className="mt-2">
-              {editing ? (
-                <div className="flex flex-wrap gap-2">
-                  {secondaryCategoryOptions.map((c) => {
-                    const selected = (draft.secondary_category_ids ?? []).includes(c.id);
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => toggleId('secondary_category_ids', c.id)}
-                        className={`rounded-lg border px-3 py-1.5 text-2xs font-medium transition-colors ${
-                          selected
-                            ? 'border-brand bg-brand-soft text-brand'
-                            : 'border-line bg-white text-ink-secondary hover:border-zinc-300'
-                        }`}
-                      >
-                        {c.name}
-                      </button>
-                    );
-                  })}
-                  {secondaryCategoryOptions.length === 0 && draft.primary_category_id && (
-                    <span className="text-2xs text-ink-secondary">
-                      All categories assigned as primary — pick a different primary to add secondaries.
-                    </span>
-                  )}
-                </div>
-              ) : secondaryNames.length > 0 ? (
-                <div className="flex flex-wrap gap-1">
-                  {secondaryNames.map((name) => (
-                    <Pill key={name} tone="info">{name}</Pill>
-                  ))}
-                </div>
-              ) : (
-                <span className="text-ink-secondary">—</span>
               )}
             </dd>
           </div>
@@ -498,7 +451,7 @@ export function ContactEditOverview({
  * glass cards (matching the Campaign View treatment) and with empty fields
  * hidden rather than rendered as rows of "—".
  */
-function ContactReadOverview({ contact, extras, tagLabels, secondaryNames }) {
+function ContactReadOverview({ contact, extras, tagLabels }) {
   const email = extras.email ?? contact.email ?? null;
   const location = contact.city
     ? `${contact.city}${contact.country ? ` · ${countryLabel(contact.country)}` : ''}`
@@ -526,8 +479,7 @@ function ContactReadOverview({ contact, extras, tagLabels, secondaryNames }) {
       ].filter(([, v]) => v != null)
     : [];
 
-  const hasCategoriesOrTags =
-    primaryCategory || secondaryNames.length > 0 || tagLabels.length > 0;
+  const hasCategoriesOrTags = primaryCategory || tagLabels.length > 0;
   const hasSocials = instagram || youtube || otherLinks.length > 0;
 
   return (
@@ -575,14 +527,11 @@ function ContactReadOverview({ contact, extras, tagLabels, secondaryNames }) {
       {(hasCategoriesOrTags || hasSocials) && (
         <ReadCard title="Categories, tags & socials" className="sm:col-span-2">
           <div className="space-y-3">
-            {(primaryCategory || secondaryNames.length > 0) && (
+            {primaryCategory && (
               <div>
-                <span className="text-[10px] font-medium uppercase tracking-wider text-ink-tertiary">Categories</span>
+                <span className="text-[10px] font-medium uppercase tracking-wider text-ink-tertiary">Primary category</span>
                 <div className="mt-1 flex flex-wrap gap-1.5">
-                  {primaryCategory && <Pill tone="brand">{primaryCategory}</Pill>}
-                  {secondaryNames.map((name) => (
-                    <Pill key={name} tone="info">{name}</Pill>
-                  ))}
+                  <Pill tone="brand">{primaryCategory}</Pill>
                 </div>
               </div>
             )}

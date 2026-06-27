@@ -2,7 +2,6 @@ import { normalizeMobileToE164, splitMobileForForm, isMobileValid } from './phon
 import { matchCityName, normalizeCountryCode } from './locations.js';
 import {
   indicativeRatesPayload,
-  secondaryCategoryIdsWithoutPrimary,
   hasCollaborationPreference,
   COLLABORATION_PREFERENCE_ERROR,
 } from './collaborationPrefs.js';
@@ -38,7 +37,6 @@ export function buildDraftFromContact(contact, { cities = [] } = {}) {
     youtube_url: contact.youtube_url ?? '',
     other_platform_links: cloneLinks(contact.other_platform_links),
     primary_category_id: contact.primary_category_id ?? contact.primary_category?.id ?? '',
-    secondary_category_ids: (contact.secondary_categories ?? []).map((c) => c.id),
     open_to_paid: Boolean(contact.open_to_paid),
     open_to_barter: Boolean(contact.open_to_barter),
     reel_rate: contact.reel_rate ?? '',
@@ -83,10 +81,6 @@ export function buildPatchFromDraft(draft) {
     youtube_url: emptyToNull(draft.youtube_url),
     other_platform_links: links,
     primary_category_id: draft.primary_category_id || null,
-    secondary_category_ids: secondaryCategoryIdsWithoutPrimary(
-      draft.secondary_category_ids ?? [],
-      draft.primary_category_id || null,
-    ),
     open_to_paid: Boolean(draft.open_to_paid),
     open_to_barter: Boolean(draft.open_to_barter),
     ...indicativeRatesPayload(Boolean(draft.open_to_paid), draft, rateToPayload),

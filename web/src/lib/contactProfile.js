@@ -36,7 +36,6 @@ export function getContactProfileExtras(contact) {
     state: row.state ?? null,
     country: row.country ?? null,
     primary_category: row.primary_category ?? null,
-    secondary_categories: row.secondary_categories ?? [],
     total_collaborations: row.total_collaborations,
     last_collaboration_date: row.last_collaboration_date,
     avg_rating: row.avg_content_quality != null

@@ -89,15 +89,6 @@ export async function batchSetPrimaryCategory(client, contactIds, primaryCategor
     [ids, category.id],
   );
 
-  if (rows.length > 0) {
-    await client.query(
-      `DELETE FROM contact_secondary_categories
-       WHERE contact_id = ANY($1::uuid[])
-         AND category_id = $2`,
-      [rows.map((r) => r.id), category.id],
-    );
-  }
-
   return {
     updated: rows.length,
     skipped: ids.length - rows.length,

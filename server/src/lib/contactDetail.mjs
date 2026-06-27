@@ -85,7 +85,7 @@ function parseUuidList(value, fieldName) {
 
 /**
  * Parse PATCH body into scalar updates and relation payloads.
- * @returns {{ scalars: Record<string, unknown>, mobile?: string, other_platform_links?: object[], tag_ids?: string[], secondary_category_ids?: string[] }}
+ * @returns {{ scalars: Record<string, unknown>, mobile?: string, other_platform_links?: object[], tag_ids?: string[] }}
  */
 export function parseContactPatch(body) {
   const input = body ?? {};
@@ -165,14 +165,6 @@ export function parseContactPatch(body) {
   );
   if (tag_ids !== undefined) hasChange = true;
 
-  const secondary_category_ids = parseUuidList(
-    Object.prototype.hasOwnProperty.call(input, 'secondary_category_ids')
-      ? input.secondary_category_ids
-      : undefined,
-    'secondary_category_ids',
-  );
-  if (secondary_category_ids !== undefined) hasChange = true;
-
   if (!hasChange) {
     throw Object.assign(new Error('No valid fields to update'), { status: 400 });
   }
@@ -182,7 +174,6 @@ export function parseContactPatch(body) {
     mobile,
     other_platform_links,
     tag_ids,
-    secondary_category_ids,
   };
 }
 
@@ -199,16 +190,7 @@ export async function loadContactDetail(client, contactId) {
                 WHERE ct.contact_id = c.id
               ),
               '[]'::json
-            ) AS tags,
-            COALESCE(
-              (
-                SELECT json_agg(json_build_object('id', cat.id, 'name', cat.name) ORDER BY cat.name)
-                FROM contact_secondary_categories csc
-                JOIN categories cat ON cat.id = csc.category_id
-                WHERE csc.contact_id = c.id
-              ),
-              '[]'::json
-            ) AS secondary_categories
+            ) AS tags
      FROM contacts c
      LEFT JOIN categories pc ON pc.id = c.primary_category_id
      WHERE c.id = $1`,
@@ -219,7 +201,6 @@ export async function loadContactDetail(client, contactId) {
   if (!row) return null;
 
   const tags = Array.isArray(row.tags) ? row.tags : [];
-  const secondary_categories = Array.isArray(row.secondary_categories) ? row.secondary_categories : [];
 
   return {
     ...row,
@@ -227,7 +208,6 @@ export async function loadContactDetail(client, contactId) {
       ? { id: row.primary_category_id, name: row.primary_category_name }
       : null,
     tags,
-    secondary_categories,
     tag_names: tags.map((t) => t.name),
     primary_category_id_resolved: undefined,
     primary_category_name: undefined,
@@ -303,29 +283,11 @@ export async function applyContactPatch(client, contactId, body, { userId } = {}
     await assertIdsExist(client, 'tags', patch.tag_ids, 'tag');
   }
 
-  if (patch.secondary_category_ids !== undefined) {
-    await assertIdsExist(client, 'categories', patch.secondary_category_ids, 'category');
-  }
-
   if (patch.scalars.open_to_paid === false) {
     patch.scalars.reel_rate = null;
     patch.scalars.story_rate = null;
     patch.scalars.post_rate = null;
     patch.scalars.other_rate = null;
-  }
-
-  if (patch.secondary_category_ids !== undefined) {
-    let primaryId = patch.scalars.primary_category_id;
-    if (primaryId === undefined) {
-      const { rows } = await client.query(
-        'SELECT primary_category_id FROM contacts WHERE id = $1',
-        [contactId],
-      );
-      primaryId = rows[0]?.primary_category_id ?? null;
-    }
-    if (primaryId) {
-      patch.secondary_category_ids = patch.secondary_category_ids.filter((id) => id !== primaryId);
-    }
   }
 
   const sets = [];
@@ -359,16 +321,6 @@ export async function applyContactPatch(client, contactId, body, { userId } = {}
 
   if (patch.tag_ids !== undefined) {
     await syncContactTags(client, contactId, patch.tag_ids, { userId });
-  }
-
-  if (patch.secondary_category_ids !== undefined) {
-    await client.query('DELETE FROM contact_secondary_categories WHERE contact_id = $1', [contactId]);
-    for (const categoryId of patch.secondary_category_ids) {
-      await client.query(
-        `INSERT INTO contact_secondary_categories (contact_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-        [contactId, categoryId],
-      );
-    }
   }
 
   return loadContactDetail(client, contactId);

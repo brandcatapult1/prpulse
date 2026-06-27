@@ -96,7 +96,6 @@ async function main() {
       status: 'inactive',
       notes: 'Updated via test',
       primary_category_id: categories[0]?.id ?? null,
-      secondary_category_ids: categories.map((c) => c.id),
       tag_ids: tags.map((t) => t.id),
     });
 

@@ -21,12 +21,11 @@ import {
 import { healthDotClass, healthLabel } from '../lib/format.jsx';
 import {
   patchEngagement,
-  syncDeliverables,
-  fetchDeliverables,
+  logDeliverableProof,
   fetchDashboardWorkspace,
   logVisitReminder,
 } from '../lib/persistence.js';
-import { setDeliverablesCache, getDeliverablesForEngagement, updateEngagementDeliverables } from '../lib/deliverablesCache.js';
+import { setDeliverablesCache, getDeliverablesForEngagement } from '../lib/deliverablesCache.js';
 import { getCachedContact } from '../lib/contactsCache.js';
 
 export function DashboardPage() {
@@ -154,20 +153,13 @@ export function DashboardPage() {
   }, []);
 
   const applyDeliverablesLogging = useCallback(
-    async (engagementId, nextList, message) => {
-      const beforeList = await fetchDeliverables(engagementId);
+    async (engagementId, deliverable, message) => {
       try {
-        const saved = await syncDeliverables(engagementId, beforeList, nextList);
-        updateEngagementDeliverables(engagementId, saved);
+        await logDeliverableProof(engagementId, deliverable);
         await reload();
-        showActionToast(message, async () => {
-          await syncDeliverables(engagementId, saved, beforeList);
-          updateEngagementDeliverables(engagementId, beforeList);
-          await reload();
-          setToast(null);
-        });
+        showActionToast(message, null);
       } catch (err) {
-        showActionToast(err.message ?? 'Save failed', null);
+        showActionToast(err.message ?? 'Could not log deliverable', null);
       }
     },
     [reload, showActionToast],
@@ -202,13 +194,9 @@ export function DashboardPage() {
     (nextDeliverable) => {
       const engagementId = loggingDeliverable?.engagementId;
       if (!engagementId) return;
-      const deliverables = getDeliverablesForEngagement(engagementId);
-      const nextList = deliverables.map((d) =>
-        d.id === nextDeliverable.id ? nextDeliverable : d,
-      );
       applyDeliverablesLogging(
         engagementId,
-        nextList,
+        nextDeliverable,
         markDeliverablePostedToastMessage(nextDeliverable),
       );
       setLoggingDeliverable(null);

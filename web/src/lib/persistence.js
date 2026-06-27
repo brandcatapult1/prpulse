@@ -35,6 +35,20 @@ export async function deleteDeliverable(engagementId, deliverableId) {
   return engagementsApi.deleteDeliverable(engagementId, deliverableId);
 }
 
+/**
+ * Persist proof on a single deliverable as a direct write (PATCH for an
+ * existing row, POST for an unsaved temp row). Resolves with the saved row
+ * from the server, or rejects on a non-2xx response — never optimistic.
+ */
+export async function logDeliverableProof(engagementId, deliverable) {
+  const isTempId = String(deliverable?.id ?? '').startsWith('d-');
+  if (isTempId) {
+    const { id: _omit, ...body } = deliverable;
+    return createDeliverable(engagementId, body);
+  }
+  return updateDeliverable(engagementId, deliverable.id, deliverable);
+}
+
 /** Replace full deliverable list via diff (create/update/delete). */
 export async function syncDeliverables(engagementId, beforeList, afterList) {
   const beforeIds = new Set(beforeList.map((d) => d.id));

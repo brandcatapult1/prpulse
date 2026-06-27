@@ -47,8 +47,8 @@ export function CampaignKanbanBoard({
                     onApplyLogging={(patch, message, snapshotKeys) =>
                       onApplyLogging?.(engagement.id, patch, message, snapshotKeys)
                     }
-                    onApplyDeliverables={(deliverables, message) =>
-                      onApplyDeliverables?.(engagement.id, deliverables, message)
+                    onApplyDeliverables={(deliverable, message) =>
+                      onApplyDeliverables?.(engagement.id, deliverable, message)
                     }
                     onApplyDidntDeliver={(payload) =>
                       onApplyDidntDeliver?.(engagement.id, payload)

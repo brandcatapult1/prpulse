@@ -15,7 +15,8 @@ import { MODULES } from '../lib/modules.js';
 import { campaignsApi, contactsApi, engagementsApi } from '../lib/api.js';
 import {
   patchEngagement,
-  syncDeliverables,
+  logDeliverableProof,
+  updateDeliverable,
   saveFeedback,
   patchContact,
   blacklistContact,
@@ -130,20 +131,30 @@ export function CampaignViewPage() {
     }
   }
 
-  async function applyDeliverablesLogging(engagementId, nextList, message) {
-    const beforeList = await fetchDeliverables(engagementId);
+  async function refreshAfterDeliverableWrite(engagementId) {
+    const fresh = await fetchDeliverables(engagementId);
+    updateEngagementDeliverables(engagementId, fresh);
+    const camp = await campaignsApi.get(id);
+    setCampaign(camp);
+    setBoardRevision((r) => r + 1);
+    return fresh;
+  }
+
+  async function applyDeliverablesLogging(engagementId, deliverable, message) {
     try {
-      const saved = await syncDeliverables(engagementId, beforeList, nextList);
-      updateEngagementDeliverables(engagementId, saved);
-      setBoardRevision((r) => r + 1);
-      showActionToast(message, async () => {
-        await syncDeliverables(engagementId, saved, beforeList);
-        updateEngagementDeliverables(engagementId, beforeList);
-        setBoardRevision((r) => r + 1);
-        setToast(null);
-      });
+      const prior = (await fetchDeliverables(engagementId)).find((d) => d.id === deliverable.id) ?? null;
+      await logDeliverableProof(engagementId, deliverable);
+      await refreshAfterDeliverableWrite(engagementId);
+      const undo = prior
+        ? async () => {
+            await updateDeliverable(engagementId, prior.id, prior);
+            await refreshAfterDeliverableWrite(engagementId);
+            setToast(null);
+          }
+        : null;
+      showActionToast(message, undo);
     } catch (err) {
-      setToast({ message: err.message ?? 'Save failed', onUndo: null });
+      setToast({ message: err.message ?? 'Could not log deliverable', onUndo: null });
     }
   }
 

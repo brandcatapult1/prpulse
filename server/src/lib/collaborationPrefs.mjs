@@ -1,6 +1,27 @@
 export const COLLABORATION_PREFERENCE_ERROR =
   'Select at least one: open to paid and/or barter';
 
+export const INDICATIVE_RATE_FIELDS = ['reel_rate', 'story_rate', 'post_rate', 'other_rate'];
+
+function parseOptionalRate(value) {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) {
+    throw Object.assign(new Error('Rates must be non-negative numbers'), { status: 400 });
+  }
+  return n;
+}
+
+/** Null out stored rates when not open to paid (create/save payloads). */
+export function indicativeRatesForStorage(openToPaid, fields) {
+  if (!openToPaid) {
+    return Object.fromEntries(INDICATIVE_RATE_FIELDS.map((key) => [key, null]));
+  }
+  return Object.fromEntries(
+    INDICATIVE_RATE_FIELDS.map((key) => [key, parseOptionalRate(fields[key])]),
+  );
+}
+
 export function hasCollaborationPreference(openToPaid, openToBarter) {
   return Boolean(openToPaid) || Boolean(openToBarter);
 }

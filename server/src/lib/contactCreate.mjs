@@ -1,7 +1,7 @@
 import { findContactByMobile, normalizeMobileToE164 } from './mobileNumber.mjs';
 import { assertValidCity } from './cities.mjs';
 import { assertValidCategoryId } from './categories.mjs';
-import { assertCollaborationPreference } from './collaborationPrefs.mjs';
+import { assertCollaborationPreference, indicativeRatesForStorage } from './collaborationPrefs.mjs';
 
 /**
  * Raised when a create would collide with an existing contact's normalized mobile.
@@ -66,14 +66,18 @@ export async function createContactDeduped(client, fields) {
 
   assertCollaborationPreference(fields.open_to_paid, fields.open_to_barter);
 
+  const openToPaid = Boolean(fields.open_to_paid);
+  const rates = indicativeRatesForStorage(openToPaid, fields);
+
   try {
     const { rows } = await client.query(
       `INSERT INTO contacts (
          full_name, mobile_number, email, city, state, country,
          instagram_url, youtube_url, classification, primary_category_id,
-         open_to_paid, open_to_barter, source, created_by
+         open_to_paid, open_to_barter, reel_rate, story_rate, post_rate, other_rate,
+         source, created_by
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
        RETURNING *`,
       [
         fullName,
@@ -86,8 +90,12 @@ export async function createContactDeduped(client, fields) {
         fields.youtube_url ?? null,
         fields.classification ?? null,
         primaryCategoryId,
-        fields.open_to_paid ?? false,
+        openToPaid,
         fields.open_to_barter ?? false,
+        rates.reel_rate,
+        rates.story_rate,
+        rates.post_rate,
+        rates.other_rate,
         fields.source,
         fields.created_by ?? null,
       ],

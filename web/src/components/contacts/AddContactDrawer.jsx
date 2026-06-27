@@ -10,7 +10,20 @@ import { isMobileValid } from '../../lib/phone.js';
 import { e164FromDraft } from '../../lib/contactDraft.js';
 import { CLASSIFICATION_OPTIONS, classificationSelectLabel } from '../../lib/classifications.js';
 import { citiesForCountry } from '../../lib/locations.js';
-import { hasCollaborationPreference, COLLABORATION_PREFERENCE_ERROR } from '../../lib/collaborationPrefs.js';
+import { hasCollaborationPreference, COLLABORATION_PREFERENCE_ERROR, draftWithOpenToPaid, showIndicativeRates, indicativeRatesPayload, INDICATIVE_RATE_FIELDS } from '../../lib/collaborationPrefs.js';
+
+const RATE_LABELS = {
+  reel_rate: 'Reel',
+  story_rate: 'Story',
+  post_rate: 'Post',
+  other_rate: 'Other',
+};
+
+function rateToPayload(value) {
+  if (value === '' || value == null) return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
 
 const EMPTY = {
   full_name: '',
@@ -23,6 +36,10 @@ const EMPTY = {
   primary_category_id: '',
   open_to_paid: false,
   open_to_barter: false,
+  reel_rate: '',
+  story_rate: '',
+  post_rate: '',
+  other_rate: '',
   tag_ids: [],
 };
 
@@ -114,6 +131,7 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
         primary_category_id: form.primary_category_id || null,
         open_to_paid: form.open_to_paid,
         open_to_barter: form.open_to_barter,
+        ...indicativeRatesPayload(form.open_to_paid, form, rateToPayload),
         tag_ids: form.tag_ids,
       };
 
@@ -250,13 +268,36 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
               <input
                 type="checkbox"
                 checked={form.open_to_paid}
-                onChange={(e) => updateField('open_to_paid', e.target.checked)}
+                onChange={(e) => setForm((f) => draftWithOpenToPaid(f, e.target.checked))}
               />
               Open to paid
             </label>
           </div>
           {!preferenceValid && (
             <p className="text-2xs text-red-700">{COLLABORATION_PREFERENCE_ERROR}</p>
+          )}
+
+          {showIndicativeRates(form.open_to_paid) && (
+            <div>
+              <p className="text-2xs text-ink-tertiary">
+                Indicative rates (optional — current rates only, not historical)
+              </p>
+              <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                {INDICATIVE_RATE_FIELDS.map((key) => (
+                  <label key={key} className="block text-2xs text-ink-secondary">
+                    {RATE_LABELS[key]}
+                    <input
+                      className="input-field mt-1"
+                      type="number"
+                      min={0}
+                      value={form[key]}
+                      onChange={(e) => updateField(key, e.target.value)}
+                      placeholder="₹"
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
           )}
 
           <div>

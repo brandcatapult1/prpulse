@@ -103,6 +103,10 @@ contactsRouter.post('/quick-add', requireAuth, async (req, res) => {
     open_to_paid,
     open_to_barter,
     primary_category_id,
+    reel_rate,
+    story_rate,
+    post_rate,
+    other_rate,
     tag_ids,
   } = req.body;
   if (!full_name?.trim() || !mobile_number?.trim()) {
@@ -126,6 +130,10 @@ contactsRouter.post('/quick-add', requireAuth, async (req, res) => {
         primary_category_id: primary_category_id || null,
         open_to_paid: Boolean(open_to_paid),
         open_to_barter: Boolean(open_to_barter),
+        reel_rate,
+        story_rate,
+        post_rate,
+        other_rate,
         source: 'quick_add',
         created_by: req.user.id,
       });

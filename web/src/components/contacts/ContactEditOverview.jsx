@@ -66,6 +66,16 @@ export function ContactEditOverview({
     (c) => c.id !== (draft.primary_category_id ?? contact.primary_category?.id ?? contact.primary_category_id),
   );
 
+  if (!editing) {
+    return (
+      <ContactReadOverview
+        contact={contact}
+        extras={extras}
+        secondaryNames={secondaryNames}
+      />
+    );
+  }
+
   return (
     <div className="space-y-3">
       <ExpandableSection title="Vital information" defaultOpen>
@@ -479,6 +489,121 @@ export function ContactEditOverview({
         )}
       </ExpandableSection>
     </div>
+  );
+}
+
+/**
+ * Compact, scan-at-a-glance READ view. Unlike the edit accordions, this omits
+ * empty fields entirely (no rows of "—") and collapses related data into a few
+ * tight clusters so a manager can absorb the relationship in one glance.
+ */
+function ContactReadOverview({ contact, extras, secondaryNames }) {
+  const email = extras.email ?? contact.email ?? null;
+  const location = contact.city
+    ? `${contact.city}${contact.country ? ` · ${countryLabel(contact.country)}` : ''}`
+    : null;
+  const state = extras.state ?? contact.state ?? null;
+  const classification = contact.classification ? formatClassification(contact.classification) : null;
+
+  const instagram = extras.instagram_url ?? contact.instagram_url ?? null;
+  const youtube = extras.youtube_url ?? contact.youtube_url ?? null;
+  const otherLinks = (extras.other_platform_links ?? contact.other_platform_links ?? []).filter((l) => l?.url);
+
+  const primaryCategory = contact.primary_category?.name ?? extras.primary_category?.name ?? null;
+  const openToPaid = Boolean(extras.open_to_paid ?? contact.open_to_paid);
+  const openToBarter = Boolean(extras.open_to_barter ?? contact.open_to_barter);
+  const terms = [openToBarter && 'Barter', openToPaid && 'Paid'].filter(Boolean);
+
+  const rates = openToPaid
+    ? [
+        ['Reel', extras.reel_rate],
+        ['Story', extras.story_rate],
+        ['Post', extras.post_rate],
+        ['Other', extras.other_rate],
+      ].filter(([, v]) => v != null)
+    : [];
+
+  const hasContactFacts = contact.mobile_number || email || location || state || classification;
+  const hasCommercial = primaryCategory || secondaryNames.length > 0 || terms.length > 0 || rates.length > 0;
+  const hasOnline = instagram || youtube || otherLinks.length > 0;
+
+  return (
+    <div className="panel divide-y divide-line p-0">
+      {hasContactFacts && (
+        <section className="grid grid-cols-2 gap-x-6 gap-y-3 px-4 py-3.5 sm:grid-cols-3">
+          <ReadFact label="Mobile" value={contact.mobile_number} />
+          <ReadFact label="Email" value={email} />
+          <ReadFact label="Location" value={location} />
+          <ReadFact label="State" value={state} />
+          <ReadFact label="Classification" value={classification} />
+        </section>
+      )}
+
+      {hasCommercial && (
+        <section className="space-y-2.5 px-4 py-3.5">
+          {(primaryCategory || secondaryNames.length > 0) && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {primaryCategory && <Pill tone="brand">{primaryCategory}</Pill>}
+              {secondaryNames.map((name) => (
+                <Pill key={name} tone="info">{name}</Pill>
+              ))}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
+            <span className="text-2xs uppercase tracking-wide text-ink-tertiary">Open to</span>
+            {terms.length > 0 ? (
+              <span className="text-ink">{terms.join(' · ')}</span>
+            ) : (
+              <span className="text-ink-tertiary">Not specified</span>
+            )}
+            {rates.length > 0 && (
+              <span className="text-ink-secondary">
+                {rates.map(([label, value]) => `${label} ${formatFee(value)}`).join(' · ')}
+              </span>
+            )}
+          </div>
+        </section>
+      )}
+
+      {hasOnline && (
+        <section className="flex flex-wrap gap-2 px-4 py-3.5">
+          {instagram && <LinkChip label="Instagram" url={instagram} />}
+          {youtube && <LinkChip label="YouTube" url={youtube} />}
+          {otherLinks.map((link, i) => (
+            <LinkChip key={i} label={link.label || 'Link'} url={link.url} />
+          ))}
+        </section>
+      )}
+
+      {!hasContactFacts && !hasCommercial && !hasOnline && (
+        <p className="px-4 py-6 text-center text-2xs text-ink-tertiary">
+          No additional profile details yet — use Edit to fill them in.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function ReadFact({ label, value }) {
+  if (value == null || value === '') return null;
+  return (
+    <div>
+      <dt className="text-2xs uppercase tracking-wide text-ink-tertiary">{label}</dt>
+      <dd className="mt-0.5 text-sm text-ink">{value}</dd>
+    </div>
+  );
+}
+
+function LinkChip({ label, url }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center rounded-md border border-line bg-white px-2.5 py-1 text-2xs font-medium text-brand transition-colors hover:border-brand/40 hover:bg-brand-soft/40"
+    >
+      {label}
+    </a>
   );
 }
 

@@ -4,6 +4,7 @@ const tones = {
   warning: 'bg-amber-50 text-amber-700',
   danger: 'bg-red-50 text-red-700',
   info: 'bg-brand-soft text-brand',
+  brand: 'bg-brand text-white',
   muted: 'bg-canvas text-ink-tertiary',
 };
 

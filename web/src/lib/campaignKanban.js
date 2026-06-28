@@ -159,12 +159,41 @@ export function deliverableProofSummary(engagementId) {
   const dels = getDeliverablesForEngagement(engagementId).filter(
     (d) => isDeliverableFullyPosted(d) && deliverableHasProof(d),
   );
-  return dels.map((d) => ({
-    id: d.id,
-    label: `${d.deliverable_type} ×${d.quantity}`,
-    content_link: d.content_link,
-    screenshots: d.screenshots ?? [],
-  }));
+  return dels.map((d) => {
+    const unitProofs = Array.isArray(d.unit_proofs) ? d.unit_proofs : [];
+
+    const links = [];
+    const addLink = (link) => {
+      const trimmed = link?.trim?.() ?? link;
+      if (trimmed && !links.includes(trimmed)) links.push(trimmed);
+    };
+    addLink(d.content_link);
+    unitProofs.forEach((u) => addLink(u.content_link));
+
+    // Proof screenshots can live on the deliverable (assets) and/or inside
+    // each unit_proof. Merge both and dedupe so uploaded images render even
+    // when content_link is null (e.g. Story image proofs).
+    const screenshots = [];
+    const seen = new Set();
+    const addShot = (s) => {
+      if (!s) return;
+      const url = s.url ?? s.file_path ?? null;
+      const key = url ?? s.id ?? s.label;
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      screenshots.push({ id: s.id ?? key, label: s.label ?? 'Screenshot', url });
+    };
+    (d.screenshots ?? []).forEach(addShot);
+    unitProofs.forEach((u) => (u.screenshots ?? []).forEach(addShot));
+
+    return {
+      id: d.id,
+      label: `${d.deliverable_type} ×${d.quantity}`,
+      content_link: links[0] ?? null,
+      links,
+      screenshots,
+    };
+  });
 }
 
 export function groupEngagementsByColumn(engagements) {

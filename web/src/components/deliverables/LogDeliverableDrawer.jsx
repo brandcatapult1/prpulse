@@ -8,6 +8,7 @@ import {
   deliverableTotalUnits,
 } from '../../lib/deliverableLogging.js';
 import { todayIso } from '../../lib/dates.js';
+import { readFileAsDataUrl } from '../../lib/files.js';
 
 function deliverableDrawerTitle(deliverable) {
   const typeLabel = `${deliverable.deliverable_type} ×${deliverableTotalUnits(deliverable)}`;
@@ -30,15 +31,18 @@ export function LogDeliverableForm({
   const fileRef = useRef(null);
   const emphasis = deliverableProofEmphasis(deliverable.deliverable_type);
 
-  function handleFiles(event) {
+  async function handleFiles(event) {
     const files = Array.from(event.target.files ?? []);
-    if (!files.length) return;
-    const added = files.map((file) => ({
-      id: `s-${Date.now()}-${file.name}`,
-      label: file.name,
-    }));
-    setScreenshots((prev) => [...prev, ...added]);
     event.target.value = '';
+    if (!files.length) return;
+    const added = await Promise.all(
+      files.map(async (file) => ({
+        id: `s-${Date.now()}-${file.name}`,
+        label: file.name,
+        url: await readFileAsDataUrl(file).catch(() => null),
+      })),
+    );
+    setScreenshots((prev) => [...prev, ...added.filter((s) => s.url)]);
   }
 
   return (
@@ -77,12 +81,21 @@ export function LogDeliverableForm({
             {screenshots.map((shot) => (
               <li
                 key={shot.id}
-                className="flex items-center justify-between rounded-md border border-line px-2 py-1 text-2xs"
+                className="flex items-center justify-between gap-2 rounded-md border border-line px-2 py-1 text-2xs"
               >
-                <span className="truncate">{shot.label}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                  {shot.url && (
+                    <img
+                      src={shot.url}
+                      alt={shot.label}
+                      className="h-8 w-8 shrink-0 rounded object-cover"
+                    />
+                  )}
+                  <span className="truncate">{shot.label}</span>
+                </span>
                 <button
                   type="button"
-                  className="text-ink-tertiary hover:text-health-red"
+                  className="shrink-0 text-ink-tertiary hover:text-health-red"
                   onClick={() => setScreenshots((prev) => prev.filter((s) => s.id !== shot.id))}
                 >
                   Remove

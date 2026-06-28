@@ -25,22 +25,51 @@ export function DeliverableProofDrawer({ engagementId, contactName, open, onClos
           {proofItems.map((item) => (
             <li key={item.id} className="rounded-lg border border-line bg-canvas px-3 py-2">
               <p className="text-sm font-medium capitalize text-ink">{item.label}</p>
-              {item.content_link && (
+
+              {item.links.map((link) => (
                 <a
-                  href={item.content_link}
+                  key={link}
+                  href={link}
                   target="_blank"
                   rel="noreferrer"
                   className="mt-1 block truncate text-2xs text-brand hover:underline"
                 >
-                  {item.content_link}
+                  {link}
                 </a>
-              )}
+              ))}
+
               {item.screenshots.length > 0 && (
-                <ul className="mt-1 space-y-0.5 text-2xs text-ink-secondary">
-                  {item.screenshots.map((s) => (
-                    <li key={s.id}>{s.label ?? 'Screenshot'}</li>
-                  ))}
-                </ul>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {item.screenshots.map((s) =>
+                    (s.url ? (
+                      <figure key={s.id} className="overflow-hidden rounded-md border border-line bg-white">
+                        <a href={s.url} target="_blank" rel="noreferrer">
+                          <img
+                            src={s.url}
+                            alt={s.label ?? 'Screenshot'}
+                            className="h-32 w-full object-cover"
+                          />
+                        </a>
+                        {s.label && (
+                          <figcaption className="truncate px-1.5 py-1 text-[10px] text-ink-tertiary">
+                            {s.label}
+                          </figcaption>
+                        )}
+                      </figure>
+                    ) : (
+                      <div
+                        key={s.id}
+                        className="flex items-center rounded-md border border-line px-2 py-1 text-2xs text-ink-secondary"
+                      >
+                        📎 {s.label ?? 'Screenshot'}
+                      </div>
+                    )),
+                  )}
+                </div>
+              )}
+
+              {item.links.length === 0 && item.screenshots.length === 0 && (
+                <p className="mt-1 text-2xs text-ink-tertiary">No proof captured.</p>
               )}
             </li>
           ))}

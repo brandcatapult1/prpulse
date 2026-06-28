@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ExpandableSection } from '../ui/DataKit.jsx';
 import { deliverableTypeLabel } from '../../lib/deliverableTypes.js';
+import { readFileAsDataUrl } from '../../lib/files.js';
 
 /**
  * Inline proof capture for a deliverable — content link + screenshots (PRD Module 6).
@@ -25,15 +26,21 @@ export function DeliverableProofSection({ deliverable, editable, onUpdate, onSav
     notify();
   };
 
-  const handleFiles = (event) => {
+  const handleFiles = async (event) => {
     const files = Array.from(event.target.files ?? []);
-    if (!files.length) return;
-    const added = files.map((file) => ({
-      id: `s-${Date.now()}-${file.name}`,
-      label: file.name,
-    }));
-    onUpdate({ screenshots: [...screenshots, ...added] });
     event.target.value = '';
+    if (!files.length) return;
+    const added = (
+      await Promise.all(
+        files.map(async (file) => ({
+          id: `s-${Date.now()}-${file.name}`,
+          label: file.name,
+          url: await readFileAsDataUrl(file).catch(() => null),
+        })),
+      )
+    ).filter((s) => s.url);
+    if (!added.length) return;
+    onUpdate({ screenshots: [...screenshots, ...added] });
     notify();
   };
 
@@ -116,13 +123,22 @@ export function DeliverableProofSection({ deliverable, editable, onUpdate, onSav
                 key={shot.id}
                 className="flex items-center justify-between gap-2 rounded-md border border-line bg-white px-2.5 py-1.5 text-2xs"
               >
-                <span className="min-w-0 truncate text-ink">
+                <span className="flex min-w-0 items-center gap-2 text-ink">
+                  {shot.url && (
+                    <a href={shot.url} target="_blank" rel="noreferrer" className="shrink-0">
+                      <img
+                        src={shot.url}
+                        alt={shot.label}
+                        className="h-9 w-9 rounded object-cover"
+                      />
+                    </a>
+                  )}
                   {shot.url ? (
-                    <a href={shot.url} target="_blank" rel="noreferrer" className="text-brand hover:underline">
+                    <a href={shot.url} target="_blank" rel="noreferrer" className="truncate text-brand hover:underline">
                       {shot.label}
                     </a>
                   ) : (
-                    <>📎 {shot.label}</>
+                    <span className="truncate">📎 {shot.label}</span>
                   )}
                 </span>
                 {editable && (

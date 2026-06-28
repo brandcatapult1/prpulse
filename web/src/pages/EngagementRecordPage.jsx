@@ -94,7 +94,7 @@ export function EngagementRecordPage() {
   const [notesEditing, setNotesEditing] = useState(false);
   const [notesDraft, setNotesDraft] = useState('');
 
-  const persistEngagement = async (patch, { silent = false } = {}) => {
+  const persistEngagement = async (patch, { silent = false, successMessage = 'Saved' } = {}) => {
     setSaving(true);
     try {
       const saved = await patchEngagement(id, patch);
@@ -107,9 +107,11 @@ export function EngagementRecordPage() {
         owner_name: prev?.owner_name ?? saved.owner_name,
         campaign_id: prev?.campaign_id ?? saved.campaign_id,
       }));
-      if (!silent) setToast('Saved');
+      if (!silent) setToast(successMessage);
+      return true;
     } catch {
       setToast('Could not save — please try again');
+      return false;
     } finally {
       setSaving(false);
     }
@@ -249,12 +251,14 @@ export function EngagementRecordPage() {
     persistEngagement({ next_follow_up_date: date || null });
   };
 
-  const acceptFollowUpSuggestion = () => {
+  const acceptFollowUpSuggestion = async () => {
     if (!followUpSuggestion) return;
     const { date } = followUpSuggestion;
     setFollowUpSuggestion(null);
-    persistEngagement({ next_follow_up_date: date }, { silent: true });
-    setToast(`Follow-up set to ${formatDate(date)}`);
+    await persistEngagement(
+      { next_follow_up_date: date },
+      { successMessage: `Follow-up set to ${formatDate(date)}` },
+    );
   };
 
   const addDeliverable = (type) => {
@@ -534,10 +538,12 @@ export function EngagementRecordPage() {
                   <button
                     type="button"
                     className="btn-primary text-2xs"
-                    onClick={() => {
-                      persistEngagement({ notes: notesDraft.trim() || null });
-                      setNotesEditing(false);
-                      setToast('Notes saved');
+                    onClick={async () => {
+                      const ok = await persistEngagement(
+                        { notes: notesDraft.trim() || null },
+                        { successMessage: 'Notes saved' },
+                      );
+                      if (ok) setNotesEditing(false);
                     }}
                   >
                     Save
@@ -639,17 +645,20 @@ export function EngagementRecordPage() {
         title={`Visit · ${engagement.contact_name}`}
         intro="Required when status is Scheduled. Follow-up will be set to the visit date you pick."
         initialValues={visitFieldsFromEngagement(engagement)}
-        onSave={(fields) => {
+        onSave={async (fields) => {
           const payload = buildScheduledTransitionPayload(engagement, fields);
           const result = transitionStage(engagement, STAGE.SCHEDULED, payload);
           if (!result.ok) {
             setToast(result.error ?? 'Could not save visit');
             return;
           }
-          persistEngagement(result.patch);
-          setFollowUpSuggestion(null);
-          setModal(null);
-          setToast('Visit saved — follow-up set to visit date');
+          const ok = await persistEngagement(result.patch, {
+            successMessage: 'Visit saved — follow-up set to visit date',
+          });
+          if (ok) {
+            setFollowUpSuggestion(null);
+            setModal(null);
+          }
         }}
       />
 

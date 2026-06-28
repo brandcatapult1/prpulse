@@ -17,6 +17,22 @@ export function isActiveEngagement(status) {
   return status && !isTerminalEngagement(status);
 }
 
+// Postgres numeric columns (avg_*, would_work_again_pct) arrive as strings;
+// coerce before doing math so we don't string-concat into NaN.
+function toNumberOrNull(value) {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function avgRatingFromSummary(row) {
+  const cq = toNumberOrNull(row.avg_content_quality);
+  if (cq == null) return null;
+  const pr = toNumberOrNull(row.avg_professionalism) ?? 0;
+  const tm = toNumberOrNull(row.avg_timeliness) ?? 0;
+  return (cq + pr + tm) / 3;
+}
+
 export function getContactProfileExtras(contact) {
   if (!contact) return {};
   const cached = contact.id ? getCachedContact(contact.id) : null;
@@ -38,10 +54,8 @@ export function getContactProfileExtras(contact) {
     primary_category: row.primary_category ?? null,
     total_collaborations: row.total_collaborations,
     last_collaboration_date: row.last_collaboration_date,
-    avg_rating: row.avg_content_quality != null
-      ? ((row.avg_content_quality ?? 0) + (row.avg_professionalism ?? 0) + (row.avg_timeliness ?? 0)) / 3
-      : null,
-    would_work_again_pct: row.would_work_again_pct,
+    avg_rating: avgRatingFromSummary(row),
+    would_work_again_pct: toNumberOrNull(row.would_work_again_pct),
   };
 }
 

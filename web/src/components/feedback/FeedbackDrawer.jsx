@@ -18,6 +18,7 @@ export function BoardFeedbackDrawer({
   onClose,
   contactName,
   contactId,
+  initialFeedback,
   onSubmit,
 }) {
   const [rating, setRating] = useState(0);
@@ -26,11 +27,11 @@ export function BoardFeedbackDrawer({
 
   useEffect(() => {
     if (open) {
-      setRating(0);
-      setWouldWorkAgain(null);
-      setNote('');
+      setRating(initialFeedback?.content_quality ?? 0);
+      setWouldWorkAgain(initialFeedback?.would_work_again ?? null);
+      setNote(initialFeedback?.internal_notes ?? '');
     }
-  }, [open]);
+  }, [open, initialFeedback]);
 
   function handleSave() {
     if (!rating || wouldWorkAgain == null) return;
@@ -41,7 +42,7 @@ export function BoardFeedbackDrawer({
   return (
     <Drawer
       open={open}
-      title={`Log feedback · ${contactName}`}
+      title={`${initialFeedback ? 'Edit' : 'Log'} feedback · ${contactName}`}
       onClose={onClose}
       footer={
         <div className="flex justify-end gap-2">

@@ -18,6 +18,7 @@ import {
   logDeliverableProof,
   updateDeliverable,
   saveFeedback,
+  fetchFeedback,
   blacklistContact,
   clearBlacklist,
   populateCampaign,
@@ -38,14 +39,19 @@ async function loadCampaignData(campaignId) {
   ]);
 
   const deliverablesMap = {};
-  await Promise.all(
+  const engsWithFeedback = await Promise.all(
     (engs ?? []).map(async (eng) => {
       deliverablesMap[eng.id] = await fetchDeliverables(eng.id);
+      if (eng.conversation_status === 'collaboration_complete') {
+        const feedback = await fetchFeedback(eng.id).catch(() => null);
+        return { ...eng, feedback };
+      }
+      return eng;
     }),
   );
 
   setDeliverablesCache(deliverablesMap);
-  return { camp, engs: engs ?? [], deliverablesMap };
+  return { camp, engs: engsWithFeedback, deliverablesMap };
 }
 
 export function CampaignViewPage() {
@@ -215,7 +221,11 @@ export function CampaignViewPage() {
     { contactId, engagementFeedback, message },
   ) {
     try {
-      await saveFeedback(engagementId, engagementFeedback);
+      const saved = await saveFeedback(engagementId, engagementFeedback);
+      // One feedback per engagement (upsert): keep the saved row on the
+      // engagement so the card shows "Edit feedback" and prefills next time.
+      setEngagements((rows) =>
+        rows.map((r) => (r.id === engagementId ? { ...r, feedback: saved } : r)));
       // Contact rollups are recomputed server-side by the feedback trigger;
       // refresh the cached contact so the card reflects the new stats.
       if (contactId) {
@@ -392,6 +402,7 @@ export function CampaignViewPage() {
         open={Boolean(feedbackEngagement)}
         contactName={feedbackEngagement?.contact_name ?? ''}
         contactId={feedbackEngagement?.contact_id}
+        initialFeedback={feedbackEngagement?.feedback ?? null}
         onClose={() => setFeedbackEngagement(null)}
         onSubmit={({ rating, wouldWorkAgain, note }) => {
           if (!feedbackEngagement) return;

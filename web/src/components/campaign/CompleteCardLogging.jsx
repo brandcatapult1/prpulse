@@ -27,7 +27,7 @@ export function CompleteCardLogging({
           className="btn-secondary w-full !py-1 text-[11px]"
           onClick={() => onRequestFeedback?.(engagement)}
         >
-          Log feedback
+          {engagement.feedback ? 'Edit feedback' : 'Log feedback'}
         </button>
       </div>
     </LoggingPanel>

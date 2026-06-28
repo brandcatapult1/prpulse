@@ -25,12 +25,19 @@ function toNumberOrNull(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+/** Average only populated scores; skip null/undefined. */
+export function avgRatingFromScores(...values) {
+  const scores = values.map(toNumberOrNull).filter((n) => n != null);
+  if (scores.length === 0) return null;
+  return scores.reduce((sum, n) => sum + n, 0) / scores.length;
+}
+
 function avgRatingFromSummary(row) {
-  const cq = toNumberOrNull(row.avg_content_quality);
-  if (cq == null) return null;
-  const pr = toNumberOrNull(row.avg_professionalism) ?? 0;
-  const tm = toNumberOrNull(row.avg_timeliness) ?? 0;
-  return (cq + pr + tm) / 3;
+  return avgRatingFromScores(
+    row.avg_content_quality,
+    row.avg_professionalism,
+    row.avg_timeliness,
+  );
 }
 
 export function getContactProfileExtras(contact) {
@@ -75,7 +82,11 @@ export function getCollaborationHistory(engagements, { deliverablesByEngagement 
       const posted = dels.filter((d) => d.status === 'posted').length;
       const feedback = feedbackByEngagement[e.id];
       const avgRating = feedback
-        ? ((feedback.content_quality ?? 0) + (feedback.professionalism ?? 0) + (feedback.timeliness ?? 0)) / 3
+        ? avgRatingFromScores(
+          feedback.content_quality,
+          feedback.professionalism,
+          feedback.timeliness,
+        )
         : null;
       return {
         ...e,

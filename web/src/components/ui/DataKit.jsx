@@ -169,10 +169,15 @@ export function MetricStrip({ items }) {
 }
 
 export function RatingStars({ value = 0 }) {
+  const n = value == null || value === '' ? null : Number(value);
+  if (n == null || !Number.isFinite(n) || n <= 0) {
+    return <span className="text-2xs text-ink-tertiary">—</span>;
+  }
+  const rounded = Math.round(n);
   return (
     <span className="text-sm text-health-amber">
-      {'★'.repeat(Math.round(value))}
-      <span className="text-line">{'★'.repeat(5 - Math.round(value))}</span>
+      {'★'.repeat(rounded)}
+      <span className="text-line">{'★'.repeat(5 - rounded)}</span>
     </span>
   );
 }

@@ -21,21 +21,35 @@ export function BoardFeedbackDrawer({
   initialFeedback,
   onSubmit,
 }) {
-  const [rating, setRating] = useState(0);
+  const [ratings, setRatings] = useState({
+    content_quality: 0,
+    professionalism: 0,
+    timeliness: 0,
+  });
   const [wouldWorkAgain, setWouldWorkAgain] = useState(null);
   const [note, setNote] = useState('');
 
   useEffect(() => {
     if (open) {
-      setRating(initialFeedback?.content_quality ?? 0);
+      setRatings({
+        content_quality: initialFeedback?.content_quality ?? 0,
+        professionalism: initialFeedback?.professionalism ?? 0,
+        timeliness: initialFeedback?.timeliness ?? 0,
+      });
       setWouldWorkAgain(initialFeedback?.would_work_again ?? null);
       setNote(initialFeedback?.internal_notes ?? '');
     }
   }, [open, initialFeedback]);
 
   function handleSave() {
-    if (!rating || wouldWorkAgain == null) return;
-    onSubmit?.({ rating, wouldWorkAgain, note });
+    if (wouldWorkAgain == null) return;
+    onSubmit?.({
+      contentQuality: ratings.content_quality || null,
+      professionalism: ratings.professionalism || null,
+      timeliness: ratings.timeliness || null,
+      wouldWorkAgain,
+      note,
+    });
     onClose();
   }
 
@@ -50,7 +64,7 @@ export function BoardFeedbackDrawer({
           <button
             type="button"
             className="btn-primary"
-            disabled={!rating || wouldWorkAgain == null}
+            disabled={wouldWorkAgain == null}
             onClick={handleSave}
           >
             Save feedback
@@ -59,22 +73,23 @@ export function BoardFeedbackDrawer({
       }
     >
       <div className="space-y-4">
-        <div>
-          <p className="mb-2 text-2xs font-medium text-ink-secondary">Rating</p>
-          <div className="flex gap-1">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button
-                key={star}
-                type="button"
-                onClick={() => setRating(star)}
-                className={`text-lg ${star <= rating ? 'text-health-amber' : 'text-line'}`}
-                aria-label={`${star} stars`}
-              >
-                ★
-              </button>
-            ))}
+        <p className="text-2xs text-ink-secondary">
+          Rate each dimension independently. All ratings are optional.
+        </p>
+
+        {[
+          ['content_quality', 'Content quality'],
+          ['professionalism', 'Professionalism'],
+          ['timeliness', 'Timeliness'],
+        ].map(([field, label]) => (
+          <div key={field} className="flex items-center justify-between rounded-lg border border-line bg-canvas px-3 py-2.5">
+            <span className="text-2xs font-medium text-ink-secondary">{label}</span>
+            <StarPicker
+              value={ratings[field]}
+              onChange={(v) => setRatings((r) => ({ ...r, [field]: v }))}
+            />
           </div>
-        </div>
+        ))}
 
         <div>
           <p className="mb-2 text-2xs font-medium text-ink-secondary">Would work again?</p>
@@ -136,12 +151,13 @@ export function FeedbackDrawer({
   const setRating = (field, value) => setForm((f) => ({ ...f, [field]: value }));
 
   async function saveFeedback() {
-    if (!form.content_quality || !form.professionalism || !form.timeliness) {
-      setToast('Rate all three categories before saving');
-      return;
-    }
-
-    const record = { ...form, saved_at: todayIso() };
+    const record = {
+      ...form,
+      content_quality: form.content_quality || null,
+      professionalism: form.professionalism || null,
+      timeliness: form.timeliness || null,
+      saved_at: todayIso(),
+    };
     try {
       await putEngagementFeedback(engagementId, record);
     } catch (err) {
@@ -216,7 +232,7 @@ export function FeedbackDrawer({
         {step === 'form' && (
           <>
             <p className="mb-4 text-2xs text-ink-secondary">
-              Record your evaluation after collaboration is complete. This refreshes the contact summary.
+              Record your evaluation after collaboration is complete. Ratings are optional per dimension.
             </p>
             <div className="space-y-4">
               {[
@@ -290,7 +306,7 @@ function StarPicker({ value, onChange }) {
         <button
           key={star}
           type="button"
-          onClick={() => onChange(star)}
+          onClick={() => onChange(star === value ? 0 : star)}
           className={`text-lg ${star <= value ? 'text-health-amber' : 'text-line'} hover:text-health-amber`}
           aria-label={`${star} stars`}
         >

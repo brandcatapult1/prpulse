@@ -432,8 +432,24 @@ engagementsRouter.put('/:id/feedback', requireAuth, requireEngagementWriteAccess
     internal_notes,
   } = req.body ?? {};
 
-  if (!content_quality || !professionalism || !timeliness) {
-    return res.status(400).json({ error: 'All three ratings are required' });
+  function parseOptionalRating(value, label) {
+    if (value == null || value === '' || value === 0) return null;
+    const n = Number(value);
+    if (!Number.isInteger(n) || n < 1 || n > 5) {
+      throw Object.assign(new Error(`${label} must be 1-5 or omitted`), { status: 400 });
+    }
+    return n;
+  }
+
+  let parsed;
+  try {
+    parsed = {
+      content_quality: parseOptionalRating(content_quality, 'Content quality'),
+      professionalism: parseOptionalRating(professionalism, 'Professionalism'),
+      timeliness: parseOptionalRating(timeliness, 'Timeliness'),
+    };
+  } catch (err) {
+    return res.status(err.status ?? 400).json({ error: err.message });
   }
 
   try {
@@ -457,9 +473,9 @@ engagementsRouter.put('/:id/feedback', requireAuth, requireEngagementWriteAccess
          RETURNING *`,
         [
           req.params.id,
-          content_quality,
-          professionalism,
-          timeliness,
+          parsed.content_quality,
+          parsed.professionalism,
+          parsed.timeliness,
           adherence_to_terms ?? true,
           would_work_again ?? true,
           internal_notes ?? null,

@@ -404,17 +404,24 @@ export function CampaignViewPage() {
         contactId={feedbackEngagement?.contact_id}
         initialFeedback={feedbackEngagement?.feedback ?? null}
         onClose={() => setFeedbackEngagement(null)}
-        onSubmit={({ rating, wouldWorkAgain, note }) => {
+        onSubmit={({ contentQuality, professionalism, timeliness, wouldWorkAgain, note }) => {
           if (!feedbackEngagement) return;
           const { engagementFeedback } = buildContactFeedbackUpdate({
-            rating,
+            contentQuality,
+            professionalism,
+            timeliness,
             wouldWorkAgain,
             note,
           });
           applyContactFeedbackLogging(feedbackEngagement.id, {
             contactId: feedbackEngagement.contact_id,
             engagementFeedback,
-            message: contactFeedbackToastMessage(rating, wouldWorkAgain),
+            message: contactFeedbackToastMessage({
+              contentQuality,
+              professionalism,
+              timeliness,
+              wouldWorkAgain,
+            }),
           });
           setFeedbackEngagement(null);
         }}

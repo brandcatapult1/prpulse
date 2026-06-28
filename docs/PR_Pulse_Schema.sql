@@ -332,9 +332,9 @@ CREATE TABLE assets (
 CREATE TABLE feedback (
   id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   engagement_id      uuid NOT NULL UNIQUE REFERENCES engagements(id) ON DELETE CASCADE,
-  content_quality    integer NOT NULL CHECK (content_quality BETWEEN 1 AND 5),
-  professionalism    integer NOT NULL CHECK (professionalism BETWEEN 1 AND 5),
-  timeliness         integer NOT NULL CHECK (timeliness BETWEEN 1 AND 5),
+  content_quality    integer CHECK (content_quality IS NULL OR (content_quality BETWEEN 1 AND 5)),
+  professionalism    integer CHECK (professionalism IS NULL OR (professionalism BETWEEN 1 AND 5)),
+  timeliness         integer CHECK (timeliness IS NULL OR (timeliness BETWEEN 1 AND 5)),
   adherence_to_terms boolean NOT NULL,
   would_work_again   boolean NOT NULL,
   internal_notes     text,

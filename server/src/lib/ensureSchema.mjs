@@ -45,4 +45,31 @@ export async function ensureCriticalSchema(pool) {
       END IF;
     END $$;
   `);
+
+  // v_deliverables was originally created as `SELECT d.*` and froze its column
+  // list before posted_quantity / unit_proofs existed (added later to the table
+  // but not re-expanded into the view). That makes logged posted counts read
+  // back as 0 even though the PATCH wrote them. Self-heal: if the view is
+  // missing posted_quantity, drop and recreate it so d.* re-expands.
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF to_regclass('public.v_deliverables') IS NOT NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM information_schema.columns
+           WHERE table_schema = 'public'
+             AND table_name = 'v_deliverables'
+             AND column_name = 'posted_quantity'
+         ) THEN
+        DROP VIEW v_deliverables;
+        CREATE VIEW v_deliverables AS
+        SELECT d.*,
+               (d.status <> 'posted'
+                AND d.due_date IS NOT NULL
+                AND d.due_date < (now() AT TIME ZONE 'Asia/Kolkata')::date) AS is_overdue
+        FROM deliverables d;
+        RAISE NOTICE 'Repaired v_deliverables: re-expanded to include posted_quantity / unit_proofs.';
+      END IF;
+    END $$;
+  `);
 }

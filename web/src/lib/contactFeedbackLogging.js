@@ -1,33 +1,15 @@
 import { todayIso } from './dates.js';
 
 /**
- * Write relationship feedback to the contact profile (not pipeline state).
- * Also returns engagement feedback record for the collaboration.
+ * Build the engagement feedback record for a collaboration.
+ *
+ * Contact relationship rollups (avg_content_quality / avg_professionalism /
+ * avg_timeliness / would_work_again_pct / total_collaborations) are derived
+ * columns recomputed by the `fn_feedback_after` DB trigger - they are NOT
+ * directly patchable on the contact, so we only write the feedback row here.
  */
-export function buildContactFeedbackUpdate(existingProfile, { rating, wouldWorkAgain, note }) {
-  const prevCount = existingProfile?.total_collaborations ?? 0;
-  const prevAvg = existingProfile?.avg_rating;
-  const nextCount = prevCount + 1;
-  const nextAvg =
-    prevAvg == null
-      ? rating
-      : Math.round((((prevAvg * prevCount) + rating) / nextCount) * 10) / 10;
-
-  const prevYes = existingProfile?.feedback_yes_count ?? 0;
-  const prevTotal = existingProfile?.feedback_count ?? 0;
-  const nextYes = prevYes + (wouldWorkAgain ? 1 : 0);
-  const nextFeedbackTotal = prevTotal + 1;
-  const wouldWorkAgainPct = Math.round((nextYes / nextFeedbackTotal) * 100);
-
+export function buildContactFeedbackUpdate({ rating, wouldWorkAgain, note }) {
   return {
-    contactProfilePatch: {
-      avg_rating: nextAvg,
-      would_work_again_pct: wouldWorkAgainPct,
-      feedback_count: nextFeedbackTotal,
-      feedback_yes_count: nextYes,
-      last_feedback_note: note?.trim() || null,
-      last_feedback_at: todayIso(),
-    },
     engagementFeedback: {
       content_quality: rating,
       professionalism: rating,

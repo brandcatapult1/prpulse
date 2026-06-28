@@ -18,7 +18,6 @@ import {
   logDeliverableProof,
   updateDeliverable,
   saveFeedback,
-  patchContact,
   blacklistContact,
   clearBlacklist,
   populateCampaign,
@@ -29,7 +28,6 @@ import { setDeliverablesCache, updateEngagementDeliverables } from '../lib/deliv
 import { BoardFeedbackDrawer } from '../components/feedback/FeedbackDrawer.jsx';
 import { DeliverableProofDrawer } from '../components/deliverables/DeliverableProofDrawer.jsx';
 import { buildContactFeedbackUpdate, contactFeedbackToastMessage } from '../lib/contactFeedbackLogging.js';
-import { getContactProfileExtras } from '../lib/contactProfile.js';
 import { mergeContactsCache } from '../lib/contactsCache.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
@@ -214,14 +212,16 @@ export function CampaignViewPage() {
 
   async function applyContactFeedbackLogging(
     engagementId,
-    { contactId, contactProfilePatch, engagementFeedback, message },
+    { contactId, engagementFeedback, message },
   ) {
     try {
-      if (contactProfilePatch && Object.keys(contactProfilePatch).length) {
-        await patchContact(contactId, contactProfilePatch);
-        mergeContactsCache([{ id: contactId, ...contactProfilePatch }]);
-      }
       await saveFeedback(engagementId, engagementFeedback);
+      // Contact rollups are recomputed server-side by the feedback trigger;
+      // refresh the cached contact so the card reflects the new stats.
+      if (contactId) {
+        const fresh = await contactsApi.get(contactId).catch(() => null);
+        if (fresh) mergeContactsCache([fresh]);
+      }
       showActionToast(message, null);
       setBoardRevision((r) => r + 1);
     } catch (err) {
@@ -395,15 +395,13 @@ export function CampaignViewPage() {
         onClose={() => setFeedbackEngagement(null)}
         onSubmit={({ rating, wouldWorkAgain, note }) => {
           if (!feedbackEngagement) return;
-          const existing = getContactProfileExtras(feedbackEngagement.contact_id);
-          const { contactProfilePatch, engagementFeedback } = buildContactFeedbackUpdate(existing, {
+          const { engagementFeedback } = buildContactFeedbackUpdate({
             rating,
             wouldWorkAgain,
             note,
           });
           applyContactFeedbackLogging(feedbackEngagement.id, {
             contactId: feedbackEngagement.contact_id,
-            contactProfilePatch,
             engagementFeedback,
             message: contactFeedbackToastMessage(rating, wouldWorkAgain),
           });

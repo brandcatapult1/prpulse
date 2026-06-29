@@ -43,12 +43,18 @@ reportsRouter.get('/campaign/:campaignId', requireAuth, async (req, res) => {
   if (!campaigns[0]) return res.status(404).json({ error: 'Campaign not found' });
   const campaign = campaigns[0];
 
+  // Canonical "completed collaboration": engagement marked Collaboration Complete
+  // AND every deliverable is posted (verified against the deliverables table, not
+  // assumed from status). fn_engagement_counted() is the same predicate the stored
+  // campaigns.completed_collaborations rollup uses, so Reports and Dashboard agree.
+  // Period-scoping (completed_at within the month) is layered on top; the definition
+  // of "completed" itself is identical everywhere.
   const { rows: engagements } = await pool.query(
     `SELECT e.id, e.completed_at, c.full_name AS contact_name
      FROM engagements e
      JOIN contacts c ON c.id = e.contact_id
      WHERE e.campaign_id = $1
-       AND e.conversation_status = 'collaboration_complete'
+       AND fn_engagement_counted(e.id)
        AND e.completed_at >= $2::date
        AND e.completed_at < $3::date`,
     [req.params.campaignId, period.start, period.end],

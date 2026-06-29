@@ -5,6 +5,17 @@ import { deliverableTypeFromDb } from '../lib/deliverableTypes.mjs';
 
 export const reportsRouter = Router();
 
+/**
+ * Posted UNIT count for a deliverable row. Postgres returns integer columns as
+ * numbers, but coerce defensively. A "Story ×2" posted row counts as 2, not 1.
+ * Falls back to quantity for legacy posted rows where posted_quantity is unset.
+ */
+function postedUnits(deliverable) {
+  const posted = Number(deliverable?.posted_quantity);
+  if (Number.isFinite(posted) && posted > 0) return posted;
+  return Number(deliverable?.quantity) || 1;
+}
+
 function parsePeriod(period) {
   const match = /^(\d{4})-(\d{2})$/.exec(String(period ?? ''));
   if (!match) return null;
@@ -81,11 +92,11 @@ reportsRouter.get('/campaign/:campaignId', requireAuth, async (req, res) => {
       influencerMap[eng.id] = {
         id: eng.id,
         contact_name: eng.contact_name,
-        deliverables: posted.length,
+        deliverables: posted.reduce((sum, d) => sum + postedUnits(d), 0),
       };
     }
     for (const d of posted) {
-      byType[d.deliverable_type] = (byType[d.deliverable_type] ?? 0) + 1;
+      byType[d.deliverable_type] = (byType[d.deliverable_type] ?? 0) + postedUnits(d);
       if (d.content_link || d.screenshot_count > 0) {
         gallery.push({
           id: d.id,

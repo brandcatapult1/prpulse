@@ -1,5 +1,6 @@
 import { getCachedContact } from './contactsCache.js';
 import { getDeliverablesForEngagement } from './deliverablesCache.js';
+import { deliverablePostedUnits, deliverableTotalUnits } from './deliverableLogging.js';
 
 const TERMINAL_STATUSES = new Set([
   'collaboration_complete',
@@ -79,7 +80,8 @@ export function getCollaborationHistory(engagements, { deliverablesByEngagement 
     .filter((e) => e.conversation_status === 'collaboration_complete')
     .map((e) => {
       const dels = deliverablesByEngagement[e.id] ?? getDeliverablesForEngagement(e.id);
-      const posted = dels.filter((d) => d.status === 'posted').length;
+      const posted = dels.reduce((sum, d) => sum + deliverablePostedUnits(d), 0);
+      const total = dels.reduce((sum, d) => sum + deliverableTotalUnits(d), 0);
       const feedback = feedbackByEngagement[e.id];
       const avgRating = feedback
         ? avgRatingFromScores(
@@ -90,7 +92,7 @@ export function getCollaborationHistory(engagements, { deliverablesByEngagement 
         : null;
       return {
         ...e,
-        deliverables_completed: `${posted}/${dels.length || '—'}`,
+        deliverables_completed: `${posted}/${total || '—'}`,
         avg_rating: avgRating,
         would_work_again: feedback?.would_work_again,
         internal_notes: feedback?.internal_notes ?? e.notes,
@@ -125,5 +127,5 @@ export function getFeedbackHistoryForContact(engagements, feedbackByEngagement =
 
 export function countPostedDeliverables(engagementId, deliverablesByEngagement = {}) {
   const dels = deliverablesByEngagement[engagementId] ?? getDeliverablesForEngagement(engagementId);
-  return dels.filter((d) => d.status === 'posted').length;
+  return dels.reduce((sum, d) => sum + deliverablePostedUnits(d), 0);
 }

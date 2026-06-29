@@ -138,6 +138,14 @@ export async function applyCampaignPatch(client, campaignId, body) {
     await syncCampaignTags(client, campaignId, patch.tag_ids);
   }
 
+  // Changing the target re-bases remaining_collaborations, achievement_pct and
+  // campaign_health, but no deliverable/status trigger fires on a target edit.
+  // Recompute in-transaction so the rollups update immediately (and commit with
+  // this same campaign update), rather than going stale until the next event.
+  if (Object.prototype.hasOwnProperty.call(patch.scalars, 'target_collaborations')) {
+    await client.query('SELECT recompute_campaign_metrics($1)', [campaignId]);
+  }
+
   return loadCampaignDetail(client, campaignId);
 }
 

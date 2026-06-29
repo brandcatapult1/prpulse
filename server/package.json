@@ -4,12 +4,14 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "cloudinary": "^2.6.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-session": "^1.18.1",
     "helmet": "^8.0.0",
+    "multer": "^1.4.5-lts.2",
     "google-auth-library": "^9.15.1",
     "libphonenumber-js": "^1.12.24",
     "pg": "^8.13.1"

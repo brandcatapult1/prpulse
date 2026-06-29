@@ -1,10 +1,12 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { pool, withUserTransaction } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
 import {
   requireDidntDeliverPermission,
   requireEngagementWriteAccess,
 } from '../middleware/permissions.mjs';
+import { isCloudinaryConfigured, uploadProofScreenshot } from '../lib/cloudinary.mjs';
 import {
   ACTIVITY_ACTION,
   activityRowToTimelineEntry,
@@ -36,6 +38,15 @@ import {
 import { commitScheduleEngagement } from '../lib/scheduleEngagement.mjs';
 
 export const engagementsRouter = Router();
+
+const proofScreenshotUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype?.startsWith('image/')) cb(null, true);
+    else cb(Object.assign(new Error('Only image files are allowed'), { status: 400 }));
+  },
+});
 
 /** Contact fields joined onto engagement rows for board/drawer identity (no separate contacts fetch). */
 const ENGAGEMENT_CONTACT_COLS = `
@@ -284,6 +295,44 @@ engagementsRouter.get('/:id/deliverables', requireAuth, async (req, res) => {
     client.release();
   }
 });
+
+/** Upload a proof screenshot to Cloudinary; returns hosted URL for unit_proofs / assets. */
+engagementsRouter.post(
+  '/:engagementId/proof-screenshots',
+  requireAuth,
+  requireEngagementWriteAccess('engagementId'),
+  (req, res, next) => {
+    proofScreenshotUpload.single('file')(req, res, (err) => {
+      if (err) {
+        const status = err.status ?? (err.code === 'LIMIT_FILE_SIZE' ? 413 : 400);
+        return res.status(status).json({ error: err.message ?? 'Upload failed' });
+      }
+      next();
+    });
+  },
+  async (req, res) => {
+    if (!isCloudinaryConfigured()) {
+      return res.status(503).json({ error: 'Image upload is not configured on the server' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+
+    try {
+      const uploaded = await uploadProofScreenshot(req.file.buffer, {
+        filename: req.file.originalname,
+        mimeType: req.file.mimetype,
+      });
+      res.json({
+        id: `s-${Date.now()}-${req.file.originalname}`,
+        label: req.file.originalname,
+        url: uploaded.url,
+      });
+    } catch (err) {
+      res.status(err.status ?? 502).json({ error: err.message ?? 'Could not upload screenshot' });
+    }
+  },
+);
 
 engagementsRouter.post('/:id/deliverables', requireAuth, requireEngagementWriteAccess('id'), async (req, res) => {
   try {

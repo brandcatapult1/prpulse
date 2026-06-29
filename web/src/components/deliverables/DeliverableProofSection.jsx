@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ExpandableSection } from '../ui/DataKit.jsx';
 import { deliverableTypeLabel } from '../../lib/deliverableTypes.js';
-import { readFileAsDataUrl } from '../../lib/files.js';
+import { uploadProofScreenshot } from '../../lib/proofUpload.js';
 
 /**
  * Inline proof capture for a deliverable — content link + screenshots (PRD Module 6).
@@ -10,6 +10,10 @@ export function DeliverableProofSection({ deliverable, editable, onUpdate, onSav
   const fileRef = useRef(null);
   const [linkDraft, setLinkDraft] = useState(deliverable.content_link ?? '');
   const [urlDraft, setUrlDraft] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+
+  const engagementId = deliverable?.engagement_id ?? deliverable?.engagementId ?? null;
 
   const screenshots = deliverable.screenshots ?? [];
   const contentLink = deliverable.content_link ?? '';
@@ -29,19 +33,30 @@ export function DeliverableProofSection({ deliverable, editable, onUpdate, onSav
   const handleFiles = async (event) => {
     const files = Array.from(event.target.files ?? []);
     event.target.value = '';
-    if (!files.length) return;
-    const added = (
-      await Promise.all(
-        files.map(async (file) => ({
-          id: `s-${Date.now()}-${file.name}`,
-          label: file.name,
-          url: await readFileAsDataUrl(file).catch(() => null),
-        })),
-      )
-    ).filter((s) => s.url);
-    if (!added.length) return;
-    onUpdate({ screenshots: [...screenshots, ...added] });
-    notify();
+    if (!files.length || !engagementId) return;
+
+    setUploading(true);
+    setUploadError(null);
+    const added = [];
+    const failures = [];
+
+    for (const file of files) {
+      try {
+        const uploaded = await uploadProofScreenshot(engagementId, file);
+        added.push(uploaded);
+      } catch (err) {
+        failures.push(`${file.name}: ${err.message ?? 'upload failed'}`);
+      }
+    }
+
+    if (added.length) {
+      onUpdate({ screenshots: [...screenshots, ...added] });
+      notify();
+    }
+    if (failures.length) {
+      setUploadError(failures.join(' · '));
+    }
+    setUploading(false);
   };
 
   const addImageUrl = () => {
@@ -169,10 +184,14 @@ export function DeliverableProofSection({ deliverable, editable, onUpdate, onSav
             <button
               type="button"
               className="btn-secondary w-full justify-center"
+              disabled={uploading || !engagementId}
               onClick={() => fileRef.current?.click()}
             >
-              Upload screenshots
+              {uploading ? 'Uploading…' : 'Upload screenshots'}
             </button>
+            {uploadError && (
+              <p className="text-2xs text-health-red">{uploadError}</p>
+            )}
             <div className="flex flex-wrap gap-2">
               <input
                 type="url"

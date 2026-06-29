@@ -1,9 +1,14 @@
 import { formatDate } from './format.jsx';
 
+export function screenshotHasUrl(shot) {
+  const url = shot?.url ?? shot?.file_path;
+  return Boolean(String(url ?? '').trim());
+}
+
 export function unitProofHasEvidence(unit) {
   const link = unit?.content_link?.trim();
-  const shots = unit?.screenshots?.length ?? 0;
-  return Boolean(link) || shots > 0;
+  const shots = unit?.screenshots ?? [];
+  return Boolean(link) || shots.some(screenshotHasUrl);
 }
 
 /** How many units on this row have been logged with proof. */
@@ -59,8 +64,8 @@ export function deliverableProofEmphasis(type) {
 
 export function canMarkDeliverablePosted({ contentLink, screenshots }) {
   const link = contentLink?.trim();
-  const shots = screenshots?.length ?? 0;
-  return Boolean(link) || shots > 0;
+  const hasShot = (screenshots ?? []).some(screenshotHasUrl);
+  return Boolean(link) || hasShot;
 }
 
 /** Log one unit; marks the row posted when all units are logged. */

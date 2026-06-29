@@ -55,8 +55,8 @@ reportsRouter.get('/campaign/:campaignId', requireAuth, async (req, res) => {
      JOIN contacts c ON c.id = e.contact_id
      WHERE e.campaign_id = $1
        AND fn_engagement_counted(e.id)
-       AND e.completed_at >= $2::date
-       AND e.completed_at < $3::date`,
+       AND (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date >= $2::date
+       AND (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date < $3::date`,
     [req.params.campaignId, period.start, period.end],
   );
 
@@ -73,7 +73,9 @@ reportsRouter.get('/campaign/:campaignId', requireAuth, async (req, res) => {
          AND d.status = 'posted'
          AND (
            (d.published_date IS NOT NULL AND d.published_date >= $2::date AND d.published_date < $3::date)
-           OR (d.published_date IS NULL AND e.completed_at >= $2::date AND e.completed_at < $3::date)
+           OR (d.published_date IS NULL
+               AND (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date >= $2::date
+               AND (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date < $3::date)
          )`,
       [engagementIds, period.start, period.end],
     );

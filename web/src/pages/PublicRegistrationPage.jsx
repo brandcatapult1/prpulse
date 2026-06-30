@@ -182,9 +182,14 @@ export function PublicRegistrationPage() {
   if (submitted) {
     return (
       <SignupShell logoUrl={logoUrl}>
-        <div className="campaign-glass-tile mx-auto max-w-md p-8 text-center">
-          <h1 className="text-lg font-semibold text-ink">{confirmation.title}</h1>
-          <p className="mt-2 text-sm text-ink-secondary">{confirmation.body}</p>
+        <div className="campaign-glass-tile mx-auto max-w-md px-8 py-10 text-center">
+          <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-brand-soft text-brand">
+            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+              <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-semibold text-ink">{confirmation.title}</h1>
+          <p className="mt-2.5 text-sm leading-relaxed text-ink-secondary">{confirmation.body}</p>
         </div>
       </SignupShell>
     );
@@ -192,10 +197,15 @@ export function PublicRegistrationPage() {
 
   return (
     <SignupShell logoUrl={logoUrl}>
-      <div className="mx-auto w-full max-w-lg">
-        <header className="mb-6 text-center">
-          <h1 className="text-xl font-semibold text-ink">Join our creator network</h1>
-          <p className="mt-2 text-sm text-ink-secondary">
+      <div className="mx-auto w-full max-w-xl">
+        <header className="mb-8 text-center">
+          <p className="text-2xs font-semibold uppercase tracking-[0.18em] text-brand">
+            Creator network
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-ink">
+            Join our creator network
+          </h1>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-ink-secondary">
             Tell us about yourself — our team will review your profile and reach out in case of
             relevant collaboration opportunities.
           </p>
@@ -207,7 +217,7 @@ export function PublicRegistrationPage() {
           </div>
         )}
 
-        <form onSubmit={submit} className="campaign-glass-tile space-y-4 p-6">
+        <form onSubmit={submit} className="campaign-glass-tile space-y-5 p-6 sm:rounded-2xl sm:p-8">
           <Field label="Full name *">
             <input className="input-field" value={form.full_name} onChange={set('full_name')} placeholder="Your name" />
           </Field>
@@ -247,30 +257,30 @@ export function PublicRegistrationPage() {
             )}
           </Field>
 
-          <Field label="Instagram link">
+          <div className="space-y-3">
+            <span className="block text-2xs font-medium text-ink-secondary">Profile links *</span>
             <input
               className="input-field"
               type="url"
               value={form.instagram_link}
               onChange={set('instagram_link')}
-              placeholder="https://instagram.com/…"
+              placeholder="Instagram — https://instagram.com/…"
             />
-          </Field>
-          <Field label="YouTube link">
             <input
               className="input-field"
               type="url"
               value={form.youtube_link}
               onChange={set('youtube_link')}
-              placeholder="https://youtube.com/…"
+              placeholder="YouTube — https://youtube.com/…"
             />
-          </Field>
-          {fieldErrors.profile_link && (
-            <p className="-mt-2 text-2xs text-red-700">{fieldErrors.profile_link}</p>
-          )}
-          <p className="-mt-2 text-2xs text-ink-tertiary">
-            Add at least one profile link — Instagram or YouTube.
-          </p>
+            {fieldErrors.profile_link ? (
+              <p className="text-2xs text-red-700">{fieldErrors.profile_link}</p>
+            ) : (
+              <p className="text-2xs text-ink-tertiary">
+                Add at least one profile link — Instagram or YouTube.
+              </p>
+            )}
+          </div>
 
           <Field label="Primary category *">
             <select
@@ -308,12 +318,16 @@ export function PublicRegistrationPage() {
             <textarea className="input-field min-h-[72px] py-2" value={form.notes} onChange={set('notes')} placeholder="Anything else we should know?" />
           </Field>
 
-          <button type="submit" className="btn-primary w-full justify-center" disabled={submitting}>
+          <button
+            type="submit"
+            className="btn-primary h-11 w-full justify-center rounded-lg text-sm"
+            disabled={submitting}
+          >
             {submitting ? 'Submitting…' : 'Submit for review'}
           </button>
         </form>
 
-        <p className="mt-4 text-center text-2xs text-ink-tertiary">
+        <p className="mt-5 text-center text-2xs text-ink-tertiary">
           Already on the team? <Link to="/login" className="text-brand hover:underline">Sign in</Link>
         </p>
       </div>
@@ -374,12 +388,16 @@ function CollaborationPreferences({
 
 function SignupShell({ logoUrl, children }) {
   return (
-    <div className="relative flex min-h-screen flex-col items-center px-4 py-10">
+    <div className="relative min-h-screen overflow-hidden px-4 py-14 sm:py-20">
       <SignupAuroraBackground />
-      <div className="relative z-10 w-full">
+      <div className="relative z-10 mx-auto w-full max-w-xl">
         {logoUrl && (
-          <div className="mb-8 flex justify-center">
-            <img src={logoUrl} alt="" className="h-10 w-auto max-w-[200px] object-contain" />
+          <div className="mb-10 flex justify-center">
+            <img
+              src={logoUrl}
+              alt=""
+              className="h-14 w-auto max-w-[260px] object-contain"
+            />
           </div>
         )}
         {children}
@@ -391,10 +409,10 @@ function SignupShell({ logoUrl, children }) {
 function SignupAuroraBackground() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-      <div className="absolute inset-0 bg-gradient-to-br from-[#f7f5fa]/90 via-[#f3f5f8]/85 to-[#f0f6f4]/90" />
-      <div className="absolute -left-20 -top-24 h-[420px] w-[420px] rounded-full bg-violet-200/30 blur-[120px]" />
-      <div className="absolute -right-12 top-[8%] h-[360px] w-[360px] rounded-full bg-orange-100/25 blur-[120px]" />
-      <div className="absolute bottom-[-8%] left-[20%] h-[340px] w-[340px] rounded-full bg-teal-100/22 blur-[120px]" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[#f3effa] via-[#eef2f8] to-[#eaf5f1]" />
+      <div className="absolute -left-24 -top-28 h-[480px] w-[480px] rounded-full bg-violet-300/40 blur-[130px]" />
+      <div className="absolute -right-16 top-[6%] h-[420px] w-[420px] rounded-full bg-orange-200/35 blur-[130px]" />
+      <div className="absolute bottom-[-12%] left-[18%] h-[420px] w-[420px] rounded-full bg-teal-200/30 blur-[130px]" />
     </div>
   );
 }

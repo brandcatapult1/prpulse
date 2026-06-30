@@ -277,10 +277,8 @@ export function ContactFilters({
           <button
             type="button"
             onClick={() => setFiltersExpanded((v) => !v)}
-            className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-2xs transition-colors ${
-              facetActive
-                ? 'border-brand/30 bg-brand-soft/40 text-brand'
-                : 'border-line bg-white text-ink-secondary hover:border-zinc-300'
+            className={`campaign-glass-chip flex w-full items-center justify-between px-3 py-2 ${
+              facetActive ? 'campaign-glass-chip-active' : ''
             }`}
           >
             <span className="font-medium">Filters{facetActive ? ' · active' : ''}</span>
@@ -288,7 +286,7 @@ export function ContactFilters({
           </button>
 
           {filtersExpanded && (
-            <div className="mt-2 flex flex-wrap gap-1.5 rounded-md border border-line bg-canvas/50 p-2">
+            <div className="campaign-glass-tile mt-2 flex flex-wrap gap-1.5 p-2">
               <ContactFilterFacets
                 filters={filters}
                 onChange={onChange}

@@ -23,7 +23,7 @@ function InstagramHandle({ contact }) {
       href={profile.profileUrl}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-2xs font-medium text-brand hover:underline"
+      className="campaign-glass-chip text-brand hover:text-brand"
       onClick={(e) => e.stopPropagation()}
     >
       {profile.handleLabel ?? 'Instagram'}
@@ -171,7 +171,7 @@ export function AddCreatorsDrawer({
         onClose={onClose}
         footer={
           <div className="flex items-center justify-between gap-3">
-            <span className="text-2xs text-ink-tertiary">
+            <span className="campaign-glass-chip text-ink-tertiary">
               {selected.length} selected · active only · blacklisted hidden
             </span>
             <div className="flex shrink-0 gap-2">
@@ -205,9 +205,9 @@ export function AddCreatorsDrawer({
 
         <div className="mt-4">
           {loading ? (
-            <p className="text-2xs text-ink-tertiary">Loading creators…</p>
+            <p className="campaign-glass-tile p-4 text-center text-2xs text-ink-tertiary">Loading creators…</p>
           ) : filteredRows.length === 0 ? (
-            <p className="text-2xs text-ink-tertiary">
+            <p className="campaign-glass-tile p-4 text-center text-2xs text-ink-tertiary">
               {contacts.length === 0
                 ? 'No eligible creators — add a new contact first.'
                 : 'No creators match these filters.'}

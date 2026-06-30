@@ -7,7 +7,10 @@ import {
   showIndicativeRates,
   hasCollaborationPreference,
   COLLABORATION_PREFERENCE_ERROR,
+  PROFILE_LINK_REQUIRED_ERROR,
+  hasProfileLink,
 } from '../lib/collaborationPrefs.js';
+import { loadPublicOrgLogoUrl } from '../lib/orgBranding.js';
 import { MobileNumberField } from '../components/contacts/MobileNumberField.jsx';
 import { CityCountryField } from '../components/contacts/CityCountryField.jsx';
 import { normalizeMobileToE164, isMobileValid } from '../lib/phone.js';
@@ -29,20 +32,29 @@ const EMPTY = {
   notes: '',
 };
 
+const DEFAULT_CONFIRMATION = {
+  title: "Thanks — we'll review your profile",
+  body: 'Our team will get back to you after reviewing your submission. No account is created yet.',
+};
+
 export function PublicRegistrationPage() {
   const [form, setForm] = useState(EMPTY);
+  const [logoUrl, setLogoUrl] = useState(null);
   const [cityOptions, setCityOptions] = useState([]);
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const [confirmation, setConfirmation] = useState(DEFAULT_CONFIRMATION);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     Promise.all([
+      loadPublicOrgLogoUrl(),
       registrationsApi.cities().catch(() => []),
       registrationsApi.categories().catch(() => []),
-    ]).then(([cities, categories]) => {
+    ]).then(([logo, cities, categories]) => {
+      setLogoUrl(logo);
       setCityOptions(Array.isArray(cities) ? cities : []);
       setCategoryOptions(Array.isArray(categories) ? categories : []);
     });
@@ -64,6 +76,12 @@ export function PublicRegistrationPage() {
     if (field === 'mobile_number' || field === 'email' || field === 'country_code') {
       setFieldErrors((prev) => ({ ...prev, [field]: null, mobile_number: null }));
     }
+    if (field === 'city' || field === 'country_code') {
+      setFieldErrors((prev) => ({ ...prev, city: null, country_code: null }));
+    }
+    if (field === 'instagram_link' || field === 'youtube_link') {
+      setFieldErrors((prev) => ({ ...prev, profile_link: null }));
+    }
   };
 
   const submit = async (e) => {
@@ -72,6 +90,8 @@ export function PublicRegistrationPage() {
     const fullName = form.full_name.trim();
     const mobileRaw = form.mobile_number.trim();
     const emailRaw = form.email.trim();
+    const instagram = form.instagram_link.trim();
+    const youtube = form.youtube_link.trim();
 
     if (!fullName) {
       setError('Full name is required.');
@@ -82,6 +102,18 @@ export function PublicRegistrationPage() {
       nextFieldErrors.mobile_number = 'Mobile number is required.';
     } else if (!isMobileValid(mobileRaw, form.country_code)) {
       nextFieldErrors.mobile_number = 'Enter a valid mobile number for the selected country.';
+    }
+
+    if (!form.country_code) {
+      nextFieldErrors.country_code = 'Country is required.';
+    }
+
+    if (!form.city) {
+      nextFieldErrors.city = 'City is required.';
+    }
+
+    if (!hasProfileLink(instagram, youtube)) {
+      nextFieldErrors.profile_link = PROFILE_LINK_REQUIRED_ERROR;
     }
 
     if (emailRaw && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw)) {
@@ -115,9 +147,9 @@ export function PublicRegistrationPage() {
       mobile_number: e164,
       country_code: form.country_code,
       email: emailRaw || null,
-      city: form.city || null,
-      instagram_link: form.instagram_link.trim() || null,
-      youtube_link: form.youtube_link.trim() || null,
+      city: form.city,
+      instagram_link: instagram || null,
+      youtube_link: youtube || null,
       primary_category_id: form.primary_category_id,
       paid_preference: form.paid_preference,
       barter_preference: form.barter_preference,
@@ -128,41 +160,46 @@ export function PublicRegistrationPage() {
 
     try {
       await registrationsApi.submit(payload);
+      setConfirmation(DEFAULT_CONFIRMATION);
+      setSubmitted(true);
     } catch (err) {
+      if (err.data?.code === 'duplicate_signup') {
+        setConfirmation({
+          title: err.data.outcome === 'approved'
+            ? 'You\'re already in our network'
+            : 'Profile under review',
+          body: err.data.message ?? DEFAULT_CONFIRMATION.body,
+        });
+        setSubmitted(true);
+        return;
+      }
       setError(err.message ?? 'Registration failed — please try again.');
+    } finally {
       setSubmitting(false);
-      return;
     }
-
-    setSubmitting(false);
-    setSubmitted(true);
   };
 
   if (submitted) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-canvas px-4">
-        <div className="w-full max-w-md rounded-xl border border-line bg-white p-8 text-center shadow-sm">
-          <h1 className="text-lg font-semibold text-ink">Thanks — we&apos;ll review your profile</h1>
-          <p className="mt-2 text-sm text-ink-secondary">
-            Our team will get back to you after reviewing your submission. No account is created yet.
-          </p>
-          <Link to="/login" className="btn-primary mt-6 inline-flex">
-            Team login
-          </Link>
+      <SignupShell logoUrl={logoUrl}>
+        <div className="campaign-glass-tile mx-auto max-w-md p-8 text-center">
+          <h1 className="text-lg font-semibold text-ink">{confirmation.title}</h1>
+          <p className="mt-2 text-sm text-ink-secondary">{confirmation.body}</p>
         </div>
-      </div>
+      </SignupShell>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center bg-canvas px-4 py-10">
-      <div className="w-full max-w-lg">
-        <div className="mb-6 text-center">
+    <SignupShell logoUrl={logoUrl}>
+      <div className="mx-auto w-full max-w-lg">
+        <header className="mb-6 text-center">
           <h1 className="text-xl font-semibold text-ink">Join our creator network</h1>
-          <p className="mt-1 text-sm text-ink-secondary">
-            Tell us about yourself — our team will review and reach out.
+          <p className="mt-2 text-sm text-ink-secondary">
+            Tell us about yourself — our team will review your profile and reach out in case of
+            relevant collaboration opportunities.
           </p>
-        </div>
+        </header>
 
         {error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-2xs text-red-800">
@@ -170,7 +207,7 @@ export function PublicRegistrationPage() {
           </div>
         )}
 
-        <form onSubmit={submit} className="space-y-4 rounded-xl border border-line bg-white p-6 shadow-sm">
+        <form onSubmit={submit} className="campaign-glass-tile space-y-4 p-6">
           <Field label="Full name *">
             <input className="input-field" value={form.full_name} onChange={set('full_name')} placeholder="Your name" />
           </Field>
@@ -193,21 +230,47 @@ export function PublicRegistrationPage() {
               <p className="mt-1 text-2xs text-red-700">{fieldErrors.email}</p>
             )}
           </Field>
-          <Field label="City">
+
+          <Field label="Country & city *">
             <CityCountryField
               countryCode={form.country_code}
               city={form.city}
               cities={cityOptions}
+              required
               onCountryChange={(code) => set('country_code')({ target: { value: code } })}
               onCityChange={(value) => setForm((f) => ({ ...f, city: value }))}
             />
+            {(fieldErrors.city || fieldErrors.country_code) && (
+              <p className="mt-1 text-2xs text-red-700">
+                {fieldErrors.city ?? fieldErrors.country_code}
+              </p>
+            )}
           </Field>
+
           <Field label="Instagram link">
-            <input className="input-field" type="url" value={form.instagram_link} onChange={set('instagram_link')} placeholder="https://instagram.com/…" />
+            <input
+              className="input-field"
+              type="url"
+              value={form.instagram_link}
+              onChange={set('instagram_link')}
+              placeholder="https://instagram.com/…"
+            />
           </Field>
           <Field label="YouTube link">
-            <input className="input-field" type="url" value={form.youtube_link} onChange={set('youtube_link')} placeholder="https://youtube.com/…" />
+            <input
+              className="input-field"
+              type="url"
+              value={form.youtube_link}
+              onChange={set('youtube_link')}
+              placeholder="https://youtube.com/…"
+            />
           </Field>
+          {fieldErrors.profile_link && (
+            <p className="-mt-2 text-2xs text-red-700">{fieldErrors.profile_link}</p>
+          )}
+          <p className="-mt-2 text-2xs text-ink-tertiary">
+            Add at least one profile link — Instagram or YouTube.
+          </p>
 
           <Field label="Primary category *">
             <select
@@ -222,30 +285,13 @@ export function PublicRegistrationPage() {
             </select>
           </Field>
 
-          <div className="space-y-3 rounded-lg border border-line bg-canvas px-4 py-3">
-            <p className="text-2xs font-medium text-ink-secondary">Collaboration preferences *</p>
-            <label className="flex items-center gap-2 text-sm text-ink-secondary">
-              <input
-                type="checkbox"
-                checked={form.barter_preference}
-                onChange={set('barter_preference')}
-                className="rounded border-line text-brand"
-              />
-              Open to barter
-            </label>
-            <label className="flex items-center gap-2 text-sm text-ink-secondary">
-              <input
-                type="checkbox"
-                checked={form.paid_preference}
-                onChange={set('paid_preference')}
-                className="rounded border-line text-brand"
-              />
-              Open to paid
-            </label>
-            {!hasCollaborationPreference(form.paid_preference, form.barter_preference) && (
-              <p className="text-2xs text-red-700">{COLLABORATION_PREFERENCE_ERROR}</p>
-            )}
-          </div>
+          <CollaborationPreferences
+            barterPreference={form.barter_preference}
+            paidPreference={form.paid_preference}
+            onBarterChange={set('barter_preference')}
+            onEnablePaid={() => setForm((f) => formWithPaidPreference(f, true))}
+            onPaidChange={set('paid_preference')}
+          />
 
           {showIndicativeRates(form.paid_preference) && (
             <div className="grid gap-3 sm:grid-cols-2">
@@ -271,6 +317,84 @@ export function PublicRegistrationPage() {
           Already on the team? <Link to="/login" className="text-brand hover:underline">Sign in</Link>
         </p>
       </div>
+    </SignupShell>
+  );
+}
+
+/** Barter-primary, paid-secondary — mirrors campaign drawer "Make paid →" weighting. */
+function CollaborationPreferences({
+  barterPreference,
+  paidPreference,
+  onBarterChange,
+  onEnablePaid,
+  onPaidChange,
+}) {
+  const missingPreference = !hasCollaborationPreference(paidPreference, barterPreference);
+
+  return (
+    <div className="campaign-glass-lane space-y-3 p-4">
+      <p className="text-2xs font-medium text-ink-secondary">Collaboration preferences *</p>
+
+      <label className="flex items-center gap-2 text-sm font-medium text-ink">
+        <input
+          type="checkbox"
+          checked={barterPreference}
+          onChange={onBarterChange}
+          className="rounded border-line text-brand"
+        />
+        Open to barter
+      </label>
+
+      {paidPreference ? (
+        <label className="flex items-center gap-2 text-2xs text-ink-secondary">
+          <input
+            type="checkbox"
+            checked={paidPreference}
+            onChange={onPaidChange}
+            className="rounded border-line text-brand"
+          />
+          Open to paid
+        </label>
+      ) : (
+        <button
+          type="button"
+          className="text-2xs text-brand hover:underline"
+          onClick={onEnablePaid}
+        >
+          Open to paid →
+        </button>
+      )}
+
+      {missingPreference && (
+        <p className="text-2xs text-red-700">{COLLABORATION_PREFERENCE_ERROR}</p>
+      )}
+    </div>
+  );
+}
+
+function SignupShell({ logoUrl, children }) {
+  return (
+    <div className="relative flex min-h-screen flex-col items-center px-4 py-10">
+      <SignupAuroraBackground />
+      <div className="relative z-10 w-full">
+        {logoUrl && (
+          <div className="mb-8 flex justify-center">
+            <img src={logoUrl} alt="" className="h-10 w-auto max-w-[200px] object-contain" />
+          </div>
+        )}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function SignupAuroraBackground() {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+      <div className="absolute inset-0 bg-gradient-to-br from-[#f7f5fa]/90 via-[#f3f5f8]/85 to-[#f0f6f4]/90" />
+      <div className="absolute -left-20 -top-24 h-[420px] w-[420px] rounded-full bg-violet-200/30 blur-[120px]" />
+      <div className="absolute -right-12 top-[8%] h-[360px] w-[360px] rounded-full bg-orange-100/25 blur-[120px]" />
+      <div className="absolute bottom-[-8%] left-[20%] h-[340px] w-[340px] rounded-full bg-teal-100/22 blur-[120px]" />
     </div>
   );
 }

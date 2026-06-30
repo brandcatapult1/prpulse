@@ -97,6 +97,7 @@ export const engagementsApi = {
 
 export const registrationsApi = {
   list: () => api('/registrations'),
+  branding: () => api('/registrations/branding'),
   cities: (country) =>
     api(`/registrations/cities${country ? `?country=${encodeURIComponent(country)}` : ''}`),
   categories: () => api('/registrations/categories'),

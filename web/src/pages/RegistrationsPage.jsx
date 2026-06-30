@@ -8,6 +8,7 @@ import { contactsApi, registrationsApi } from '../lib/api.js';
 import { findContactByMobile } from '../lib/phone.js';
 import { formatPrimaryCategory } from '../lib/creatorCategories.js';
 import { todayIso } from '../lib/dates.js';
+import { countryLabel } from '../lib/locations.js';
 
 const PENDING_STATUSES = new Set(['new', 'pending_review']);
 
@@ -67,7 +68,11 @@ export function RegistrationsPage() {
         </div>
       ),
     },
-    { key: 'city', label: 'City', render: (r) => r.city ?? '—' },
+    {
+      key: 'city',
+      label: 'City',
+      render: (r) => [r.city, r.country_code ? countryLabel(r.country_code) : null].filter(Boolean).join(' · ') || '—',
+    },
     { key: 'category', label: 'Category', render: (r) => formatPrimaryCategory(r) },
     {
       key: 'status',
@@ -290,7 +295,13 @@ function ReviewDrawer({ registration, contacts, onClose, onApprove, onReject, on
       <dl className="space-y-3 text-sm">
         <Detail label="Mobile" value={registration.mobile_number} />
         <Detail label="Email" value={registration.email ?? '—'} />
-        <Detail label="City" value={registration.city ?? '—'} />
+        <Detail
+          label="City"
+          value={[
+            registration.city,
+            registration.country_code ? countryLabel(registration.country_code) : null,
+          ].filter(Boolean).join(' · ') || '—'}
+        />
         <Detail label="Instagram" value={registration.instagram_link ?? '—'} link />
         <Detail label="YouTube" value={registration.youtube_link ?? '—'} link />
         <Detail label="Primary category" value={formatPrimaryCategory(registration)} />

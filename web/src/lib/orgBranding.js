@@ -1,4 +1,4 @@
-import { orgBrandingApi } from './api.js';
+import { orgBrandingApi, registrationsApi } from './api.js';
 
 /** Bundled transparent wordmark for the light sidebar. */
 export const DEFAULT_DEMO_ORG_LOGO = '/branding/brand-catapult-wordmark.svg';
@@ -22,6 +22,16 @@ export function normalizeOrgLogoUrl(url) {
   if (!url || url === LOGO_CLEARED) return null;
   if (url === LEGACY_ORG_LOGO) return DEFAULT_DEMO_ORG_LOGO;
   return url;
+}
+
+export async function loadPublicOrgLogoUrl() {
+  try {
+    const data = await registrationsApi.branding();
+    if (data?.logo_url === LOGO_CLEARED || !data?.logo_url) return null;
+    return normalizeOrgLogoUrl(data.logo_url);
+  } catch {
+    return null;
+  }
 }
 
 export async function loadOrgLogoUrl() {

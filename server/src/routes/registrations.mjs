@@ -7,21 +7,36 @@ import { createContactDeduped } from '../lib/contactCreate.mjs';
 import { assertValidCity, loadCities } from '../lib/cities.mjs';
 import { assertValidCategoryId, loadCategories } from '../lib/categories.mjs';
 import { collaborationPreferenceError } from '../lib/collaborationPrefs.mjs';
+import { profileLinkError } from '../lib/registrationValidation.mjs';
+import {
+  checkExistingRegistrationByMobile,
+} from '../lib/registrationDuplicateCheck.mjs';
 
 export const registrationsRouter = Router();
 
 const SELECT_FIELDS = `
-  id, full_name, mobile_number, email, city, instagram_link, youtube_link,
+  id, full_name, mobile_number, email, country_code, city, instagram_link, youtube_link,
   category, primary_category_id, paid_preference, barter_preference, reel_rate, story_rate,
   portfolio_links, notes, status, linked_contact_id, created_at, reviewed_at
 `;
 
 const LIST_SELECT = `
-  r.id, r.full_name, r.mobile_number, r.email, r.city, r.instagram_link, r.youtube_link,
+  r.id, r.full_name, r.mobile_number, r.email, r.country_code, r.city, r.instagram_link, r.youtube_link,
   r.category, r.primary_category_id, cat.name AS primary_category_name,
   r.paid_preference, r.barter_preference, r.reel_rate, r.story_rate,
   r.portfolio_links, r.notes, r.status, r.linked_contact_id, r.created_at, r.reviewed_at
 `;
+
+/** Public — org logo for creator signup (same org_settings.logo_url as dashboard). */
+registrationsRouter.get('/branding', async (_req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT logo_url FROM org_settings WHERE id = 1');
+    res.json({ logo_url: rows[0]?.logo_url ?? null });
+  } catch (err) {
+    if (err.code === '42P01') return res.json({ logo_url: null });
+    res.status(503).json({ error: 'Could not load branding' });
+  }
+});
 
 /** Public — curated city list for signup (same source as internal lookup). */
 registrationsRouter.get('/cities', async (req, res) => {
@@ -84,9 +99,35 @@ registrationsRouter.post('/', async (req, res) => {
     return res.status(400).json({ error: prefError });
   }
 
+  const linkError = profileLinkError(instagram_link, youtube_link);
+  if (linkError) {
+    return res.status(400).json({ error: linkError });
+  }
+
+  if (!country_code?.trim()) {
+    return res.status(400).json({ error: 'Country is required' });
+  }
+
+  if (!city?.trim()) {
+    return res.status(400).json({ error: 'City is required' });
+  }
+
   const e164 = normalizeMobileToE164(mobile_number, country_code ?? undefined);
   if (!e164) {
     return res.status(400).json({ error: 'Enter a valid mobile number for the selected country' });
+  }
+
+  const duplicateCheck = await checkExistingRegistrationByMobile(
+    pool,
+    e164,
+    country_code ?? undefined,
+  );
+  if (duplicateCheck.duplicate) {
+    return res.status(409).json({
+      code: 'duplicate_signup',
+      outcome: duplicateCheck.outcome,
+      message: duplicateCheck.message,
+    });
   }
 
   let categoryRow;
@@ -96,14 +137,12 @@ registrationsRouter.post('/', async (req, res) => {
     return res.status(err.status ?? 400).json({ error: err.message ?? 'Invalid category' });
   }
 
-  let storedCity = null;
-  if (city?.trim()) {
-    try {
-      const row = await assertValidCity(pool, city, country_code ?? 'IN');
-      storedCity = row.name;
-    } catch (err) {
-      return res.status(err.status ?? 400).json({ error: err.message ?? 'Invalid city' });
-    }
+  let storedCity;
+  try {
+    const row = await assertValidCity(pool, city, country_code ?? 'IN');
+    storedCity = row.name;
+  } catch (err) {
+    return res.status(err.status ?? 400).json({ error: err.message ?? 'Invalid city' });
   }
 
   const legacyCategoryText = category?.trim() || categoryRow.name;
@@ -111,15 +150,16 @@ registrationsRouter.post('/', async (req, res) => {
   try {
     const { rows } = await pool.query(
       `INSERT INTO registration_submissions (
-        full_name, mobile_number, email, city, instagram_link, youtube_link,
+        full_name, mobile_number, email, country_code, city, instagram_link, youtube_link,
         category, primary_category_id, paid_preference, barter_preference, reel_rate, story_rate,
         portfolio_links, notes, status
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'new')
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'new')
       RETURNING ${SELECT_FIELDS}`,
       [
         full_name.trim(),
         e164,
         email ?? null,
+        country_code ?? 'IN',
         storedCity,
         instagram_link ?? null,
         youtube_link ?? null,
@@ -187,14 +227,7 @@ registrationsRouter.patch('/:id', requireAuth, requireSeniorOrAdmin, async (req,
             throw Object.assign(new Error('Linked contact not found'), { status: 404 });
           }
         } else {
-          let country = null;
-          if (sub.city) {
-            const cityRow = await client.query(
-              'SELECT country FROM cities WHERE name = $1 LIMIT 1',
-              [sub.city],
-            );
-            country = cityRow.rows[0]?.country ?? null;
-          }
+          const country = sub.country_code ?? null;
 
           // Approve never mints a duplicate: a mobile match links to the existing
           // record (status 'duplicate'); otherwise a new contact is created.
@@ -206,9 +239,13 @@ registrationsRouter.patch('/:id', requireAuth, requireSeniorOrAdmin, async (req,
               city: sub.city,
               country,
               instagram_url: sub.instagram_link,
+              youtube_url: sub.youtube_link,
               primary_category_id: sub.primary_category_id,
               open_to_paid: Boolean(sub.paid_preference),
               open_to_barter: Boolean(sub.barter_preference),
+              reel_rate: sub.reel_rate,
+              story_rate: sub.story_rate,
+              notes: sub.notes,
               source: 'signup_form',
               created_by: req.user.id,
             });

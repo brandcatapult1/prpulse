@@ -10,17 +10,8 @@ import { MODULES } from '../lib/modules.js';
 import { contactsApi, lookupApi } from '../lib/api.js';
 import { setContactsCache } from '../lib/contactsCache.js';
 import { canBulkImport } from '../lib/csvImport.js';
+import { CONTACT_PAGE_FILTER_DEFAULTS, filterContacts } from '../lib/contactFilters.js';
 import { useAuth } from '../context/AuthContext.jsx';
-
-const EMPTY_FILTERS = {
-  status: '',
-  classification: '',
-  city: '',
-  openToPaid: false,
-  openToBarter: false,
-  tagIds: [],
-  primaryCategoryIds: [],
-};
 
 export function ContactsPage() {
   const navigate = useNavigate();
@@ -31,7 +22,7 @@ export function ContactsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [query, setQuery] = useState('');
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [filters, setFilters] = useState(CONTACT_PAGE_FILTER_DEFAULTS);
   const [tagOptions, setTagOptions] = useState([]);
   const [cityOptions, setCityOptions] = useState([]);
   const [categoryOptions, setCategoryOptions] = useState([]);
@@ -75,60 +66,13 @@ export function ContactsPage() {
 
   function clearAll() {
     setQuery('');
-    setFilters(EMPTY_FILTERS);
+    setFilters(CONTACT_PAGE_FILTER_DEFAULTS);
   }
 
-  const selectedTagNames = useMemo(
-    () => filters.tagIds
-      .map((id) => tagOptions.find((t) => t.id === id)?.name)
-      .filter(Boolean),
-    [filters.tagIds, tagOptions],
+  const filteredRows = useMemo(
+    () => filterContacts(rows, { query, filters, tagOptions, includeStatusFilter: true }),
+    [rows, query, filters, tagOptions],
   );
-
-  const filteredRows = useMemo(() => {
-    let result = rows;
-    const q = query.trim().toLowerCase();
-    if (q) {
-      result = result.filter(
-        (r) =>
-          r.full_name?.toLowerCase().includes(q)
-          || r.mobile_number?.includes(q)
-          || r.city?.toLowerCase().includes(q)
-          || r.primary_category_name?.toLowerCase().includes(q)
-          || r.tags?.some((t) => t.toLowerCase().includes(q)),
-      );
-    }
-
-    if (filters.status === 'active' || filters.status === 'inactive' || filters.status === 'archived') {
-      result = result.filter((r) => r.status === filters.status);
-    } else if (filters.status === '') {
-      result = result.filter((r) => r.status !== 'archived');
-    }
-
-    if (filters.classification) {
-      result = result.filter((r) => r.classification === filters.classification);
-    }
-    if (filters.city) {
-      result = result.filter((r) => r.city === filters.city);
-    }
-    if (filters.openToPaid) {
-      result = result.filter((r) => r.open_to_paid);
-    }
-    if (filters.openToBarter) {
-      result = result.filter((r) => r.open_to_barter);
-    }
-    if (selectedTagNames.length > 0) {
-      result = result.filter((r) =>
-        selectedTagNames.every((name) => r.tags?.includes(name)),
-      );
-    }
-    if (filters.primaryCategoryIds.length > 0) {
-      result = result.filter((r) =>
-        filters.primaryCategoryIds.includes(r.primary_category_id),
-      );
-    }
-    return result;
-  }, [rows, query, filters, selectedTagNames]);
 
   const selectableIds = useMemo(
     () => filteredRows.map((r) => r.id),

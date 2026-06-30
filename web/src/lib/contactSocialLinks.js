@@ -57,7 +57,7 @@ export function whatsAppUrl(mobile) {
   return n ? `https://wa.me/${n}` : null;
 }
 
-function instagramProfileFromUrl(url) {
+export function instagramProfileFromUrl(url) {
   const trimmed = String(url ?? '').trim();
   if (!trimmed) return null;
   const match = trimmed.match(/instagram\.com\/([^/?#]+)/i);

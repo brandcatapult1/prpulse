@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { DataTable } from '../components/ui/DataKit.jsx';
-import { Drawer, EmptyState, Toast } from '../components/ui/Primitives.jsx';
+import { EmptyState, Toast } from '../components/ui/Primitives.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { CampaignKanbanBoard } from '../components/campaign/CampaignKanbanBoard.jsx';
 import { CampaignQuickEditDrawer } from '../components/campaign/CampaignQuickEditDrawer.jsx';
 import { CampaignMetricTiles } from '../components/campaign/CampaignMetricTiles.jsx';
 import { CampaignEditDrawer, CampaignTagSummary } from '../components/campaign/CampaignEditDrawer.jsx';
+import { AddCreatorsDrawer } from '../components/campaign/AddCreatorsDrawer.jsx';
 import { CampaignFilterBar, CAMPAIGN_EMPTY_FILTERS } from '../components/campaign/CampaignFilterBar.jsx';
-import { AddContactDrawer } from '../components/contacts/AddContactDrawer.jsx';
 import { filterCampaignEngagements } from '../lib/campaignBoardFilters.js';
 import { Pill, formatStatus, formatDate, formatFee, statusTone } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
@@ -21,8 +21,6 @@ import {
   fetchFeedback,
   blacklistContact,
   clearBlacklist,
-  populateCampaign,
-  fetchPopulationContacts,
   fetchDeliverables,
 } from '../lib/persistence.js';
 import { setDeliverablesCache, updateEngagementDeliverables } from '../lib/deliverablesCache.js';
@@ -475,152 +473,5 @@ function CampaignAuroraBackground() {
       <div className="absolute -right-12 top-[8%] h-[360px] w-[360px] rounded-full bg-orange-100/25 blur-[120px]" />
       <div className="absolute bottom-[-8%] left-[20%] h-[340px] w-[340px] rounded-full bg-teal-100/22 blur-[120px]" />
     </div>
-  );
-}
-
-function AddCreatorsDrawer({
-  open,
-  onClose,
-  campaignId,
-  campaignName,
-  engagementContactIds,
-  onAdded,
-}) {
-  const { user } = useAuth();
-  const [selected, setSelected] = useState([]);
-  const [contacts, setContacts] = useState([]);
-  const [quickOpen, setQuickOpen] = useState(false);
-  const [toast, setToast] = useState(null);
-  const [adding, setAdding] = useState(false);
-
-  const inCampaignIds = useMemo(
-    () => new Set(engagementContactIds.map(String)),
-    [engagementContactIds],
-  );
-
-  useEffect(() => {
-    if (!open || !campaignId) return;
-    setSelected([]);
-    fetchPopulationContacts(campaignId)
-      .then((rows) => {
-        setContacts(rows ?? []);
-        mergeContactsCache(rows);
-      })
-      .catch(() => setContacts([]));
-  }, [open, campaignId]);
-
-  const toggle = (rowId) => {
-    if (inCampaignIds.has(String(rowId))) return;
-    setSelected((s) => (s.includes(rowId) ? s.filter((x) => x !== rowId) : [...s, rowId]));
-  };
-
-  async function handleAddToCampaign() {
-    const picked = contacts.filter(
-      (c) => selected.includes(c.id) && !inCampaignIds.has(String(c.id)),
-    );
-    if (picked.length === 0) {
-      setToast(selected.length > 0 ? 'Selected creators are already on this campaign' : 'Select at least one creator');
-      return;
-    }
-
-    setAdding(true);
-    const skippedCount = selected.length - picked.length;
-
-    try {
-      const result = await populateCampaign(
-        campaignId,
-        picked.map((c) => c.id),
-        user?.id,
-      );
-      const created = result?.created ?? [];
-      if (created.length === 0 && picked.length > 0) {
-        throw new Error('No new engagements created');
-      }
-    } catch (err) {
-      setToast(err.message ?? 'Could not add creators');
-      setAdding(false);
-      return;
-    }
-
-    setAdding(false);
-    let message = `Added ${picked.length} creator${picked.length === 1 ? '' : 's'} to campaign`;
-    if (skippedCount > 0) message += ` · ${skippedCount} already on campaign`;
-    setToast(message);
-    onAdded?.();
-    setSelected([]);
-    onClose();
-  }
-
-  return (
-    <>
-      <Drawer
-        open={open}
-        title="Add creators"
-        onClose={onClose}
-        footer={
-          <div className="flex items-center justify-between">
-            <span className="text-2xs text-ink-tertiary">
-              {selected.length} selected · blacklisted hidden
-            </span>
-            <div className="flex gap-2">
-              <button type="button" className="btn-secondary" onClick={() => setQuickOpen(true)}>
-                Add Contact
-              </button>
-              <button
-                type="button"
-                className="btn-primary"
-                disabled={adding || selected.length === 0}
-                onClick={handleAddToCampaign}
-              >
-                {adding ? 'Adding…' : 'Add to campaign'}
-              </button>
-            </div>
-          </div>
-        }
-      >
-        <div className="mt-4">
-          {contacts.length === 0 ? (
-            <p className="text-2xs text-ink-tertiary">No eligible contacts — add a new contact first.</p>
-          ) : (
-            <DataTable
-              selectable
-              selected={selected}
-              onSelect={toggle}
-              isRowDisabled={(row) => inCampaignIds.has(String(row.id))}
-              columns={[
-                {
-                  key: 'full_name',
-                  label: 'Name',
-                  render: (r, { disabled }) => (
-                    <div>
-                      <span className={disabled ? 'text-ink-tertiary' : 'font-medium text-ink'}>
-                        {r.full_name}
-                      </span>
-                      {disabled && (
-                        <span className="mt-0.5 block text-2xs text-ink-tertiary">Already on campaign</span>
-                      )}
-                    </div>
-                  ),
-                },
-                { key: 'city', label: 'City' },
-                { key: 'classification', label: 'Class', render: (r) => r.classification?.replace('_', ' ') ?? '—' },
-              ]}
-              rows={contacts}
-            />
-          )}
-        </div>
-      </Drawer>
-
-      <AddContactDrawer
-        open={quickOpen}
-        onClose={() => setQuickOpen(false)}
-        onSaved={() => {
-          fetchPopulationContacts(campaignId).then(setContacts).catch(() => {});
-          setToast('Contact added — select them above to add to campaign');
-        }}
-      />
-
-      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
-    </>
   );
 }

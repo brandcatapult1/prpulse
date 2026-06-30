@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CLASSIFICATION_OPTIONS, classificationSelectLabel } from '../../lib/classifications.js';
 import { countryLabel } from '../../lib/locations.js';
+import { contactFiltersActive } from '../../lib/contactFilters.js';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Active & inactive' },
@@ -162,7 +163,86 @@ function CategoryFilterMenu({ categoryOptions, selectedIds, onChange }) {
   );
 }
 
-/** Combinable, AND-ed contact filters plus instant text search. */
+function ContactFilterFacets({
+  filters,
+  onChange,
+  cityOptions,
+  tagOptions,
+  categoryOptions,
+  hideStatus = false,
+  selectClass,
+}) {
+  return (
+    <>
+      {!hideStatus && (
+        <select
+          className={selectClass}
+          value={filters.status ?? ''}
+          onChange={(e) => onChange({ status: e.target.value })}
+        >
+          {STATUS_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      )}
+
+      <select
+        className={selectClass}
+        value={filters.classification}
+        onChange={(e) => onChange({ classification: e.target.value })}
+      >
+        <option value="">All classes</option>
+        {CLASSIFICATION_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>{classificationSelectLabel(opt)}</option>
+        ))}
+      </select>
+
+      <select
+        className={`${selectClass} min-w-[120px]`}
+        value={filters.city}
+        onChange={(e) => onChange({ city: e.target.value })}
+      >
+        <option value="">All cities</option>
+        {cityOptions.map((city) => (
+          <option key={city.id ?? city.name} value={city.name}>
+            {city.name}{city.country ? ` · ${countryLabel(city.country)}` : ''}
+          </option>
+        ))}
+      </select>
+
+      <TagFilterMenu
+        tagOptions={tagOptions}
+        selectedIds={filters.tagIds}
+        onChange={(tagIds) => onChange({ tagIds })}
+      />
+
+      <CategoryFilterMenu
+        categoryOptions={categoryOptions}
+        selectedIds={filters.primaryCategoryIds}
+        onChange={(primaryCategoryIds) => onChange({ primaryCategoryIds })}
+      />
+
+      <ToggleChip
+        active={filters.openToBarter}
+        onClick={() => onChange({ openToBarter: !filters.openToBarter })}
+      >
+        Barter
+      </ToggleChip>
+
+      <ToggleChip
+        active={filters.openToPaid}
+        onClick={() => onChange({ openToPaid: !filters.openToPaid })}
+      >
+        Paid
+      </ToggleChip>
+    </>
+  );
+}
+
+/**
+ * Combinable, AND-ed contact filters plus instant text search.
+ * layout="drawer" — search always visible; facets in a collapsible panel (no status).
+ */
 export function ContactFilters({
   query,
   onQueryChange,
@@ -172,18 +252,67 @@ export function ContactFilters({
   tagOptions,
   categoryOptions,
   onClear,
+  layout = 'page',
+  hideStatus = false,
 }) {
-  const hasActiveFilters =
-    Boolean(filters.status)
-    || Boolean(filters.classification)
-    || Boolean(filters.city)
-    || filters.openToPaid
-    || filters.openToBarter
-    || filters.tagIds.length > 0
-    || filters.primaryCategoryIds.length > 0;
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const includeStatus = !hideStatus && layout !== 'drawer';
+  const hasActive = contactFiltersActive(filters, { query, includeStatus });
 
   const selectClass =
     'input-field h-8 w-auto min-w-[108px] shrink-0 py-0 text-2xs';
+
+  if (layout === 'drawer') {
+    const facetActive = contactFiltersActive(filters, { includeStatus: false });
+    return (
+      <div className="space-y-2">
+        <input
+          className="input-field h-8 w-full py-0 text-2xs"
+          placeholder="Search name, mobile, city, tags…"
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+        />
+
+        <div>
+          <button
+            type="button"
+            onClick={() => setFiltersExpanded((v) => !v)}
+            className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-2xs transition-colors ${
+              facetActive
+                ? 'border-brand/30 bg-brand-soft/40 text-brand'
+                : 'border-line bg-white text-ink-secondary hover:border-zinc-300'
+            }`}
+          >
+            <span className="font-medium">Filters{facetActive ? ' · active' : ''}</span>
+            <span className="text-ink-tertiary">{filtersExpanded ? '▾' : '▸'}</span>
+          </button>
+
+          {filtersExpanded && (
+            <div className="mt-2 flex flex-wrap gap-1.5 rounded-md border border-line bg-canvas/50 p-2">
+              <ContactFilterFacets
+                filters={filters}
+                onChange={onChange}
+                cityOptions={cityOptions}
+                tagOptions={tagOptions}
+                categoryOptions={categoryOptions}
+                hideStatus
+                selectClass={selectClass}
+              />
+              {hasActive && (
+                <button
+                  type="button"
+                  onClick={onClear}
+                  className="shrink-0 whitespace-nowrap text-2xs text-ink-tertiary hover:text-ink"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2">
@@ -195,67 +324,17 @@ export function ContactFilters({
       />
 
       <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-        <select
-          className={selectClass}
-          value={filters.status}
-          onChange={(e) => onChange({ status: e.target.value })}
-        >
-          {STATUS_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-
-        <select
-          className={selectClass}
-          value={filters.classification}
-          onChange={(e) => onChange({ classification: e.target.value })}
-        >
-          <option value="">All classes</option>
-          {CLASSIFICATION_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>{classificationSelectLabel(opt)}</option>
-          ))}
-        </select>
-
-        <select
-          className={`${selectClass} min-w-[120px]`}
-          value={filters.city}
-          onChange={(e) => onChange({ city: e.target.value })}
-        >
-          <option value="">All cities</option>
-          {cityOptions.map((city) => (
-            <option key={city.id ?? city.name} value={city.name}>
-              {city.name}{city.country ? ` · ${countryLabel(city.country)}` : ''}
-            </option>
-          ))}
-        </select>
-
-        <TagFilterMenu
+        <ContactFilterFacets
+          filters={filters}
+          onChange={onChange}
+          cityOptions={cityOptions}
           tagOptions={tagOptions}
-          selectedIds={filters.tagIds}
-          onChange={(tagIds) => onChange({ tagIds })}
-        />
-
-        <CategoryFilterMenu
           categoryOptions={categoryOptions}
-          selectedIds={filters.primaryCategoryIds}
-          onChange={(primaryCategoryIds) => onChange({ primaryCategoryIds })}
+          hideStatus={hideStatus}
+          selectClass={selectClass}
         />
 
-        <ToggleChip
-          active={filters.openToBarter}
-          onClick={() => onChange({ openToBarter: !filters.openToBarter })}
-        >
-          Barter
-        </ToggleChip>
-
-        <ToggleChip
-          active={filters.openToPaid}
-          onClick={() => onChange({ openToPaid: !filters.openToPaid })}
-        >
-          Paid
-        </ToggleChip>
-
-        {(hasActiveFilters || query) && (
+        {hasActive && (
           <button type="button" onClick={onClear} className="shrink-0 whitespace-nowrap text-2xs text-ink-tertiary hover:text-ink">
             Clear all
           </button>

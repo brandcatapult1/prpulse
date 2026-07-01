@@ -4,7 +4,7 @@ import { DataTable } from '../components/ui/DataKit.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { Pill, roleLabel } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
-import { AUDIT_ENTITY_TYPES, USER_ROLES, canAccessAdmin, eligibleReportingManagers } from '../lib/adminPermissions.js';
+import { AUDIT_ENTITY_TYPES, USER_ROLES, canAccessAdmin, eligibleReportingManagers, reportsToEditableForRole } from '../lib/adminPermissions.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { adminApi } from '../lib/api.js';
 import { OrgBrandingSettings } from '../components/admin/OrgBrandingSettings.jsx';
@@ -87,7 +87,11 @@ export function AdminPage() {
           className="input-field h-8 max-w-[180px]"
           value={r.role}
           onClick={(e) => e.stopPropagation()}
-          onChange={(e) => updateUser(r.id, { role: e.target.value })}
+          onChange={(e) => {
+            const role = e.target.value;
+            const patch = role === 'admin' ? { role, reports_to: null } : { role };
+            updateUser(r.id, patch);
+          }}
         >
           {USER_ROLES.map((opt) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -99,7 +103,11 @@ export function AdminPage() {
       key: 'reports_to',
       label: 'Reports to',
       render: (r) => {
+        if (!reportsToEditableForRole(r.role)) {
+          return <span className="text-2xs text-ink-tertiary">Top of org</span>;
+        }
         const managers = eligibleReportingManagers(users, {
+          userRole: r.role,
           excludeUserId: r.id,
           includeUserId: r.reports_to,
         });

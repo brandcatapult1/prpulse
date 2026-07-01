@@ -47,9 +47,13 @@ adminRouter.post('/users', async (req, res) => {
 
   let reportsTo = null;
   try {
-    reportsTo = await validateReportsTo(pool, null, body.reports_to ?? null);
+    reportsTo = await validateReportsTo(pool, null, body.reports_to ?? null, role);
   } catch (err) {
     return res.status(err.status ?? 400).json({ error: err.message });
+  }
+
+  if (role === 'admin') {
+    reportsTo = null;
   }
 
   try {
@@ -76,6 +80,18 @@ adminRouter.patch('/users/:id', async (req, res) => {
   const params = [];
   let paramIndex = 1;
 
+  let currentUser;
+  try {
+    const { rows } = await pool.query('SELECT role, reports_to FROM users WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'User not found' });
+    currentUser = rows[0];
+  } catch (err) {
+    console.warn('Admin user load failed:', err.message ?? err);
+    return res.status(503).json({ error: 'Update failed' });
+  }
+
+  const nextRole = body.role ?? currentUser.role;
+
   if (body.role != null) {
     if (!isAllowedUserRole(body.role)) {
       return res.status(400).json({ error: 'Invalid role' });
@@ -89,11 +105,20 @@ adminRouter.patch('/users/:id', async (req, res) => {
     params.push(Boolean(body.is_active));
   }
 
-  if ('reports_to' in body) {
+  if (nextRole === 'admin') {
+    patches.push(`reports_to = $${paramIndex++}`);
+    params.push(null);
+  } else if ('reports_to' in body) {
     try {
-      const reportsTo = await validateReportsTo(pool, req.params.id, body.reports_to ?? null);
+      const reportsTo = await validateReportsTo(pool, req.params.id, body.reports_to ?? null, nextRole);
       patches.push(`reports_to = $${paramIndex++}`);
       params.push(reportsTo);
+    } catch (err) {
+      return res.status(err.status ?? 400).json({ error: err.message });
+    }
+  } else if (body.role != null && currentUser.reports_to) {
+    try {
+      await validateReportsTo(pool, req.params.id, currentUser.reports_to, nextRole);
     } catch (err) {
       return res.status(err.status ?? 400).json({ error: err.message });
     }

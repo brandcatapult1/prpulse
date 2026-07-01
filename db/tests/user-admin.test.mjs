@@ -50,6 +50,11 @@ async function main() {
        VALUES ('ua-sm@test.com', 'UA SM', 'senior_manager')
        RETURNING id`,
     );
+    const sm2 = await client.query(
+      `INSERT INTO users (email, full_name, role)
+       VALUES ('ua-sm2@test.com', 'UA SM Two', 'senior_manager')
+       RETURNING id`,
+    );
     const cm = await client.query(
       `INSERT INTO users (email, full_name, role)
        VALUES ('ua-cm@test.com', 'UA CM', 'campaign_manager')
@@ -58,25 +63,40 @@ async function main() {
 
     const adminId = admin.rows[0].id;
     const smId = sm.rows[0].id;
+    const sm2Id = sm2.rows[0].id;
     const cmId = cm.rows[0].id;
 
-    await validateReportsTo(client, cmId, smId);
-    await validateReportsTo(client, cmId, adminId);
+    await validateReportsTo(client, cmId, smId, 'campaign_manager');
+    await validateReportsTo(client, cmId, adminId, 'campaign_manager');
+    await validateReportsTo(client, smId, sm2Id, 'senior_manager');
+    await validateReportsTo(client, smId, adminId, 'senior_manager');
 
     await expectError(
-      () => validateReportsTo(client, cmId, cmId),
+      () => validateReportsTo(client, null, smId, 'admin'),
+      'top of the org chart',
+    );
+
+    await expectError(
+      () => validateReportsTo(client, cmId, cmId, 'campaign_manager'),
       'cannot report to themselves',
     );
 
     await expectError(
-      () => validateReportsTo(client, smId, cmId),
-      'Senior Manager or Admin',
+      () => validateReportsTo(client, smId, cmId, 'senior_manager'),
+      'Campaign Manager cannot be a reporting manager',
     );
 
     await client.query('UPDATE users SET reports_to = $1 WHERE id = $2', [smId, adminId]);
     await expectError(
-      () => validateReportsTo(client, smId, adminId),
-      'cycle',
+      () => validateReportsTo(client, smId, adminId, 'senior_manager'),
+      'circular reporting line',
+    );
+
+    await client.query('UPDATE users SET reports_to = NULL WHERE id = $1', [adminId]);
+    await client.query('UPDATE users SET reports_to = $1 WHERE id = $2', [cmId, smId]);
+    await expectError(
+      () => validateReportsTo(client, smId, cmId, 'senior_manager'),
+      'circular reporting line',
     );
 
     await client.query('ROLLBACK');

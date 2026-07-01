@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Drawer, Toast } from '../ui/Primitives.jsx';
-import { USER_ROLES, eligibleReportingManagers } from '../../lib/adminPermissions.js';
+import { USER_ROLES, eligibleReportingManagers, reportsToEditableForRole } from '../../lib/adminPermissions.js';
 import { adminApi } from '../../lib/api.js';
 
 const EMPTY = {
@@ -23,10 +23,17 @@ export function AddUserDrawer({ open, onClose, users, onSaved }) {
   }, [open]);
 
   function updateField(key, value) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => {
+      const next = { ...prev, [key]: value };
+      if (key === 'role' && value === 'admin') {
+        next.reports_to = '';
+      }
+      return next;
+    });
   }
 
-  const managerOptions = eligibleReportingManagers(users);
+  const showReportsTo = reportsToEditableForRole(form.role);
+  const managerOptions = eligibleReportingManagers(users, { userRole: form.role });
   const canSave = form.full_name.trim() && form.email.trim();
 
   async function handleSave() {
@@ -38,7 +45,7 @@ export function AddUserDrawer({ open, onClose, users, onSaved }) {
         full_name: form.full_name.trim(),
         email: form.email.trim(),
         role: form.role,
-        reports_to: form.reports_to || null,
+        reports_to: showReportsTo ? (form.reports_to || null) : null,
         is_active: form.is_active,
       });
       onSaved?.(saved);
@@ -106,19 +113,25 @@ export function AddUserDrawer({ open, onClose, users, onSaved }) {
             </select>
           </label>
 
-          <label className="block text-2xs text-ink-secondary">
-            Reports to
-            <select
-              className="input-field mt-1"
-              value={form.reports_to}
-              onChange={(e) => updateField('reports_to', e.target.value)}
-            >
-              <option value="">— None —</option>
-              {managerOptions.map((u) => (
-                <option key={u.id} value={u.id}>{u.full_name}</option>
-              ))}
-            </select>
-          </label>
+          {showReportsTo ? (
+            <label className="block text-2xs text-ink-secondary">
+              Reports to
+              <select
+                className="input-field mt-1"
+                value={form.reports_to}
+                onChange={(e) => updateField('reports_to', e.target.value)}
+              >
+                <option value="">— None —</option>
+                {managerOptions.map((u) => (
+                  <option key={u.id} value={u.id}>{u.full_name}</option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <p className="text-2xs text-ink-tertiary">
+              Admins are top of the org chart and do not report to anyone.
+            </p>
+          )}
 
           <label className="flex items-center gap-2 text-2xs text-ink-secondary">
             <input

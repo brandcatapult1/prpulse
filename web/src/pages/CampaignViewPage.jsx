@@ -6,6 +6,7 @@ import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { CampaignKanbanBoard } from '../components/campaign/CampaignKanbanBoard.jsx';
 import { CampaignQuickEditDrawer } from '../components/campaign/CampaignQuickEditDrawer.jsx';
 import { CampaignMetricTiles } from '../components/campaign/CampaignMetricTiles.jsx';
+import { CampaignCycleIndicator } from '../components/campaign/CampaignCycleIndicator.jsx';
 import { CampaignEditDrawer, CampaignTagSummary } from '../components/campaign/CampaignEditDrawer.jsx';
 import { AddCreatorsDrawer } from '../components/campaign/AddCreatorsDrawer.jsx';
 import { CampaignFilterBar, CAMPAIGN_EMPTY_FILTERS } from '../components/campaign/CampaignFilterBar.jsx';
@@ -297,6 +298,8 @@ export function CampaignViewPage() {
           <CampaignTagSummary tags={campaign.tags} />
         </div>
       )}
+
+      <CampaignCycleIndicator campaign={campaign} />
 
       <CampaignMetricTiles campaign={campaign} />
 

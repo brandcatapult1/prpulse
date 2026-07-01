@@ -3,6 +3,12 @@ import {
   assertMonthlyTermMonths,
   parseRequiredTargetCollaborations,
 } from './campaignValidation.mjs';
+import {
+  ensureCampaignCycles,
+  listCampaignCycles,
+  pickCurrentCycle,
+} from './campaignCycles.mjs';
+import { todayIst } from './constants.mjs';
 
 const SCALAR_FIELDS = new Set([
   'campaign_name',
@@ -99,6 +105,19 @@ export function parseCampaignPatch(body) {
   return { scalars, tag_ids };
 }
 
+function coerceCampaignScalars(row) {
+  return {
+    ...row,
+    target_collaborations:
+      row.target_collaborations != null ? Number(row.target_collaborations) : null,
+    term_months: row.term_months != null ? Number(row.term_months) : null,
+    completed_collaborations: Number(row.completed_collaborations ?? 0),
+    remaining_collaborations:
+      row.remaining_collaborations != null ? Number(row.remaining_collaborations) : null,
+    achievement_pct: row.achievement_pct != null ? Number(row.achievement_pct) : null,
+  };
+}
+
 export async function loadCampaignDetail(client, campaignId) {
   const { rows } = await client.query(
     `SELECT cam.*, b.brand_name
@@ -110,8 +129,20 @@ export async function loadCampaignDetail(client, campaignId) {
   const row = rows[0];
   if (!row) return null;
 
+  const campaign = coerceCampaignScalars(row);
+  await ensureCampaignCycles(client, campaign);
+
   const tags = await loadCampaignTags(client, campaignId);
-  return { ...row, tags, tag_names: tags.map((t) => t.name) };
+  const cycles = await listCampaignCycles(client, campaignId);
+  const current_cycle = pickCurrentCycle(cycles, todayIst());
+
+  return {
+    ...campaign,
+    tags,
+    tag_names: tags.map((t) => t.name),
+    cycles,
+    current_cycle,
+  };
 }
 
 async function assertTagIdsExist(client, tagIds) {

@@ -3,6 +3,13 @@ import { pool } from '../db.mjs';
 import { requireAuth, requireRole } from '../middleware/auth.mjs';
 import { runDemoSeed } from '../../../scripts/seed-demo.mjs';
 import { assertSupportedCountry } from '../lib/cities.mjs';
+import {
+  assertValidUserEmail,
+  fetchUserAdminRow,
+  isAllowedUserRole,
+  listUsersAdmin,
+  validateReportsTo,
+} from '../lib/userAdmin.mjs';
 
 export const adminRouter = Router();
 
@@ -10,12 +17,7 @@ adminRouter.use(requireAuth, requireRole('admin'));
 
 adminRouter.get('/users', async (_req, res) => {
   try {
-    const { rows } = await pool.query(
-      `SELECT id, full_name, email, role, is_active, created_at
-       FROM users
-       ORDER BY full_name
-       LIMIT 200`,
-    );
+    const rows = await listUsersAdmin(pool);
     res.json(rows);
   } catch (err) {
     console.warn('Admin users list failed:', err.message ?? err);
@@ -23,26 +25,95 @@ adminRouter.get('/users', async (_req, res) => {
   }
 });
 
-adminRouter.patch('/users/:id', async (req, res) => {
-  const { role, is_active } = req.body ?? {};
-  const allowedRoles = ['campaign_manager', 'senior_manager', 'admin'];
+adminRouter.post('/users', async (req, res) => {
+  const body = req.body ?? {};
+  const fullName = String(body.full_name ?? '').trim();
+  const role = body.role;
+  const isActive = body.is_active !== false;
 
-  if (role != null && !allowedRoles.includes(role)) {
+  if (!fullName) {
+    return res.status(400).json({ error: 'full_name is required' });
+  }
+  if (!isAllowedUserRole(role)) {
     return res.status(400).json({ error: 'Invalid role' });
+  }
+
+  let email;
+  try {
+    email = assertValidUserEmail(body.email);
+  } catch (err) {
+    return res.status(err.status ?? 400).json({ error: err.message });
+  }
+
+  let reportsTo = null;
+  try {
+    reportsTo = await validateReportsTo(pool, null, body.reports_to ?? null);
+  } catch (err) {
+    return res.status(err.status ?? 400).json({ error: err.message });
   }
 
   try {
     const { rows } = await pool.query(
-      `UPDATE users SET
-        role = COALESCE($1, role),
-        is_active = COALESCE($2, is_active),
-        updated_at = now()
-       WHERE id = $3
-       RETURNING id, full_name, email, role, is_active`,
-      [role ?? null, is_active ?? null, req.params.id],
+      `INSERT INTO users (full_name, email, role, reports_to, is_active)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id`,
+      [fullName, email, role, reportsTo, isActive],
     );
-    if (!rows[0]) return res.status(404).json({ error: 'User not found' });
-    res.json(rows[0]);
+    const saved = await fetchUserAdminRow(pool, rows[0].id);
+    res.status(201).json(saved);
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'A user with that email already exists' });
+    }
+    console.warn('Admin user create failed:', err.message ?? err);
+    res.status(503).json({ error: 'Could not create user' });
+  }
+});
+
+adminRouter.patch('/users/:id', async (req, res) => {
+  const body = req.body ?? {};
+  const patches = [];
+  const params = [];
+  let paramIndex = 1;
+
+  if (body.role != null) {
+    if (!isAllowedUserRole(body.role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+    patches.push(`role = $${paramIndex++}`);
+    params.push(body.role);
+  }
+
+  if ('is_active' in body) {
+    patches.push(`is_active = $${paramIndex++}`);
+    params.push(Boolean(body.is_active));
+  }
+
+  if ('reports_to' in body) {
+    try {
+      const reportsTo = await validateReportsTo(pool, req.params.id, body.reports_to ?? null);
+      patches.push(`reports_to = $${paramIndex++}`);
+      params.push(reportsTo);
+    } catch (err) {
+      return res.status(err.status ?? 400).json({ error: err.message });
+    }
+  }
+
+  if (patches.length === 0) {
+    return res.status(400).json({ error: 'No fields to update' });
+  }
+
+  patches.push('updated_at = now()');
+  params.push(req.params.id);
+
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE users SET ${patches.join(', ')} WHERE id = $${paramIndex}`,
+      params,
+    );
+    if (rowCount === 0) return res.status(404).json({ error: 'User not found' });
+    const saved = await fetchUserAdminRow(pool, req.params.id);
+    res.json(saved);
   } catch (err) {
     console.warn('Admin user update failed:', err.message ?? err);
     res.status(503).json({ error: 'Update failed' });

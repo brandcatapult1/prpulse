@@ -4,11 +4,12 @@ import { DataTable } from '../components/ui/DataKit.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { Pill, roleLabel } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
-import { AUDIT_ENTITY_TYPES, USER_ROLES, canAccessAdmin } from '../lib/adminPermissions.js';
+import { AUDIT_ENTITY_TYPES, USER_ROLES, canAccessAdmin, eligibleReportingManagers } from '../lib/adminPermissions.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { adminApi } from '../lib/api.js';
 import { OrgBrandingSettings } from '../components/admin/OrgBrandingSettings.jsx';
 import { DemoFixturesPanel } from '../components/admin/DemoFixturesPanel.jsx';
+import { AddUserDrawer } from '../components/admin/AddUserDrawer.jsx';
 
 const TABS = [
   { id: 'users', label: 'Users & roles' },
@@ -26,6 +27,7 @@ export function AdminPage() {
   const [selectedAudit, setSelectedAudit] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [toast, setToast] = useState(null);
+  const [addUserOpen, setAddUserOpen] = useState(false);
 
   const loadUsers = useCallback(() => {
     adminApi
@@ -62,11 +64,16 @@ export function AdminPage() {
   const updateUser = async (userId, patch) => {
     try {
       const saved = await adminApi.updateUser(userId, patch);
-      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, ...saved } : u)));
+      setUsers((prev) => prev.map((u) => (u.id === userId ? saved : u)));
       setToast('User updated');
     } catch (err) {
       setToast(err.message ?? 'Update failed');
     }
+  };
+
+  const handleUserCreated = (saved) => {
+    setUsers((prev) => [...prev, saved].sort((a, b) => a.full_name.localeCompare(b.full_name)));
+    setToast(`${saved.full_name} added`);
   };
 
   const userColumns = [
@@ -87,6 +94,29 @@ export function AdminPage() {
           ))}
         </select>
       ),
+    },
+    {
+      key: 'reports_to',
+      label: 'Reports to',
+      render: (r) => {
+        const managers = eligibleReportingManagers(users, {
+          excludeUserId: r.id,
+          includeUserId: r.reports_to,
+        });
+        return (
+          <select
+            className="input-field h-8 max-w-[200px]"
+            value={r.reports_to ?? ''}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => updateUser(r.id, { reports_to: e.target.value || null })}
+          >
+            <option value="">— None —</option>
+            {managers.map((m) => (
+              <option key={m.id} value={m.id}>{m.full_name}</option>
+            ))}
+          </select>
+        );
+      },
     },
     {
       key: 'is_active',
@@ -179,10 +209,21 @@ export function AdminPage() {
 
       {tab === 'users' && (
         <>
-          <p className="text-2xs text-ink-secondary">
-            Assign roles and deactivate accounts. Changes are audit-logged in production.
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-2xs text-ink-secondary">
+              Add team members, assign roles, reporting lines, and deactivate accounts.
+            </p>
+            <button type="button" className="btn-primary" onClick={() => setAddUserOpen(true)}>
+              Add user
+            </button>
+          </div>
           <DataTable columns={userColumns} rows={users} />
+          <AddUserDrawer
+            open={addUserOpen}
+            onClose={() => setAddUserOpen(false)}
+            users={users}
+            onSaved={handleUserCreated}
+          />
         </>
       )}
 

@@ -120,6 +120,7 @@ export const importApi = {
 
 export const adminApi = {
   users: () => api('/admin/users'),
+  createUser: (body) => api('/admin/users', { method: 'POST', body: JSON.stringify(body) }),
   updateUser: (id, body) => api(`/admin/users/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   auditLog: (entityType) => {
     const q = entityType ? `?entity_type=${encodeURIComponent(entityType)}` : '';

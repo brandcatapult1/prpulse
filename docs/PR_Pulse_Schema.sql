@@ -104,6 +104,7 @@ CREATE TABLE users (
   full_name   text NOT NULL,
   role        user_role NOT NULL DEFAULT 'campaign_manager',
   is_active   boolean NOT NULL DEFAULT true,
+  reports_to  uuid REFERENCES users(id) ON DELETE SET NULL,  -- optional reporting manager (SM/Admin)
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now()
 );

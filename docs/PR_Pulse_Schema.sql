@@ -448,8 +448,8 @@ $$;
 
 -- Recompute a campaign's completed/remaining/achievement/health.
 -- Recounts from scratch, so reopening an engagement self-corrects.
--- When cycles exist, per-cycle counts use completed_at (IST) windows; campaign
--- rollups reflect the current cycle (recurring) or the sole cycle (project).
+-- When cycles exist, per-cycle counts use completed_at (IST) windows; out-of-range
+-- completions clamp to the first/last cycle; campaign rollups reflect the current cycle.
 CREATE OR REPLACE FUNCTION fn_campaign_health_for_target(p_target integer, p_completed integer)
 RETURNS campaign_health LANGUAGE plpgsql IMMUTABLE AS $$
 DECLARE
@@ -519,18 +519,38 @@ DECLARE
   v_health campaign_health;
 BEGIN
   FOR rec IN
-    SELECT id, cycle_start, cycle_end, target
+    SELECT id, cycle_number, cycle_start, cycle_end, target
     FROM campaign_cycles
     WHERE campaign_id = p_campaign_id
     ORDER BY cycle_number
   LOOP
     SELECT count(*)::integer INTO v_completed
     FROM engagements e
+    CROSS JOIN (
+      SELECT min(cycle_start) AS first_start,
+             max(cycle_end) AS last_end,
+             min(cycle_number) AS first_num,
+             max(cycle_number) AS last_num
+      FROM campaign_cycles
+      WHERE campaign_id = p_campaign_id
+    ) bounds
     WHERE e.campaign_id = p_campaign_id
       AND fn_engagement_counted(e.id)
       AND e.completed_at IS NOT NULL
-      AND (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date >= rec.cycle_start
-      AND (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date < rec.cycle_end;
+      AND (
+        (
+          (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date >= rec.cycle_start
+          AND (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date < rec.cycle_end
+        )
+        OR (
+          rec.cycle_number = bounds.first_num
+          AND (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date < bounds.first_start
+        )
+        OR (
+          rec.cycle_number = bounds.last_num
+          AND (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date >= bounds.last_end
+        )
+      );
 
     IF rec.target IS NULL OR rec.target = 0 THEN
       v_pct := NULL;

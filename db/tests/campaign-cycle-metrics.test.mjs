@@ -100,6 +100,63 @@ async function main() {
     assert(Number(cycles.rows[2].completed_collaborations) === 0, 'cycle 3 should have 0');
     assert(cycles.rows[0].cycle_health === 'red', 'cycle 1 at 10% should be red');
 
+    const counted = await client.query(
+      `SELECT count(*)::int AS n FROM engagements e
+       WHERE e.campaign_id = $1 AND fn_engagement_counted(e.id)`,
+      [monthlyId],
+    );
+    const sumCycles = cycles.rows.reduce(
+      (sum, row) => sum + Number(row.completed_collaborations),
+      0,
+    );
+    assert(sumCycles === counted.rows[0].n, 'cycle totals must equal counted engagements');
+
+    await seedCountedEngagement(client, {
+      campaignId: monthlyId,
+      userId,
+      completedAt: '2025-01-01T10:00:00+05:30',
+    });
+    await client.query('SELECT recompute_campaign_metrics($1::uuid)', [monthlyId]);
+    const clamped = await client.query(
+      `SELECT cycle_number, completed_collaborations
+       FROM campaign_cycles WHERE campaign_id = $1 ORDER BY cycle_number`,
+      [monthlyId],
+    );
+    assert(
+      Number(clamped.rows[0].completed_collaborations) === 2,
+      'completion before cycle 1 start should clamp into cycle 1',
+    );
+
+    await seedCountedEngagement(client, {
+      campaignId: monthlyId,
+      userId,
+      completedAt: '2025-04-10T10:00:00+05:30',
+    });
+    await client.query('SELECT recompute_campaign_metrics($1::uuid)', [monthlyId]);
+    const afterLast = await client.query(
+      `SELECT cycle_number, completed_collaborations
+       FROM campaign_cycles WHERE campaign_id = $1 ORDER BY cycle_number`,
+      [monthlyId],
+    );
+    assert(
+      Number(afterLast.rows[2].completed_collaborations) === 1,
+      'completion after last cycle end should clamp into last cycle',
+    );
+
+    const countedAfter = await client.query(
+      `SELECT count(*)::int AS n FROM engagements e
+       WHERE e.campaign_id = $1 AND fn_engagement_counted(e.id)`,
+      [monthlyId],
+    );
+    const sumAfter = afterLast.rows.reduce(
+      (sum, row) => sum + Number(row.completed_collaborations),
+      0,
+    );
+    assert(
+      sumAfter === countedAfter.rows[0].n,
+      'clamped cycle totals must still equal counted engagements',
+    );
+
     const project = await client.query(
       `INSERT INTO campaigns (
          campaign_name, brand_id, campaign_type, start_date, end_date,

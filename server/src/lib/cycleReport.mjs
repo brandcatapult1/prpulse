@@ -7,7 +7,7 @@ import { mapCycleRow, pickCurrentCycle } from './campaignCycles.mjs';
 import { todayIst } from './constants.mjs';
 
 const CYCLE_BOUNDS_JOIN = `
-  CROSS JOIN (
+  CROSS JOIN LATERAL (
     SELECT min(cycle_start) AS first_start,
            max(cycle_end) AS last_end,
            min(cycle_number) AS first_num,

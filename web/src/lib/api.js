@@ -145,9 +145,10 @@ export const orgBrandingApi = {
 };
 
 export const reportsApi = {
-  campaign: (campaignId, period) =>
-    api(`/reports/campaign/${campaignId}?period=${encodeURIComponent(period)}`),
-  periods: () => api('/reports/periods'),
+  brands: () => api('/reports/brands'),
+  brandCampaigns: (brandId) => api(`/reports/brands/${brandId}/campaigns`),
+  campaignCycles: (campaignId) => api(`/reports/campaigns/${campaignId}/cycles`),
+  cycleReport: (cycleId) => api(`/reports/cycles/${cycleId}`),
 };
 
 export const lookupApi = {

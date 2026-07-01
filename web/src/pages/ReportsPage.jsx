@@ -1,51 +1,124 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card } from '../components/ui/Primitives.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
-import { Pill } from '../lib/format.jsx';
+import { HealthBadge } from '../components/ui/HealthBadge.jsx';
+import { MetricTile } from '../components/campaign/CampaignMetricTiles.jsx';
+import { DeliverableProofList } from '../components/deliverables/DeliverableProofList.jsx';
+import { formatCycleSelectorLabel } from '../lib/campaignCycles.js';
+import { formatDate } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
-import { campaignsApi } from '../lib/api.js';
-import { fetchCampaignReport, fetchReportPeriods } from '../lib/persistence.js';
+import {
+  fetchCycleReport,
+  fetchReportBrandCampaigns,
+  fetchReportBrands,
+  fetchReportCampaignCycles,
+} from '../lib/persistence.js';
 
 export function ReportsPage() {
+  const [brands, setBrands] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
-  const [periods, setPeriods] = useState([]);
-  const [campaignId, setCampaignId] = useState('');
-  const [period, setPeriod] = useState('');
+  const [cyclesPayload, setCyclesPayload] = useState(null);
   const [report, setReport] = useState(null);
-  const [loading, setLoading] = useState(true);
+
+  const [brandId, setBrandId] = useState('');
+  const [campaignId, setCampaignId] = useState('');
+  const [cycleId, setCycleId] = useState('');
+
+  const [loadingNav, setLoadingNav] = useState(true);
+  const [loadingReport, setLoadingReport] = useState(false);
   const [error, setError] = useState(null);
 
+  const selectedCampaign = useMemo(
+    () => campaigns.find((c) => c.id === campaignId) ?? null,
+    [campaigns, campaignId],
+  );
+
+  const cycles = cyclesPayload?.cycles ?? [];
+  const currentCycleId = cyclesPayload?.current_cycle?.id ?? null;
+
   useEffect(() => {
-    Promise.all([campaignsApi.list(), fetchReportPeriods()])
-      .then(([camps, p]) => {
-        const list = Array.isArray(camps) ? camps : [];
-        setCampaigns(list);
-        setPeriods(Array.isArray(p) && p.length ? p : [new Date().toISOString().slice(0, 7)]);
-        if (list[0]?.id) setCampaignId(list[0].id);
-        if (p?.[0]) setPeriod(p[0]);
+    setLoadingNav(true);
+    fetchReportBrands()
+      .then((list) => {
+        const items = Array.isArray(list) ? list : [];
+        setBrands(items);
+        if (items[0]?.id) setBrandId(items[0].id);
       })
-      .catch((err) => setError(err.message ?? 'Could not load report options'))
-      .finally(() => setLoading(false));
+      .catch((err) => setError(err.message ?? 'Could not load clients'))
+      .finally(() => setLoadingNav(false));
   }, []);
 
   useEffect(() => {
-    if (!campaignId || !period) return;
-    setLoading(true);
-    fetchCampaignReport(campaignId, period)
-      .then(setReport)
+    if (!brandId) {
+      setCampaigns([]);
+      setCampaignId('');
+      return;
+    }
+    setLoadingNav(true);
+    fetchReportBrandCampaigns(brandId)
+      .then((list) => {
+        const items = Array.isArray(list) ? list : [];
+        setCampaigns(items);
+        setCampaignId(items[0]?.id ?? '');
+      })
+      .catch((err) => {
+        setCampaigns([]);
+        setCampaignId('');
+        setError(err.message ?? 'Could not load campaigns');
+      })
+      .finally(() => setLoadingNav(false));
+  }, [brandId]);
+
+  useEffect(() => {
+    if (!campaignId) {
+      setCyclesPayload(null);
+      setCycleId('');
+      return;
+    }
+    setLoadingNav(true);
+    fetchReportCampaignCycles(campaignId)
+      .then((payload) => {
+        setCyclesPayload(payload);
+        const defaultCycle = payload?.current_cycle?.id ?? payload?.cycles?.[0]?.id ?? '';
+        setCycleId(defaultCycle);
+      })
+      .catch((err) => {
+        setCyclesPayload(null);
+        setCycleId('');
+        setError(err.message ?? 'Could not load cycles');
+      })
+      .finally(() => setLoadingNav(false));
+  }, [campaignId]);
+
+  const loadReport = useCallback((id) => {
+    if (!id) {
+      setReport(null);
+      return;
+    }
+    setLoadingReport(true);
+    fetchCycleReport(id)
+      .then((data) => {
+        setReport(data);
+        setError(null);
+      })
       .catch((err) => {
         setReport(null);
         setError(err.message ?? 'Could not load report');
       })
-      .finally(() => setLoading(false));
-  }, [campaignId, period]);
+      .finally(() => setLoadingReport(false));
+  }, []);
 
-  const periodLabel = useMemo(
-    () => report?.period ?? period,
-    [report?.period, period],
-  );
+  useEffect(() => {
+    loadReport(cycleId);
+  }, [cycleId, loadReport]);
 
-  if (loading && !report && !error) {
+  const hero = report?.hero;
+  const stats = report?.stats;
+  const heroHealth = hero?.cycle_health ?? 'not_set';
+  const heroHasHealth = heroHealth !== 'not_set';
+  const heroPct = hero?.achievement_pct != null ? Math.round(Number(hero.achievement_pct)) : null;
+
+  if (loadingNav && !brands.length && !error) {
     return (
       <div className="mx-auto max-w-5xl py-12 text-center text-sm text-ink-secondary">
         Loading report…
@@ -60,10 +133,20 @@ export function ReportsPage() {
         subtitle={MODULES.reporting.subtitle}
         actions={
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn-secondary" disabled title="Coming in a future release">
+            <button
+              type="button"
+              className="btn-secondary opacity-60"
+              disabled
+              title="Coming soon"
+            >
               Export PDF
             </button>
-            <button type="button" className="btn-primary" disabled title="Coming in a future release">
+            <button
+              type="button"
+              className="btn-primary opacity-60"
+              disabled
+              title="Coming soon"
+            >
               Shareable link
             </button>
           </div>
@@ -71,7 +154,9 @@ export function ReportsPage() {
       />
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-2xs text-red-800">{error}</div>
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-2xs text-red-800">
+          {error}
+        </div>
       )}
 
       <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-2xs text-amber-900">
@@ -79,115 +164,163 @@ export function ReportsPage() {
       </div>
 
       <Card className="!p-4">
-        <div className="flex flex-wrap gap-3">
-          <label className="text-2xs text-ink-secondary">
-            Campaign
-            <select
-              className="input-field ml-2 mt-1 min-w-[180px]"
-              value={campaignId}
-              onChange={(e) => setCampaignId(e.target.value)}
-            >
-              {campaigns.map((c) => (
-                <option key={c.id} value={c.id}>{c.campaign_name}</option>
-              ))}
-            </select>
-          </label>
-          <label className="text-2xs text-ink-secondary">
-            Period
-            <select
-              className="input-field ml-2 mt-1 min-w-[140px]"
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
-            >
-              {periods.map((p) => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-          </label>
+        <div className="flex flex-wrap gap-4">
+          <DrillDownSelect
+            label="Client"
+            value={brandId}
+            onChange={setBrandId}
+            disabled={loadingNav}
+            options={brands.map((b) => ({ value: b.id, label: b.brand_name }))}
+          />
+          <DrillDownSelect
+            label="Campaign"
+            value={campaignId}
+            onChange={setCampaignId}
+            disabled={loadingNav || !brandId}
+            options={campaigns.map((c) => ({ value: c.id, label: c.campaign_name }))}
+          />
+          <DrillDownSelect
+            label="Cycle"
+            value={cycleId}
+            onChange={setCycleId}
+            disabled={loadingNav || !campaignId || !cycles.length}
+            options={cycles.map((c) => ({
+              value: c.id,
+              label: formatCycleSelectorLabel(c, {
+                campaignType: selectedCampaign?.campaign_type,
+                termMonths: selectedCampaign?.term_months,
+              }),
+            }))}
+            hint={
+              currentCycleId && cycleId === currentCycleId ? 'Current cycle' : undefined
+            }
+          />
         </div>
       </Card>
 
+      {loadingReport && !report && (
+        <div className="py-8 text-center text-sm text-ink-secondary">Loading cycle report…</div>
+      )}
+
       {report && (
         <>
-          <ReportSection title="Campaign Summary">
-            <dl className="grid gap-3 sm:grid-cols-3 text-sm">
-              <div><dt className="text-2xs text-ink-tertiary">Campaign</dt><dd className="font-medium text-ink">{report.campaign.campaign_name}</dd></div>
-              <div><dt className="text-2xs text-ink-tertiary">Brand</dt><dd className="font-medium text-ink">{report.campaign.brand_name}</dd></div>
-              <div><dt className="text-2xs text-ink-tertiary">Period</dt><dd className="font-medium text-ink">{periodLabel}</dd></div>
-            </dl>
-          </ReportSection>
+          <section className="space-y-2">
+            <div className="px-0.5">
+              <h2 className="text-base font-semibold text-ink">{report.campaign.campaign_name}</h2>
+              <p className="text-sm text-ink-secondary">
+                {report.brand.brand_name}
+                {' · '}
+                {formatCycleSelectorLabel(report.cycle, {
+                  campaignType: report.campaign.campaign_type,
+                  termMonths: report.campaign.term_months,
+                })}
+              </p>
+            </div>
 
-          <ReportSection title="Performance Summary">
-            <dl className="grid gap-3 sm:grid-cols-3 text-sm">
-              <div><dt className="text-2xs text-ink-tertiary">Target</dt><dd className="font-medium text-ink">{report.campaign.target_collaborations ?? 'Not set'}</dd></div>
-              <div><dt className="text-2xs text-ink-tertiary">Completed</dt><dd className="font-medium text-ink">{report.completedCount}</dd></div>
-              <div><dt className="text-2xs text-ink-tertiary">Achievement</dt><dd className="font-medium text-ink">{report.achievementPct != null ? `${report.achievementPct}%` : '—'}</dd></div>
-            </dl>
-          </ReportSection>
+            <div className="campaign-glass-tile flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wider text-ink-tertiary">
+                  Collaborations complete vs target
+                </p>
+                <p className="mt-1 tabular-nums text-3xl font-semibold leading-none text-ink">
+                  {hero?.completed_collaborations ?? 0}
+                  <span className="text-xl font-medium text-ink-tertiary"> / </span>
+                  {hero?.target ?? '—'}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                {heroPct != null && (
+                  <p className="tabular-nums text-lg font-medium text-ink">{heroPct}% achieved</p>
+                )}
+                {heroHasHealth && <HealthBadge health={heroHealth} variant="pill" />}
+              </div>
+            </div>
+          </section>
 
-          <ReportSection title="Deliverable Breakdown">
-            {Object.keys(report.byType).length === 0 ? (
-              <p className="text-2xs text-ink-tertiary">No posted deliverables in this period.</p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <MetricTile
+              label="Collaborations complete (this cycle)"
+              value={stats?.collaborations_complete ?? 0}
+            />
+            <MetricTile
+              label="Deliverables awaited (this cycle)"
+              value={stats?.deliverables_awaited ?? 0}
+            />
+            <MetricTile
+              label="Successful visits completed (this cycle)"
+              value={stats?.visits_completed ?? 0}
+            />
+          </div>
+
+          <ReportSection title="Proof of delivery">
+            {(report.collaborations ?? []).length === 0 ? (
+              <p className="text-2xs text-ink-tertiary">
+                No completed collaborations in this cycle.
+              </p>
             ) : (
-              <ul className="grid gap-2 sm:grid-cols-2">
-                {Object.entries(report.byType).map(([type, count]) => (
-                  <li key={type} className="flex items-center justify-between rounded-md border border-line bg-canvas px-3 py-2 text-sm">
-                    <span className="capitalize text-ink">{type.replace(/_/g, ' ')}</span>
-                    <Pill tone="info">{count} posted</Pill>
+              <ul className="space-y-4">
+                {report.collaborations.map((collab) => (
+                  <li
+                    key={collab.id}
+                    className="rounded-lg border border-line bg-canvas px-4 py-3"
+                  >
+                    <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+                      <p className="text-sm font-semibold text-ink">{collab.contact_name}</p>
+                      {collab.completed_at_ist && (
+                        <p className="text-2xs text-ink-tertiary">
+                          Completed {formatDate(collab.completed_at_ist)}
+                        </p>
+                      )}
+                    </div>
+                    <DeliverableProofList proofItems={collab.proof} />
                   </li>
                 ))}
               </ul>
             )}
           </ReportSection>
 
-          <ReportSection title="Content Gallery">
-            {report.gallery.length === 0 ? (
-              <p className="text-2xs text-ink-tertiary">No posted content with links or screenshots in this period.</p>
-            ) : (
-              <ul className="space-y-2">
-                {report.gallery.map((item) => (
-                  <li key={item.id} className="rounded-md border border-line bg-canvas px-3 py-2 text-2xs">
-                    <div className="font-medium text-ink">{item.contact_name} · {item.deliverable_type} ×{item.quantity}</div>
-                    {item.content_link && (
-                      <a href={item.content_link} target="_blank" rel="noreferrer" className="text-brand hover:underline">
-                        {item.content_link}
-                      </a>
-                    )}
-                    {item.screenshot_count > 0 && (
-                      <span className="ml-2 text-ink-tertiary">📎 {item.screenshot_count} screenshot(s)</span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </ReportSection>
-
-          <ReportSection title="Influencer Summary">
-            {report.influencers.length === 0 ? (
-              <p className="text-2xs text-ink-tertiary">No completed collaborations in this period.</p>
-            ) : (
-              <ul className="divide-y divide-line">
-                {report.influencers.map((inf) => (
-                  <li key={inf.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
-                    <span className="font-medium text-ink">{inf.contact_name}</span>
-                    <span className="text-2xs text-ink-tertiary">{inf.deliverables} deliverable(s) posted</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </ReportSection>
-
-          <ReportSection title="Campaign Manager Notes">
+          <ReportSection title="Campaign manager notes">
             <textarea
               className="input-field min-h-[96px] py-2 opacity-60"
-              placeholder="Manager notes — coming in a future release"
+              placeholder="Manager notes — coming soon"
               disabled
               readOnly
             />
           </ReportSection>
         </>
       )}
+
+      {!loadingNav && !loadingReport && !report && !error && (
+        <p className="py-8 text-center text-sm text-ink-secondary">
+          Select a client, campaign, and cycle to view the report.
+        </p>
+      )}
     </div>
+  );
+}
+
+function DrillDownSelect({ label, value, onChange, options, disabled, hint }) {
+  return (
+    <label className="min-w-[160px] flex-1 text-2xs text-ink-secondary">
+      {label}
+      <select
+        className="input-field mt-1 w-full"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled || options.length === 0}
+      >
+        {options.length === 0 ? (
+          <option value="">None available</option>
+        ) : (
+          options.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))
+        )}
+      </select>
+      {hint && <span className="mt-0.5 block text-[10px] text-brand">{hint}</span>}
+    </label>
   );
 }
 

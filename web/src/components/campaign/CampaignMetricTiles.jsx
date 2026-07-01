@@ -1,6 +1,6 @@
 import { HealthBadge } from '../ui/HealthBadge.jsx';
 
-function MetricTile({ label, value, suffix }) {
+export function MetricTile({ label, value, suffix }) {
   return (
     <div className="campaign-glass-tile flex flex-col px-3.5 py-2.5">
       <p className="text-[10px] font-medium uppercase tracking-wider text-ink-tertiary">{label}</p>

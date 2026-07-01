@@ -11,6 +11,16 @@ export function formatCycleDayMonth(iso) {
   }).format(new Date(`${iso.slice(0, 10)}T12:00:00`));
 }
 
+/** Label for cycle drill-down selector (Reports and similar surfaces). */
+export function formatCycleSelectorLabel(cycle, { campaignType, termMonths } = {}) {
+  if (!cycle) return '—';
+  const range = formatCycleRangeLabel(cycle);
+  if (campaignType === 'monthly' && Number.isFinite(Number(termMonths))) {
+    return `Cycle ${cycle.cycle_number} of ${Number(termMonths)} · ${range}`;
+  }
+  return range ? `Cycle ${cycle.cycle_number} · ${range}` : `Cycle ${cycle.cycle_number}`;
+}
+
 export function formatCycleRangeLabel(cycle) {
   if (!cycle?.cycle_start || !cycle?.cycle_end) return '';
   const endInclusive = addDaysToIsoDate(cycle.cycle_end, -1);

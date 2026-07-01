@@ -121,12 +121,20 @@ export async function logVisitReminder(engagementId, details) {
   return engagementsApi.visitReminder(engagementId, details);
 }
 
-export async function fetchCampaignReport(campaignId, period) {
-  return reportsApi.campaign(campaignId, period);
+export async function fetchReportBrands() {
+  return reportsApi.brands();
 }
 
-export async function fetchReportPeriods() {
-  return reportsApi.periods();
+export async function fetchReportBrandCampaigns(brandId) {
+  return reportsApi.brandCampaigns(brandId);
+}
+
+export async function fetchReportCampaignCycles(campaignId) {
+  return reportsApi.campaignCycles(campaignId);
+}
+
+export async function fetchCycleReport(cycleId) {
+  return reportsApi.cycleReport(cycleId);
 }
 
 export async function fetchEngagementTimeline(engagementId) {

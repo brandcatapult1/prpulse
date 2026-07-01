@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { pool } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
-import { loadDeliverablesForEngagement } from '../lib/deliverableRows.mjs';
 import {
-  ENGAGEMENT_OUTLET_JOINS,
-  ENGAGEMENT_OUTLET_SELECT,
-} from '../lib/outlets.mjs';
+  assertCanViewDashboardFor,
+  canListDirectReports,
+  listDirectReports,
+} from '../lib/dashboardAccess.mjs';
+import { loadDashboardWorkspace } from '../lib/dashboardWorkspace.mjs';
 
 export const dashboardRouter = Router();
 
@@ -58,62 +59,34 @@ dashboardRouter.get('/', requireAuth, async (req, res) => {
   });
 });
 
-/** Full workspace payload for the AM dashboard. */
-dashboardRouter.get('/workspace', requireAuth, async (req, res) => {
-  const userId = req.user.id;
-  const role = req.user.role;
-  const isBroadRole = role === 'admin' || role === 'senior_manager';
-
-  const campaignScopeSql = isBroadRole
-    ? `cam.status = 'active'`
-    : `cam.status = 'active' AND EXISTS (
-         SELECT 1 FROM campaign_managers cm
-         WHERE cm.campaign_id = cam.id AND cm.user_id = $1
-       )`;
-
-  // AM: only engagements assigned to them. Admin / senior manager: all active work.
-  const engagementScopeSql = isBroadRole
-    ? `cam.status <> 'archived'`
-    : `cam.status <> 'archived' AND e.assigned_manager = $1`;
-
-  const [engagementsRes, campaignsRes] = await Promise.all([
-    pool.query(
-      `SELECT e.*, c.full_name AS contact_name, u.full_name AS owner_name,
-              cam.campaign_name, cam.status AS campaign_status, ${ENGAGEMENT_OUTLET_SELECT}
-       FROM engagements e
-       JOIN contacts c ON c.id = e.contact_id
-       JOIN users u ON u.id = e.assigned_manager
-       JOIN campaigns cam ON cam.id = e.campaign_id
-       ${ENGAGEMENT_OUTLET_JOINS}
-       WHERE ${engagementScopeSql}
-       ORDER BY e.updated_at DESC`,
-      isBroadRole ? [] : [userId],
-    ),
-    pool.query(
-      `SELECT cam.*, b.brand_name
-       FROM campaigns cam
-       JOIN brands b ON b.id = cam.brand_id
-       WHERE ${campaignScopeSql}
-       ORDER BY cam.updated_at DESC`,
-      isBroadRole ? [] : [userId],
-    ),
-  ]);
-
-  const engagements = engagementsRes.rows;
-  const deliverablesByEngagement = {};
-
-  const client = await pool.connect();
-  try {
-    for (const eng of engagements) {
-      deliverablesByEngagement[eng.id] = await loadDeliverablesForEngagement(client, eng.id);
-    }
-  } finally {
-    client.release();
+/** Direct reports for tabbed manager dashboard (Senior Manager / Admin only). */
+dashboardRouter.get('/direct-reports', requireAuth, async (req, res) => {
+  if (!canListDirectReports(req.user.role)) {
+    return res.json([]);
   }
+  try {
+    const rows = await listDirectReports(pool, req.user.id);
+    res.json(rows);
+  } catch (err) {
+    console.warn('Direct reports list failed:', err.message ?? err);
+    res.json([]);
+  }
+});
 
-  res.json({
-    engagements,
-    campaigns: campaignsRes.rows,
-    deliverablesByEngagement,
-  });
+/** Full workspace payload for the dashboard — optionally scoped to a team member. */
+dashboardRouter.get('/workspace', requireAuth, async (req, res) => {
+  const scopeUserId = req.query.scope_user_id?.trim() || null;
+
+  try {
+    const allowedScopeId = await assertCanViewDashboardFor(pool, req.user, scopeUserId);
+    const payload = await loadDashboardWorkspace(
+      pool,
+      scopeUserId ? allowedScopeId : null,
+      req.user.id,
+      req.user.role,
+    );
+    res.json(payload);
+  } catch (err) {
+    res.status(err.status ?? 503).json({ error: err.message ?? 'Could not load dashboard' });
+  }
 });

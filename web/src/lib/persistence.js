@@ -113,8 +113,8 @@ export async function fetchPopulationContacts(campaignId) {
   return contactsApi.populationForCampaign(campaignId);
 }
 
-export async function fetchDashboardWorkspace() {
-  return dashboardApi.workspace();
+export async function fetchDashboardWorkspace(scopeUserId) {
+  return dashboardApi.workspace(scopeUserId);
 }
 
 export async function logVisitReminder(engagementId, details) {

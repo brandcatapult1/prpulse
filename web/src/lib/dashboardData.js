@@ -283,8 +283,8 @@ function buildCampaignTargets(campaigns, engagements) {
     .map((c) => ({
       id: c.id,
       campaignName: c.campaign_name,
-      completed: c.completed_collaborations ?? 0,
-      target: c.target_collaborations,
+      completed: Number(c.completed_collaborations) || 0,
+      target: c.target_collaborations != null ? Number(c.target_collaborations) : null,
       pct: Math.round(Number(c.achievement_pct) || 0),
       health: c.campaign_health,
     }));
@@ -429,7 +429,8 @@ export function countDashboardActionEngagements(modules) {
 
 /**
  * Build AM dashboard modules from engagements in the user's workspace.
- * API scopes: campaign_manager → assigned_manager only; admin/senior_manager → all.
+ * API scopes: campaign_manager → assigned_manager only; admin/senior_manager without
+ * scope_user_id → all active work; with scope_user_id → that person's assigned work.
  */
 export function buildDashboardFromEngagements({
   engagements,

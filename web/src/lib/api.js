@@ -23,7 +23,11 @@ export const authApi = {
 
 export const dashboardApi = {
   get: () => api('/dashboard'),
-  workspace: () => api('/dashboard/workspace'),
+  workspace: (scopeUserId) => {
+    const q = scopeUserId ? `?scope_user_id=${encodeURIComponent(scopeUserId)}` : '';
+    return api(`/dashboard/workspace${q}`);
+  },
+  directReports: () => api('/dashboard/direct-reports'),
 };
 
 export const contactsApi = {

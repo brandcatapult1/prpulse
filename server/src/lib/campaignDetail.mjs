@@ -130,7 +130,20 @@ export async function loadCampaignDetail(client, campaignId) {
   if (!row) return null;
 
   const campaign = coerceCampaignScalars(row);
-  await ensureCampaignCycles(client, campaign);
+  const materialized = await ensureCampaignCycles(client, campaign);
+  if (materialized) {
+    await client.query('SELECT recompute_campaign_metrics($1::uuid)', [campaignId]);
+    const refreshed = await client.query(
+      `SELECT cam.*, b.brand_name
+       FROM campaigns cam
+       JOIN brands b ON b.id = cam.brand_id
+       WHERE cam.id = $1`,
+      [campaignId],
+    );
+    if (refreshed.rows[0]) {
+      Object.assign(campaign, coerceCampaignScalars(refreshed.rows[0]));
+    }
+  }
 
   const tags = await loadCampaignTags(client, campaignId);
   const cycles = await listCampaignCycles(client, campaignId);
@@ -210,7 +223,7 @@ export async function applyCampaignPatch(client, campaignId, body) {
   // Recompute in-transaction so the rollups update immediately (and commit with
   // this same campaign update), rather than going stale until the next event.
   if (Object.prototype.hasOwnProperty.call(patch.scalars, 'target_collaborations')) {
-    await client.query('SELECT recompute_campaign_metrics($1)', [campaignId]);
+    await client.query('SELECT recompute_campaign_metrics($1::uuid)', [campaignId]);
   }
 
   return loadCampaignDetail(client, campaignId);

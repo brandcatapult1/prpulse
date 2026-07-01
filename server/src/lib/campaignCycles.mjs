@@ -14,6 +14,11 @@ export function mapCycleRow(row) {
     cycle_start: toIsoDate(row.cycle_start),
     cycle_end: toIsoDate(row.cycle_end),
     target: Number(row.target),
+    completed_collaborations: Number(row.completed_collaborations ?? 0),
+    remaining_collaborations:
+      row.remaining_collaborations != null ? Number(row.remaining_collaborations) : null,
+    achievement_pct: row.achievement_pct != null ? Number(row.achievement_pct) : null,
+    cycle_health: row.cycle_health ?? 'not_set',
   };
 }
 
@@ -35,7 +40,8 @@ export function pickCurrentCycle(cycles, todayIso = todayIst()) {
 
 export async function listCampaignCycles(client, campaignId) {
   const { rows } = await client.query(
-    `SELECT id, campaign_id, cycle_number, cycle_start, cycle_end, target
+    `SELECT id, campaign_id, cycle_number, cycle_start, cycle_end, target,
+            completed_collaborations, remaining_collaborations, achievement_pct, cycle_health
      FROM campaign_cycles
      WHERE campaign_id = $1
      ORDER BY cycle_number`,
@@ -54,30 +60,31 @@ export async function ensureCampaignCycles(client, campaign) {
     target_collaborations,
   } = campaign;
 
-  if (!start_date || target_collaborations == null) return;
+  if (!start_date || target_collaborations == null) return false;
 
   const target = Number(target_collaborations);
   const startIso = toIsoDate(start_date);
+  let materialized = false;
 
   if (campaign_type === 'project') {
-    if (!end_date) return;
+    if (!end_date) return false;
     const endIso = toIsoDate(end_date);
-    await client.query(
+    const result = await client.query(
       `INSERT INTO campaign_cycles (campaign_id, cycle_number, cycle_start, cycle_end, target)
        VALUES ($1::uuid, 1, $2::date, ($3::date + 1), $4::integer)
        ON CONFLICT (campaign_id, cycle_number) DO NOTHING`,
       [id, startIso, endIso, target],
     );
-    return;
+    return result.rowCount > 0;
   }
 
-  if (campaign_type !== 'monthly') return;
+  if (campaign_type !== 'monthly') return false;
 
   const months = Number(term_months);
-  if (!Number.isInteger(months) || months < 1) return;
+  if (!Number.isInteger(months) || months < 1) return false;
 
   for (let cycleNumber = 1; cycleNumber <= months; cycleNumber += 1) {
-    await client.query(
+    const result = await client.query(
       `INSERT INTO campaign_cycles (campaign_id, cycle_number, cycle_start, cycle_end, target)
        VALUES (
          $1::uuid,
@@ -89,5 +96,8 @@ export async function ensureCampaignCycles(client, campaign) {
        ON CONFLICT (campaign_id, cycle_number) DO NOTHING`,
       [id, cycleNumber, startIso, target, cycleNumber],
     );
+    if (result.rowCount > 0) materialized = true;
   }
+
+  return materialized;
 }

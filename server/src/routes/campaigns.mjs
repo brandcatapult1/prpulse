@@ -13,6 +13,7 @@ import {
   parseRequiredTargetCollaborations,
   parseTermMonths,
 } from '../lib/campaignValidation.mjs';
+import { ensureCampaignCycles } from '../lib/campaignCycles.mjs';
 
 export const campaignsRouter = Router();
 
@@ -150,6 +151,14 @@ campaignsRouter.post('/', requireAuth, requireStaffRole, async (req, res) => {
       const tagIds = Array.isArray(req.body?.tag_ids) ? req.body.tag_ids.filter(Boolean) : [];
       await assignCampaignTagsOnCreate(client, rows[0].id, tagIds);
 
+      await ensureCampaignCycles(client, {
+        id: rows[0].id,
+        campaign_type: rows[0].campaign_type,
+        start_date: rows[0].start_date,
+        end_date: rows[0].end_date,
+        term_months: rows[0].term_months,
+        target_collaborations: rows[0].target_collaborations,
+      });
       await client.query('SELECT recompute_campaign_metrics($1::uuid)', [rows[0].id]);
 
       return loadCampaignDetail(client, rows[0].id);

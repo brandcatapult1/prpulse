@@ -7,8 +7,10 @@ import {
   ensureCampaignCycles,
   listCampaignCycles,
   pickCurrentCycle,
+  adjustMonthlyCampaignTermMonths,
 } from './campaignCycles.mjs';
 import { todayIst } from './constants.mjs';
+import { isAdmin } from './permissions.mjs';
 
 const SCALAR_FIELDS = new Set([
   'campaign_name',
@@ -166,11 +168,12 @@ async function assertTagIdsExist(client, tagIds) {
   }
 }
 
-export async function applyCampaignPatch(client, campaignId, body) {
+export async function applyCampaignPatch(client, campaignId, body, actor = null) {
   const patch = parseCampaignPatch(body);
 
   const existing = await client.query(
-    'SELECT campaign_type, term_months, target_collaborations FROM campaigns WHERE id = $1',
+    `SELECT campaign_type, term_months, target_collaborations, start_date
+     FROM campaigns WHERE id = $1`,
     [campaignId],
   );
   if (!existing.rows[0]) {
@@ -182,6 +185,21 @@ export async function applyCampaignPatch(client, campaignId, body) {
   const effectiveTermMonths = Object.prototype.hasOwnProperty.call(patch.scalars, 'term_months')
     ? patch.scalars.term_months
     : current.term_months;
+
+  if (Object.prototype.hasOwnProperty.call(patch.scalars, 'term_months')) {
+    const oldMonths = current.term_months != null ? Number(current.term_months) : null;
+    const newMonths = patch.scalars.term_months != null ? Number(patch.scalars.term_months) : null;
+    if (newMonths !== oldMonths) {
+      if (!isAdmin(actor?.role)) {
+        throw Object.assign(new Error('Only admins can change the number of months'), { status: 403 });
+      }
+      await adjustMonthlyCampaignTermMonths(
+        client,
+        { id: campaignId, ...current },
+        newMonths,
+      );
+    }
+  }
 
   if (Object.prototype.hasOwnProperty.call(patch.scalars, 'target_collaborations')) {
     assertMonthlyTermMonths(effectiveType, effectiveTermMonths);
@@ -222,7 +240,10 @@ export async function applyCampaignPatch(client, campaignId, body) {
   // campaign_health, but no deliverable/status trigger fires on a target edit.
   // Recompute in-transaction so the rollups update immediately (and commit with
   // this same campaign update), rather than going stale until the next event.
-  if (Object.prototype.hasOwnProperty.call(patch.scalars, 'target_collaborations')) {
+  if (
+    Object.prototype.hasOwnProperty.call(patch.scalars, 'target_collaborations')
+    || Object.prototype.hasOwnProperty.call(patch.scalars, 'term_months')
+  ) {
     await client.query('SELECT recompute_campaign_metrics($1::uuid)', [campaignId]);
   }
 

@@ -3,6 +3,8 @@ import { Drawer, Toast } from '../ui/Primitives.jsx';
 import { Pill } from '../../lib/format.jsx';
 import { campaignsApi, lookupApi } from '../../lib/api.js';
 import { TagSelectChips } from '../tags/TagSelectChips.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { canEditCampaignTermMonths } from '../../lib/campaignPermissions.js';
 import {
   parseTargetCollaborationsInput,
   parseTermMonthsInput,
@@ -14,12 +16,14 @@ import {
 const STATUSES = ['draft', 'active', 'paused', 'completed', 'archived'];
 
 export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
+  const { user } = useAuth();
   const [draft, setDraft] = useState(null);
   const [tagOptions, setTagOptions] = useState([]);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
 
   const isMonthly = campaign?.campaign_type === 'monthly';
+  const canEditTermMonths = canEditCampaignTermMonths(user?.role);
 
   useEffect(() => {
     if (!open) return;
@@ -44,7 +48,7 @@ export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
     campaign_type: campaign.campaign_type,
     target_collaborations: draft.target_collaborations,
   });
-  const termMonthsError = isMonthly
+  const termMonthsError = isMonthly && canEditTermMonths
     ? validateTermMonths({ campaign_type: 'monthly', term_months: draft.term_months })
     : null;
   const canSave = draft.campaign_name.trim() && !targetError && !termMonthsError && !saving;
@@ -66,7 +70,7 @@ export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
         target_collaborations: parseTargetCollaborationsInput(draft.target_collaborations),
         tag_ids: draft.tag_ids,
       };
-      if (isMonthly) {
+      if (isMonthly && canEditTermMonths) {
         body.term_months = parseTermMonthsInput(draft.term_months);
       }
       const saved = await campaignsApi.update(campaign.id, body);
@@ -121,24 +125,30 @@ export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
           </label>
 
           {isMonthly && (
-            <label className="block">
+            <div className="block">
               <span className="text-2xs font-medium text-ink-secondary">Number of months</span>
               <p className="mt-0.5 text-[10px] text-ink-tertiary">
                 How long this monthly retainer runs
               </p>
-              <input
-                type="number"
-                min={1}
-                step={1}
-                className="input-field mt-1 w-full"
-                value={draft.term_months}
-                onChange={(e) => setDraft((d) => ({ ...d, term_months: e.target.value }))}
-                placeholder="Required"
-              />
-              {termMonthsError && (
-                <p className="mt-1 text-2xs text-red-700">{termMonthsError}</p>
+              {canEditTermMonths ? (
+                <>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    className="input-field mt-1 w-full"
+                    value={draft.term_months}
+                    onChange={(e) => setDraft((d) => ({ ...d, term_months: e.target.value }))}
+                    placeholder="Required"
+                  />
+                  {termMonthsError && (
+                    <p className="mt-1 text-2xs text-red-700">{termMonthsError}</p>
+                  )}
+                </>
+              ) : (
+                <p className="mt-1 tabular-nums text-sm text-ink">{campaign.term_months ?? '—'}</p>
               )}
-            </label>
+            </div>
           )}
 
           <label className="block">

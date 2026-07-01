@@ -2,3 +2,8 @@
 export function canMarkDidntDeliver(role) {
   return role === 'admin' || role === 'senior_manager';
 }
+
+/** Admin only — change monthly retainer length (term_months). */
+export function canEditCampaignTermMonths(role) {
+  return role === 'admin';
+}

@@ -185,7 +185,7 @@ campaignsRouter.get('/:id', requireAuth, async (req, res) => {
 campaignsRouter.patch('/:id', requireAuth, requireCampaignWriteAccess('id'), async (req, res) => {
   try {
     const campaign = await withUserTransaction(req.user.id, async (client) =>
-      applyCampaignPatch(client, req.params.id, req.body),
+      applyCampaignPatch(client, req.params.id, req.body, req.user),
     );
     res.json(campaign);
   } catch (err) {

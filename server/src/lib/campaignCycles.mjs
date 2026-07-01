@@ -64,7 +64,7 @@ export async function ensureCampaignCycles(client, campaign) {
     const endIso = toIsoDate(end_date);
     await client.query(
       `INSERT INTO campaign_cycles (campaign_id, cycle_number, cycle_start, cycle_end, target)
-       VALUES ($1, 1, $2::date, ($3::date + 1), $4)
+       VALUES ($1::uuid, 1, $2::date, ($3::date + 1), $4::integer)
        ON CONFLICT (campaign_id, cycle_number) DO NOTHING`,
       [id, startIso, endIso, target],
     );
@@ -80,14 +80,14 @@ export async function ensureCampaignCycles(client, campaign) {
     await client.query(
       `INSERT INTO campaign_cycles (campaign_id, cycle_number, cycle_start, cycle_end, target)
        VALUES (
-         $1,
-         $2,
-         ($3::date + (($2::text || ' months')::interval - interval '1 month'))::date,
-         ($3::date + ($2::text || ' months')::interval)::date,
-         $4
+         $1::uuid,
+         $2::integer,
+         ($3::date + make_interval(months => $5::integer) - interval '1 month')::date,
+         ($3::date + make_interval(months => $5::integer))::date,
+         $4::integer
        )
        ON CONFLICT (campaign_id, cycle_number) DO NOTHING`,
-      [id, cycleNumber, startIso, target],
+      [id, cycleNumber, startIso, target, cycleNumber],
     );
   }
 }

@@ -150,7 +150,7 @@ campaignsRouter.post('/', requireAuth, requireStaffRole, async (req, res) => {
       const tagIds = Array.isArray(req.body?.tag_ids) ? req.body.tag_ids.filter(Boolean) : [];
       await assignCampaignTagsOnCreate(client, rows[0].id, tagIds);
 
-      await client.query('SELECT recompute_campaign_metrics($1)', [rows[0].id]);
+      await client.query('SELECT recompute_campaign_metrics($1::uuid)', [rows[0].id]);
 
       return loadCampaignDetail(client, rows[0].id);
     });

@@ -224,6 +224,7 @@ CREATE TABLE campaigns (
   campaign_brief      text,
   status              campaign_status NOT NULL DEFAULT 'draft',
   target_collaborations integer CHECK (target_collaborations IS NULL OR target_collaborations >= 0),
+  term_months           integer CHECK (term_months IS NULL OR term_months >= 1),
   -- Stored, derived metrics (refreshed by recompute_campaign_metrics)
   completed_collaborations integer NOT NULL DEFAULT 0,
   remaining_collaborations integer,

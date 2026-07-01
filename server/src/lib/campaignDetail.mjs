@@ -1,9 +1,14 @@
 import { syncCampaignTags, loadCampaignTags } from './contactTags.mjs';
+import {
+  assertMonthlyTermMonths,
+  parseRequiredTargetCollaborations,
+} from './campaignValidation.mjs';
 
 const SCALAR_FIELDS = new Set([
   'campaign_name',
   'status',
   'target_collaborations',
+  'term_months',
   'start_date',
   'end_date',
   'campaign_type',
@@ -47,16 +52,24 @@ export function parseCampaignPatch(body) {
         throw Object.assign(new Error('Invalid campaign type'), { status: 400 });
       }
       scalars[key] = input[key];
+      if (input[key] === 'project') {
+        scalars.term_months = null;
+      }
       continue;
     }
 
     if (key === 'target_collaborations') {
+      scalars[key] = parseRequiredTargetCollaborations(input[key]);
+      continue;
+    }
+
+    if (key === 'term_months') {
       if (input[key] === '' || input[key] == null) {
         scalars[key] = null;
       } else {
         const n = Number(input[key]);
-        if (!Number.isFinite(n) || n < 0) {
-          throw Object.assign(new Error('Target collaborations must be a non-negative number'), { status: 400 });
+        if (!Number.isInteger(n) || n < 1) {
+          throw Object.assign(new Error('term_months must be a positive integer'), { status: 400 });
         }
         scalars[key] = n;
       }
@@ -64,6 +77,10 @@ export function parseCampaignPatch(body) {
     }
 
     scalars[key] = input[key] || null;
+  }
+
+  if (scalars.campaign_type === 'project') {
+    scalars.term_months = null;
   }
 
   let tag_ids;
@@ -108,9 +125,28 @@ async function assertTagIdsExist(client, tagIds) {
 export async function applyCampaignPatch(client, campaignId, body) {
   const patch = parseCampaignPatch(body);
 
-  const existing = await client.query('SELECT id FROM campaigns WHERE id = $1', [campaignId]);
+  const existing = await client.query(
+    'SELECT campaign_type, term_months, target_collaborations FROM campaigns WHERE id = $1',
+    [campaignId],
+  );
   if (!existing.rows[0]) {
     throw Object.assign(new Error('Campaign not found'), { status: 404 });
+  }
+
+  const current = existing.rows[0];
+  const effectiveType = patch.scalars.campaign_type ?? current.campaign_type;
+  const effectiveTermMonths = Object.prototype.hasOwnProperty.call(patch.scalars, 'term_months')
+    ? patch.scalars.term_months
+    : current.term_months;
+
+  if (Object.prototype.hasOwnProperty.call(patch.scalars, 'target_collaborations')) {
+    assertMonthlyTermMonths(effectiveType, effectiveTermMonths);
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(patch.scalars, 'term_months')
+    || Object.prototype.hasOwnProperty.call(patch.scalars, 'campaign_type')
+  ) {
+    assertMonthlyTermMonths(effectiveType, effectiveTermMonths);
   }
 
   if (patch.tag_ids !== undefined) {

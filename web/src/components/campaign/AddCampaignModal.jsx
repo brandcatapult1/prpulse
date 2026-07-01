@@ -7,7 +7,12 @@ import { TagSelectChips } from '../tags/TagSelectChips.jsx';
 import {
   CAMPAIGN_TYPES,
   campaignSchedulePayload,
+  parseTargetCollaborationsInput,
+  parseTermMonthsInput,
+  targetCollaborationsLabel,
   validateCampaignSchedule,
+  validateCampaignTarget,
+  validateTermMonths,
 } from '../../lib/campaignTypes.js';
 
 function emptyForm(defaultManagerIds = []) {
@@ -17,6 +22,7 @@ function emptyForm(defaultManagerIds = []) {
     campaign_type: 'project',
     start_date: '',
     end_date: '',
+    term_months: '',
     target_collaborations: '',
     status: 'draft',
     manager_ids: defaultManagerIds,
@@ -40,11 +46,15 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
 
   const isMonthly = form.campaign_type === 'monthly';
   const scheduleError = validateCampaignSchedule(form);
+  const targetError = validateCampaignTarget(form);
+  const termMonthsError = validateTermMonths(form);
   const canSave =
     form.campaign_name.trim()
     && form.brand_id
     && form.manager_ids.length > 0
     && !scheduleError
+    && !targetError
+    && !termMonthsError
     && !saving;
 
   useEffect(() => {
@@ -82,6 +92,7 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
       ...f,
       campaign_type: nextType,
       end_date: nextType === 'monthly' ? '' : f.end_date,
+      term_months: nextType === 'monthly' ? f.term_months : '',
     }));
   }
 
@@ -105,9 +116,8 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
       const created = await campaignsApi.create({
         campaign_name: form.campaign_name.trim(),
         brand_id: form.brand_id,
-        target_collaborations: form.target_collaborations.trim()
-          ? Number(form.target_collaborations)
-          : null,
+        target_collaborations: parseTargetCollaborationsInput(form.target_collaborations),
+        term_months: isMonthly ? parseTermMonthsInput(form.term_months) : null,
         status: form.status,
         manager_ids: form.manager_ids,
         tag_ids: form.tag_ids,
@@ -261,16 +271,40 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
           )}
         </div>
 
+        {isMonthly && (
+          <label className="block">
+            <FieldLabel>Number of months</FieldLabel>
+            <p className="mt-0.5 text-[10px] text-ink-tertiary">
+              How long this monthly retainer runs
+            </p>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              className="input-field mt-1"
+              value={form.term_months}
+              onChange={(e) => setForm((f) => ({ ...f, term_months: e.target.value }))}
+              placeholder="e.g. 6"
+            />
+            {termMonthsError && (
+              <p className="mt-1 text-2xs text-red-700">{termMonthsError}</p>
+            )}
+          </label>
+        )}
+
         <label className="block">
-          <FieldLabel>Target collaborations</FieldLabel>
+          <FieldLabel>{targetCollaborationsLabel(form.campaign_type)}</FieldLabel>
           <input
             type="number"
             min="0"
             className="input-field mt-1"
             value={form.target_collaborations}
             onChange={(e) => setForm((f) => ({ ...f, target_collaborations: e.target.value }))}
-            placeholder="Optional"
+            placeholder="Required"
           />
+          {targetError && (
+            <p className="mt-1 text-2xs text-red-700">{targetError}</p>
+          )}
         </label>
 
         <label className="block">

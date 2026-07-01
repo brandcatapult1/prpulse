@@ -9,6 +9,10 @@ import {
   assignCampaignTagsOnCreate,
   loadCampaignDetail,
 } from '../lib/campaignDetail.mjs';
+import {
+  parseRequiredTargetCollaborations,
+  parseTermMonths,
+} from '../lib/campaignValidation.mjs';
 
 export const campaignsRouter = Router();
 
@@ -55,6 +59,7 @@ campaignsRouter.post('/', requireAuth, requireStaffRole, async (req, res) => {
     start_date,
     end_date,
     target_collaborations,
+    term_months,
     status,
     manager_ids,
   } = req.body ?? {};
@@ -80,13 +85,14 @@ campaignsRouter.post('/', requireAuth, requireStaffRole, async (req, res) => {
 
   const allowedStatuses = new Set(['draft', 'active', 'paused', 'completed', 'archived']);
   const campaignStatus = allowedStatuses.has(status) ? status : 'draft';
-  const target =
-    target_collaborations === '' || target_collaborations == null
-      ? null
-      : Number(target_collaborations);
 
-  if (target != null && (Number.isNaN(target) || target < 0)) {
-    return res.status(400).json({ error: 'Target collaborations must be a non-negative number' });
+  let target;
+  let storedTermMonths;
+  try {
+    target = parseRequiredTargetCollaborations(target_collaborations);
+    storedTermMonths = parseTermMonths(term_months, campaign_type);
+  } catch (err) {
+    return res.status(err.status ?? 400).json({ error: err.message });
   }
 
   const storedEndDate = campaign_type === 'project' ? end_date : null;
@@ -116,9 +122,9 @@ campaignsRouter.post('/', requireAuth, requireStaffRole, async (req, res) => {
       const { rows } = await client.query(
         `INSERT INTO campaigns (
            campaign_name, brand_id, campaign_type, start_date, end_date,
-           target_collaborations, status, created_by
+           target_collaborations, term_months, status, created_by
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING *`,
         [
           campaign_name.trim(),
@@ -127,6 +133,7 @@ campaignsRouter.post('/', requireAuth, requireStaffRole, async (req, res) => {
           start_date,
           storedEndDate,
           target,
+          storedTermMonths,
           campaignStatus,
           req.user.id,
         ],

@@ -760,9 +760,10 @@ async function applyEngagementPlan(client, { plan, campaignIds, contactIds, user
       `UPDATE engagements
        SET conversation_status = 'collaboration_complete',
            primary_collaboration_reason = $2,
+           collaboration_type = COALESCE($3, collaboration_type),
            next_follow_up_date = NULL
        WHERE id = $1`,
-      [engagementId, plan.primary_collaboration_reason ?? 'expert'],
+      [engagementId, plan.primary_collaboration_reason ?? 'expert', plan.collaboration_type ?? null],
     );
   } else if (plan.status === 'collaboration_complete' && isAlreadyComplete) {
     await client.query(

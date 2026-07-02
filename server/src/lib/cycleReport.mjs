@@ -6,6 +6,12 @@ import {
 import { mapCycleRow, pickCurrentCycle } from './campaignCycles.mjs';
 import { todayIst } from './constants.mjs';
 
+function normalizeCollaborationType(value) {
+  const type = String(value ?? '').trim().toLowerCase();
+  if (type === 'paid' || type === 'barter') return type;
+  return null;
+}
+
 const CYCLE_BOUNDS_JOIN = `
   CROSS JOIN LATERAL (
     SELECT min(cycle_start) AS first_start,
@@ -180,7 +186,7 @@ export async function loadCycleReport(client, cycleId) {
       id: eng.id,
       contact_id: eng.contact_id,
       contact_name: eng.contact_name,
-      collaboration_type: eng.collaboration_type,
+      collaboration_type: normalizeCollaborationType(eng.collaboration_type),
       completed_at_ist: eng.completed_at_ist,
       proof: buildDeliverableProofItems(deliverablesByEngagement.get(eng.id) ?? []),
     }));

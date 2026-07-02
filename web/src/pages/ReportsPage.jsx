@@ -5,7 +5,7 @@ import { HealthBadge } from '../components/ui/HealthBadge.jsx';
 import { MetricTile } from '../components/campaign/CampaignMetricTiles.jsx';
 import { DeliverableProofList } from '../components/deliverables/DeliverableProofList.jsx';
 import { defaultReportCycleId, filterCyclesForReportSelector, formatCycleSelectorLabel } from '../lib/campaignCycles.js';
-import { formatDate, Pill } from '../lib/format.jsx';
+import { collaborationTypeLabel, formatDate, normalizeCollaborationType, Pill } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
 import {
   fetchCycleReport,
@@ -262,7 +262,11 @@ export function ReportsPage() {
               </p>
             ) : (
               <ul className="space-y-4">
-                {report.collaborations.map((collab) => (
+                {report.collaborations.map((collab) => {
+                  const collabLabel = collaborationTypeLabel(collab.collaboration_type);
+                  const collabType = normalizeCollaborationType(collab.collaboration_type);
+
+                  return (
                   <li
                     key={collab.id}
                     className="rounded-lg border border-line bg-canvas px-4 py-3"
@@ -270,9 +274,9 @@ export function ReportsPage() {
                     <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-semibold text-ink">{collab.contact_name}</p>
-                        {collab.collaboration_type && (
-                          <Pill tone={collab.collaboration_type === 'paid' ? 'info' : 'success'}>
-                            {collab.collaboration_type === 'paid' ? 'Paid' : 'Barter'}
+                        {collabLabel && (
+                          <Pill tone={collabType === 'paid' ? 'info' : 'success'}>
+                            {collabLabel}
                           </Pill>
                         )}
                       </div>
@@ -284,7 +288,8 @@ export function ReportsPage() {
                     </div>
                     <DeliverableProofList proofItems={collab.proof} />
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </ReportSection>

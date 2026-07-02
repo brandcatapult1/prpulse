@@ -161,6 +161,8 @@ export async function commitScheduleEngagement(client, user, engagementId, body,
 
   if (body.collaboration_type != null) {
     patch.collaboration_type = body.collaboration_type;
+  } else if (cur.collaboration_type == null) {
+    patch.collaboration_type = 'barter';
   }
   if (Object.prototype.hasOwnProperty.call(body, 'agreed_fee')) {
     patch.agreed_fee = body.agreed_fee;

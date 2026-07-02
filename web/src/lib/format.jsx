@@ -78,3 +78,18 @@ export function formatFee(fee) {
 export function roleLabel(role) {
   return (role ?? '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+/** Normalize engagements.collaboration_type to paid | barter, or null when unset. */
+export function normalizeCollaborationType(value) {
+  const type = String(value ?? '').trim().toLowerCase();
+  if (type === 'paid' || type === 'barter') return type;
+  return null;
+}
+
+/** Paid/barter label for reports — classification only, never fee amounts. */
+export function collaborationTypeLabel(value) {
+  const type = normalizeCollaborationType(value);
+  if (type === 'paid') return 'Paid';
+  if (type === 'barter') return 'Barter';
+  return null;
+}

@@ -2,23 +2,39 @@ import PDFDocument from 'pdfkit';
 
 const IST = 'Asia/Kolkata';
 
-function formatIstDate(iso) {
+function safeIsoDate(value) {
+  if (!value) return null;
+  const iso = String(value).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  return iso;
+}
+
+function formatIstDate(value) {
+  const iso = safeIsoDate(value);
   if (!iso) return null;
+  const date = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
   return new Intl.DateTimeFormat('en-GB', {
     timeZone: IST,
     day: 'numeric',
     month: 'short',
-  }).format(new Date(`${String(iso).slice(0, 10)}T12:00:00`));
+  }).format(date);
 }
 
 function cycleRangeLabel(cycle) {
-  const start = String(cycle?.cycle_start ?? '').slice(0, 10);
-  const endExclusive = String(cycle?.cycle_end ?? '').slice(0, 10);
+  const start = safeIsoDate(cycle?.cycle_start);
+  const endExclusive = safeIsoDate(cycle?.cycle_end);
   if (!start || !endExclusive) return '';
   const end = new Date(`${endExclusive}T12:00:00`);
+  if (Number.isNaN(end.getTime())) return '';
   end.setDate(end.getDate() - 1);
-  const endIso = end.toISOString().slice(0, 10);
-  return `${formatIstDate(start)} – ${formatIstDate(endIso)}`;
+  const endIso = safeIsoDate(end.toISOString());
+  const startLabel = formatIstDate(start);
+  const endLabel = formatIstDate(endIso);
+  if (!startLabel || !endLabel) return '';
+  return `${startLabel} – ${endLabel}`;
 }
 
 async function fetchBuffer(url, timeoutMs = 12000) {

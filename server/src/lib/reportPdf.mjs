@@ -94,29 +94,6 @@ function proofUnitCount(item) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-function estimateCreatorBlockHeight(collab) {
-  const proofItems = Array.isArray(collab?.proof) ? collab.proof : [];
-  let h = 58;
-  for (const item of proofItems) {
-    h += 28;
-    const isStory = String(item?.deliverable_type ?? '').toLowerCase() === 'story';
-    if (isStory) {
-      const shots = Array.isArray(item?.screenshots) ? item.screenshots : [];
-      const expectedUnits = proofUnitCount(item);
-      const count = expectedUnits ? Math.min(expectedUnits, shots.length) : shots.length;
-      if (count > 0) {
-        const perRow = 4;
-        h += Math.ceil(count / perRow) * 188;
-      }
-    } else {
-      const links = Array.isArray(item?.links) ? item.links : [];
-      h += links.length * 12;
-    }
-    h += 10;
-  }
-  return h + 16;
-}
-
 function fileSafe(value) {
   return String(value ?? '')
     .trim()
@@ -135,22 +112,37 @@ export function reportPdfFileName(report) {
 export async function buildCycleReportPdf({ report, logoUrl }) {
   const doc = new PDFDocument({
     size: 'A4',
-    margins: { top: 36, right: 42, bottom: 42, left: 42 },
+    margins: { top: 32, right: 32, bottom: 32, left: 32 },
   });
 
   const chunks = [];
   doc.on('data', (chunk) => chunks.push(chunk));
   const done = new Promise((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
 
-  const left = doc.page.margins.left;
-  const right = doc.page.width - doc.page.margins.right;
-  const contentWidth = right - left;
+  const pageLeft = doc.page.margins.left;
+  const pageRight = doc.page.width - doc.page.margins.right;
+  const pageWidth = pageRight - pageLeft;
+  const contentWidth = Math.min(720, pageWidth);
+  const left = pageLeft + (pageWidth - contentWidth) / 2;
+  const right = left + contentWidth;
+
+  const metricGap = 16;
+  const metricWidth = (contentWidth - metricGap * 2) / 3;
+  const storyWidth = 120;
+  const storyHeight = 213;
+  const storyGap = 12;
+  const storiesPerRow = Math.max(1, Math.floor((contentWidth + storyGap) / (storyWidth + storyGap)));
+
+  function ensurePageSpaceFor(height) {
+    const bottom = doc.page.height - doc.page.margins.bottom;
+    if (doc.y + height > bottom) doc.addPage();
+  }
 
   const logoBuffer = await fetchBuffer(logoUrl, 8000);
   const headerTop = doc.y;
   if (logoBuffer) {
     try {
-      doc.image(logoBuffer, left, headerTop, { fit: [120, 34] });
+      doc.image(logoBuffer, left, headerTop, { fit: [120, 40] });
     } catch {
       doc.fontSize(10).fillColor('#667085').text('Brand Catapult', left, headerTop);
     }
@@ -163,39 +155,39 @@ export async function buildCycleReportPdf({ report, logoUrl }) {
     : `Cycle ${report?.cycle?.cycle_number ?? '—'}`;
   const title = `${report.brand.brand_name} · ${report.campaign.campaign_name} · ${cycleLabel} · ${cycleRangeLabel(report.cycle)}`;
 
-  const titleX = logoBuffer ? left + 132 : left;
-  const titleWidth = logoBuffer ? contentWidth - 132 : contentWidth;
-  doc.font('Helvetica-Bold').fontSize(14).fillColor('#101828').text(title, titleX, headerTop, {
+  const titleX = logoBuffer ? left + 136 : left;
+  const titleWidth = logoBuffer ? contentWidth - 136 : contentWidth;
+  doc.font('Helvetica-Bold').fontSize(16).fillColor('#101828').text(title, titleX, headerTop, {
     width: titleWidth,
   });
-  doc.y = Math.max(headerTop + 40, doc.y + 6);
+  doc.y = Math.max(headerTop + 44, doc.y);
   doc.moveTo(left, doc.y).lineTo(right, doc.y).strokeColor('#d0d5dd').lineWidth(1).stroke();
-  doc.moveDown(0.5);
+  doc.y += 14;
 
-  sectionTitle(doc, 'Cycle performance');
+  doc.font('Helvetica').fontSize(11).fillColor('#888888').text('CYCLE PERFORMANCE', left, doc.y);
+  doc.y += 14;
   const hero = report.hero ?? {};
   const heroLine = `${hero.completed_collaborations ?? 0} / ${hero.target ?? '—'} complete`;
-  doc.font('Helvetica-Bold').fontSize(24).fillColor('#101828').text(heroLine);
+  doc.font('Helvetica-Bold').fontSize(36).fillColor('#101828').text(heroLine, left, doc.y);
   doc.font('Helvetica').fontSize(11).fillColor('#475467')
-    .text(`${Math.round(Number(hero.achievement_pct ?? 0))}% achieved · Health: ${healthLabel(hero.cycle_health)}`);
-  doc.moveDown(0.4);
+    .text(`${Math.round(Number(hero.achievement_pct ?? 0))}% achieved · ${healthLabel(hero.cycle_health)}`, left, doc.y + 4);
+  doc.y += 20;
 
-  const cardY = doc.y;
-  const cardGap = 10;
-  const cardWidth = (contentWidth - cardGap * 2) / 3;
-  drawStatCard(doc, left, cardY, cardWidth, 'Collaborations complete', Number(report.stats?.collaborations_complete ?? 0));
-  drawStatCard(doc, left + cardWidth + cardGap, cardY, cardWidth, 'Deliverables awaited', Number(report.stats?.deliverables_awaited ?? 0));
-  drawStatCard(doc, left + (cardWidth + cardGap) * 2, cardY, cardWidth, 'Successful visits', Number(report.stats?.visits_completed ?? 0));
-  doc.y = cardY + 66;
+  const metricY = doc.y;
+  drawStatCard(doc, left, metricY, metricWidth, 'Collaborations complete', Number(report.stats?.collaborations_complete ?? 0));
+  drawStatCard(doc, left + metricWidth + metricGap, metricY, metricWidth, 'Deliverables awaited', Number(report.stats?.deliverables_awaited ?? 0));
+  drawStatCard(doc, left + (metricWidth + metricGap) * 2, metricY, metricWidth, 'Successful visits', Number(report.stats?.visits_completed ?? 0));
+  doc.y = metricY + 72;
 
-  sectionTitle(doc, 'Proof of delivery');
+  doc.font('Helvetica-Bold').fontSize(18).fillColor('#101828').text('Proof of delivery', left, doc.y + 4);
+  doc.y += 24;
   const collaborations = Array.isArray(report.collaborations) ? report.collaborations : [];
   if (!collaborations.length) {
-    doc.fontSize(10).fillColor('#667085').text('No completed collaborations in this cycle.');
+    doc.fontSize(10).fillColor('#667085').text('No completed collaborations in this cycle.', left, doc.y);
   }
 
   for (const collab of collaborations) {
-    ensurePageSpace(doc, estimateCreatorBlockHeight(collab));
+    ensurePageSpaceFor(120);
     const blockTop = doc.y;
 
     const collabType = collab.collaboration_type === 'paid' ? 'Paid' : collab.collaboration_type === 'barter' ? 'Barter' : null;
@@ -212,7 +204,7 @@ export async function buildCycleReportPdf({ report, logoUrl }) {
       });
     }
 
-    let yAfterHeader = blockTop + 16;
+    let yAfterHeader = blockTop + 18;
     if (collabType) {
       const pillW = doc.widthOfString(collabType, { font: 'Helvetica', size: 9 }) + 14;
       const pillY = blockTop + 16;
@@ -235,7 +227,7 @@ export async function buildCycleReportPdf({ report, logoUrl }) {
         const posted = formatIstDate(item.posted_date);
         const isStory = String(item.deliverable_type ?? '').toLowerCase() === 'story';
 
-        doc.font('Helvetica-Bold').fontSize(10).fillColor('#101828').text(item.label, left, doc.y, {
+        doc.font('Helvetica-Bold').fontSize(11).fillColor('#101828').text(item.label, left, doc.y, {
           width: contentWidth,
         });
         if (posted && !isStory) {
@@ -259,43 +251,39 @@ export async function buildCycleReportPdf({ report, logoUrl }) {
         if (isStory && shots.length) {
           const expectedUnits = proofUnitCount(item);
           const selectedShots = expectedUnits ? shots.slice(0, expectedUnits) : shots;
-          const shotW = 132;
-          const shotH = 235;
-          const colGap = 12;
-          const perRow = Math.max(1, Math.floor((contentWidth + colGap) / (shotW + colGap)));
           let idx = 0;
           while (idx < selectedShots.length) {
-            ensurePageSpace(doc, shotH + 28);
+            ensurePageSpaceFor(storyHeight + 28);
             const rowY = doc.y + 4;
-            for (let col = 0; col < perRow && idx < selectedShots.length; col += 1, idx += 1) {
+            for (let col = 0; col < storiesPerRow && idx < selectedShots.length; col += 1, idx += 1) {
               const shot = selectedShots[idx];
-              const x = left + col * (shotW + colGap);
+              const x = left + col * (storyWidth + storyGap);
               const shotBuffer = await fetchBuffer(shot.url, 10000);
-              doc.roundedRect(x, rowY, shotW, shotH, 4).stroke('#d0d5dd');
+              doc.roundedRect(x, rowY, storyWidth, storyHeight, 4).stroke('#d0d5dd');
               if (shotBuffer) {
                 try {
-                  doc.image(shotBuffer, x, rowY, { fit: [shotW, shotH], align: 'center', valign: 'center' });
+                  doc.image(shotBuffer, x, rowY, { fit: [storyWidth, storyHeight], align: 'center', valign: 'center' });
                 } catch {
-                  doc.fontSize(8).fillColor('#667085').text('Image unavailable', x + 6, rowY + shotH / 2 - 6, {
-                    width: shotW - 12,
+                  doc.fontSize(8).fillColor('#667085').text('Image unavailable', x + 6, rowY + storyHeight / 2 - 6, {
+                    width: storyWidth - 12,
                     align: 'center',
                   });
                 }
               } else {
-                doc.fontSize(8).fillColor('#667085').text('Image unavailable', x + 6, rowY + shotH / 2 - 6, {
-                  width: shotW - 12,
+                doc.fontSize(8).fillColor('#667085').text('Image unavailable', x + 6, rowY + storyHeight / 2 - 6, {
+                  width: storyWidth - 12,
                   align: 'center',
                 });
               }
               const shotDate = formatIstDate(shot.posted_date ?? item.posted_date);
               if (shotDate) {
-                doc.fontSize(8).fillColor('#667085').text(`Posted ${shotDate}`, x, rowY + shotH + 5, {
-                  width: shotW,
+                doc.fontSize(8).fillColor('#667085').text(`Posted ${shotDate}`, x, rowY + storyHeight + 5, {
+                  width: storyWidth,
                   align: 'center',
                 });
               }
             }
-            doc.y = rowY + shotH + 18;
+            doc.y = rowY + storyHeight + 18;
           }
         }
 
@@ -308,7 +296,7 @@ export async function buildCycleReportPdf({ report, logoUrl }) {
       .strokeColor('#eaecf0')
       .lineWidth(1)
       .stroke();
-    doc.y += 10;
+    doc.y += 12;
   }
 
   doc.end();

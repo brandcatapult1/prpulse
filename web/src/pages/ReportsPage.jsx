@@ -181,14 +181,6 @@ export function ReportsPage() {
             >
               {exportingPdf ? 'Exporting…' : 'Export PDF'}
             </button>
-            <button
-              type="button"
-              className="btn-primary opacity-60"
-              disabled
-              title="Coming soon"
-            >
-              Shareable link
-            </button>
           </div>
         }
       />
@@ -331,14 +323,6 @@ export function ReportsPage() {
             )}
           </ReportSection>
 
-          <ReportSection title="Campaign manager notes">
-            <textarea
-              className="input-field min-h-[96px] py-2 opacity-60"
-              placeholder="Manager notes — coming soon"
-              disabled
-              readOnly
-            />
-          </ReportSection>
         </>
       )}
 

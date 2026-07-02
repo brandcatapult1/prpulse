@@ -137,6 +137,10 @@ export async function fetchCycleReport(cycleId) {
   return reportsApi.cycleReport(cycleId);
 }
 
+export async function exportCycleReportPdf(cycleId) {
+  return reportsApi.cyclePdf(cycleId);
+}
+
 export async function fetchEngagementTimeline(engagementId) {
   return engagementsApi.timeline(engagementId);
 }

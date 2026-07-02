@@ -8,6 +8,7 @@ import { defaultReportCycleId, filterCyclesForReportSelector, formatCycleSelecto
 import { collaborationTypeLabel, formatDate, normalizeCollaborationType, Pill } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
 import {
+  exportCycleReportPdf,
   fetchCycleReport,
   fetchReportBrandCampaigns,
   fetchReportBrands,
@@ -26,6 +27,7 @@ export function ReportsPage() {
 
   const [loadingNav, setLoadingNav] = useState(true);
   const [loadingReport, setLoadingReport] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [error, setError] = useState(null);
 
   const selectedCampaign = useMemo(
@@ -133,6 +135,28 @@ export function ReportsPage() {
   const heroHasHealth = heroHealth !== 'not_set';
   const heroPct = hero?.achievement_pct != null ? Math.round(Number(hero.achievement_pct)) : null;
 
+  async function handleExportPdf() {
+    if (!cycleId || exportingPdf) return;
+    setExportingPdf(true);
+    try {
+      const { blob, contentDisposition } = await exportCycleReportPdf(cycleId);
+      const match = /filename=\"?([^\";]+)\"?/i.exec(contentDisposition);
+      const filename = match?.[1] ?? 'report.pdf';
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message ?? 'Could not export PDF');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   if (loadingNav && !brands.length && !error) {
     return (
       <div className="mx-auto max-w-5xl py-12 text-center text-sm text-ink-secondary">
@@ -150,11 +174,12 @@ export function ReportsPage() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className="btn-secondary opacity-60"
-              disabled
-              title="Coming soon"
+              className="btn-secondary"
+              disabled={!cycleId || loadingReport || exportingPdf}
+              onClick={handleExportPdf}
+              title={!cycleId ? 'Select a cycle first' : undefined}
             >
-              Export PDF
+              {exportingPdf ? 'Exporting…' : 'Export PDF'}
             </button>
             <button
               type="button"

@@ -8,6 +8,7 @@ import {
 } from '../lib/reportAccess.mjs';
 import { loadCampaignCyclesForReport, loadCycleReport } from '../lib/cycleReport.mjs';
 import { ensureCampaignCycles } from '../lib/campaignCycles.mjs';
+import { buildCycleReportPdf, reportPdfFileName } from '../lib/reportPdf.mjs';
 
 export const reportsRouter = Router();
 
@@ -100,5 +101,30 @@ reportsRouter.get('/cycles/:cycleId', requireAuth, async (req, res) => {
     res.json(report);
   } catch (err) {
     res.status(err.status ?? 503).json({ error: err.message ?? 'Could not load report' });
+  }
+});
+
+reportsRouter.get('/cycles/:cycleId/pdf', requireAuth, async (req, res) => {
+  try {
+    await assertCanViewCycleReport(pool, req.user, req.params.cycleId);
+    const report = await loadCycleReport(pool, req.params.cycleId);
+    if (!report) {
+      return res.status(404).json({ error: 'Cycle not found' });
+    }
+
+    let logoUrl = null;
+    try {
+      const { rows } = await pool.query('SELECT logo_url FROM org_settings WHERE id = 1');
+      logoUrl = rows[0]?.logo_url ?? null;
+    } catch (err) {
+      if (err.code !== '42P01') throw err;
+    }
+    const pdf = await buildCycleReportPdf({ report, logoUrl });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${reportPdfFileName(report)}"`);
+    res.send(pdf);
+  } catch (err) {
+    res.status(err.status ?? 503).json({ error: err.message ?? 'Could not export PDF' });
   }
 });

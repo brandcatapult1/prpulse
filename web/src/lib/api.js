@@ -15,6 +15,23 @@ export async function api(path, options = {}) {
   return res.json();
 }
 
+async function download(path) {
+  const res = await fetch(`/api${path}`, {
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const err = new Error(body.error ?? res.statusText);
+    err.status = res.status;
+    err.data = body;
+    throw err;
+  }
+  return {
+    blob: await res.blob(),
+    contentDisposition: res.headers.get('content-disposition') ?? '',
+  };
+}
+
 export const authApi = {
   me: () => api('/auth/me'),
   status: () => api('/auth/status'),
@@ -149,6 +166,7 @@ export const reportsApi = {
   brandCampaigns: (brandId) => api(`/reports/brands/${brandId}/campaigns`),
   campaignCycles: (campaignId) => api(`/reports/campaigns/${campaignId}/cycles`),
   cycleReport: (cycleId) => api(`/reports/cycles/${cycleId}`),
+  cyclePdf: (cycleId) => download(`/reports/cycles/${cycleId}/pdf`),
 };
 
 export const lookupApi = {

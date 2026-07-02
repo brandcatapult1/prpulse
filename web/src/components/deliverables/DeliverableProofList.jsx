@@ -48,8 +48,8 @@ export function DeliverableProofList({ proofItems }) {
               <div
                 className={
                   story
-                    ? 'mt-2 flex flex-wrap gap-3'
-                    : 'mt-2 grid grid-cols-2 gap-2'
+                    ? 'mt-2 flex max-w-full flex-wrap gap-3'
+                    : 'mt-2 grid max-w-full grid-cols-2 gap-2'
                 }
               >
                 {item.screenshots.map((s) => {
@@ -70,7 +70,7 @@ export function DeliverableProofList({ proofItems }) {
                     return (
                       <figure
                         key={s.id}
-                        className="w-[120px] shrink-0 overflow-hidden rounded-md border border-line bg-white sm:w-[140px]"
+                        className="w-[calc(50%-0.375rem)] max-w-[140px] shrink-0 overflow-hidden rounded-md border border-line bg-white sm:w-[120px]"
                       >
                         <a
                           href={s.url}

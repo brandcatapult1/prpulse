@@ -196,7 +196,7 @@ export function ReportsPage() {
       </div>
 
       <Card className="!p-4">
-        <div className="flex flex-wrap gap-4">
+        <div className="flex flex-col gap-4 md:flex-row md:flex-wrap">
           <DrillDownSelect
             label="Client"
             value={brandId}
@@ -249,7 +249,7 @@ export function ReportsPage() {
               </p>
             </div>
 
-            <div className="campaign-glass-tile flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="campaign-glass-tile flex flex-col gap-3 px-5 py-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-[10px] font-medium uppercase tracking-wider text-ink-tertiary">
                   Collaborations complete vs target
@@ -269,7 +269,7 @@ export function ReportsPage() {
             </div>
           </section>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
             <MetricTile
               label="Collaborations complete (this cycle)"
               value={stats?.collaborations_complete ?? 0}
@@ -337,10 +337,10 @@ export function ReportsPage() {
 
 function DrillDownSelect({ label, value, onChange, options, disabled, hint }) {
   return (
-    <label className="min-w-[160px] flex-1 text-2xs text-ink-secondary">
+    <label className="w-full min-w-0 flex-1 text-2xs text-ink-secondary md:min-w-[160px]">
       {label}
       <select
-        className="input-field mt-1 w-full"
+        className="input-field mt-1 min-h-[44px] w-full md:min-h-8"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled || options.length === 0}

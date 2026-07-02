@@ -433,13 +433,13 @@ function DashboardHero({ greeting, dateLabel, actionCount, glance }) {
           attention
         </p>
       </div>
-      <div className="w-full sm:w-auto">
-        <div className="flex flex-wrap items-end gap-3 sm:justify-end">
-          <div title={ATTENTION_BREAKDOWN_TOOLTIP}>
+      <div className="w-full md:w-auto">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end">
+          <div title={ATTENTION_BREAKDOWN_TOOLTIP} className="min-w-0">
             <p className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-ink-tertiary">
               By type
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <GlancePill label="Tasks" value={glance.tasks} tone="default" />
               <GlancePill label="Deliverables" value={glance.deliverables} tone="warning" />
               <GlancePill label="At risk" value={glance.atRisk} tone="danger" />
@@ -447,7 +447,7 @@ function DashboardHero({ greeting, dateLabel, actionCount, glance }) {
           </div>
           <div
             title={VISITS_REMINDER_TOOLTIP}
-            className="flex shrink-0 items-end self-stretch border-l border-line/60 pl-3 sm:pl-4"
+            className="flex shrink-0 items-end self-stretch border-t border-line/60 pt-3 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0"
           >
             <GlancePill label="Visits today" value={glance.visits} tone="info" />
           </div>
@@ -465,7 +465,7 @@ function GlancePill({ label, value, tone }) {
     default: 'text-ink',
   };
   return (
-    <div className="flex min-w-[88px] items-center justify-between gap-3 rounded-xl border border-white/80 bg-white/90 px-3.5 py-2 shadow-sm">
+    <div className="flex min-w-[calc(50%-0.25rem)] flex-1 items-center justify-between gap-3 rounded-xl border border-white/80 bg-white/90 px-3.5 py-2 shadow-sm sm:min-w-[88px] sm:flex-none">
       <span className="text-2xs text-ink-secondary">{label}</span>
       <span className={`text-lg font-medium tabular-nums ${valueColors[tone] ?? 'text-ink'}`}>
         {value}
@@ -527,10 +527,10 @@ function DashboardListRow({ engagementId, onOpen, children, actions }) {
   const canOpen = Boolean(engagementRecordPath(engagementId));
 
   return (
-    <li className="flex items-center gap-3 px-4 py-3 transition-colors">
+    <li className="flex flex-col gap-3 px-4 py-3 transition-colors sm:flex-row sm:items-center">
       <button
         type="button"
-        className={`flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/30 ${
+        className={`flex min-w-0 w-full items-center gap-3 rounded-lg text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/30 sm:flex-1 sm:w-auto ${
           canOpen
             ? 'cursor-pointer hover:bg-black/[0.04] active:bg-black/[0.07]'
             : 'cursor-default'
@@ -544,7 +544,9 @@ function DashboardListRow({ engagementId, onOpen, children, actions }) {
         {children}
       </button>
       {actions ? (
-        <div className="flex shrink-0 flex-wrap items-center gap-1.5">{actions}</div>
+        <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-stretch sm:justify-end">
+          {actions}
+        </div>
       ) : null}
     </li>
   );
@@ -583,7 +585,7 @@ function ActionButton({ label, onClick, variant = 'outline' }) {
         e.stopPropagation();
         onClick?.();
       }}
-      className={`shrink-0 rounded-lg px-2.5 py-1.5 text-2xs font-medium transition-colors ${
+      className={`min-h-[44px] w-full shrink-0 rounded-lg px-3 py-2.5 text-2xs font-medium transition-colors sm:w-auto sm:min-h-0 sm:px-2.5 sm:py-1.5 ${
         variant === 'primary'
           ? 'bg-brand text-white hover:bg-brand-hover'
           : variant === 'success'

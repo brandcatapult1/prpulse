@@ -1,54 +1,49 @@
-export function DataTable({
+function renderCell(col, row, ctx = {}) {
+  return col.render ? col.render(row, ctx) : row[col.key];
+}
+
+function DataTableDesktop({
   columns,
   rows,
   onRowClick,
-  selectable = false,
-  selected = [],
+  selectable,
+  selected,
   onSelect,
   onSelectAll,
-  allSelected = false,
-  someSelected = false,
+  allSelected,
+  someSelected,
   isRowDisabled,
 }) {
-  if (!rows.length) {
-    return (
-      <div className="panel px-4 py-10 text-center text-2xs text-ink-secondary">
-        No rows to show
-      </div>
-    );
-  }
-
   return (
-    <div className="panel overflow-hidden">
-      <table className="min-w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-line bg-canvas/60">
-            {selectable && (
-              <th className="w-10 px-4 py-2.5">
-                {onSelectAll && (
-                  <input
-                    type="checkbox"
-                    className="rounded border-line text-brand focus:ring-brand/30"
-                    checked={allSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = someSelected && !allSelected;
-                    }}
-                    onChange={() => onSelectAll?.()}
-                  />
-                )}
-              </th>
-            )}
-            {columns.map((col) => (
-              <th key={col.key} className="px-4 py-2.5 text-2xs font-medium uppercase tracking-wide text-ink-tertiary">
-                {col.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const disabled = isRowDisabled?.(row) ?? false;
-            return (
+    <table className="min-w-full text-left text-sm">
+      <thead>
+        <tr className="border-b border-line bg-canvas/60">
+          {selectable && (
+            <th className="w-10 px-4 py-2.5">
+              {onSelectAll && (
+                <input
+                  type="checkbox"
+                  className="rounded border-line text-brand focus:ring-brand/30"
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someSelected && !allSelected;
+                  }}
+                  onChange={() => onSelectAll?.()}
+                />
+              )}
+            </th>
+          )}
+          {columns.map((col) => (
+            <th key={col.key} className="px-4 py-2.5 text-2xs font-medium uppercase tracking-wide text-ink-tertiary">
+              {col.label}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => {
+          const disabled = isRowDisabled?.(row) ?? false;
+          return (
             <tr
               key={row.id}
               className={`group border-b border-line/80 last:border-0 transition-colors ${
@@ -75,15 +70,168 @@ export function DataTable({
               )}
               {columns.map((col) => (
                 <td key={col.key} className="px-4 py-2.5 text-sm text-ink">
-                  {col.render ? col.render(row, { disabled }) : row[col.key]}
+                  {renderCell(col, row, { disabled })}
                 </td>
               ))}
             </tr>
-            );
-          })}
-        </tbody>
-      </table>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function DataTableMobileCards({
+  columns,
+  rows,
+  onRowClick,
+  selectable,
+  selected,
+  onSelect,
+  onSelectAll,
+  allSelected,
+  someSelected,
+  isRowDisabled,
+}) {
+  const primaryCol = columns.find((col) => col.mobilePrimary) ?? columns[0];
+  const secondaryCols = columns.filter((col) => col.key !== primaryCol?.key);
+
+  return (
+    <div className="space-y-2">
+      {selectable && onSelectAll && (
+        <label className="flex min-h-[44px] cursor-pointer items-center gap-2 px-1">
+          <input
+            type="checkbox"
+            className="rounded border-line text-brand focus:ring-brand/30"
+            checked={allSelected}
+            ref={(el) => {
+              if (el) el.indeterminate = someSelected && !allSelected;
+            }}
+            onChange={() => onSelectAll?.()}
+          />
+          <span className="text-2xs text-ink-secondary">Select all</span>
+        </label>
+      )}
+
+      {rows.map((row) => {
+        const disabled = isRowDisabled?.(row) ?? false;
+        const interactive = Boolean(onRowClick) && !disabled;
+
+        return (
+          <div
+            key={row.id}
+            role={interactive ? 'button' : undefined}
+            tabIndex={interactive ? 0 : undefined}
+            className={`campaign-glass-tile w-full px-4 py-3 text-left transition-colors ${
+              disabled
+                ? 'cursor-not-allowed opacity-60'
+                : interactive
+                  ? 'cursor-pointer hover:border-brand/20'
+                  : ''
+            }`}
+            onClick={() => {
+              if (!disabled) onRowClick?.(row);
+            }}
+            onKeyDown={(event) => {
+              if (!interactive) return;
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onRowClick?.(row);
+              }
+            }}
+          >
+            <div className="flex items-start gap-3">
+              {selectable && (
+                <div className="flex min-h-[44px] shrink-0 items-center" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    className="rounded border-line text-brand focus:ring-brand/30 disabled:cursor-not-allowed"
+                    checked={selected.includes(row.id)}
+                    disabled={disabled}
+                    onChange={() => {
+                      if (!disabled) onSelect?.(row.id);
+                    }}
+                  />
+                </div>
+              )}
+
+              <div className="min-w-0 flex-1">
+                <div className="text-sm text-ink">
+                  {primaryCol ? renderCell(primaryCol, row, { disabled }) : null}
+                </div>
+
+                {secondaryCols.length > 0 && (
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-2xs">
+                    {secondaryCols.map((col) => (
+                      <div key={col.key} className="flex min-w-0 max-w-full items-center gap-1">
+                        <span className="shrink-0 text-ink-tertiary">{col.label}</span>
+                        <span className="min-w-0 text-ink-secondary">
+                          {renderCell(col, row, { disabled })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
+  );
+}
+
+export function DataTable({
+  columns,
+  rows,
+  onRowClick,
+  selectable = false,
+  selected = [],
+  onSelect,
+  onSelectAll,
+  allSelected = false,
+  someSelected = false,
+  isRowDisabled,
+  responsive = false,
+}) {
+  if (!rows.length) {
+    return (
+      <div className="panel px-4 py-10 text-center text-2xs text-ink-secondary">
+        No rows to show
+      </div>
+    );
+  }
+
+  const tableProps = {
+    columns,
+    rows,
+    onRowClick,
+    selectable,
+    selected,
+    onSelect,
+    onSelectAll,
+    allSelected,
+    someSelected,
+    isRowDisabled,
+  };
+
+  if (!responsive) {
+    return (
+      <div className="panel overflow-hidden">
+        <DataTableDesktop {...tableProps} />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="panel hidden overflow-hidden md:block">
+        <DataTableDesktop {...tableProps} />
+      </div>
+      <div className="md:hidden">
+        <DataTableMobileCards {...tableProps} />
+      </div>
+    </>
   );
 }
 

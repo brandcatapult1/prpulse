@@ -153,6 +153,7 @@ export function ContactsPage() {
         <DataTable
           columns={columns}
           rows={filteredRows}
+          responsive
           selectable
           selected={selectedIds}
           onSelect={toggleSelect}

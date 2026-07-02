@@ -101,7 +101,7 @@ export function CampaignsPage() {
           </button>
         </div>
       ) : (
-        <DataTable columns={columns} rows={rows} onRowClick={(r) => navigate(`/campaigns/${r.id}`)} />
+        <DataTable columns={columns} rows={rows} responsive onRowClick={(r) => navigate(`/campaigns/${r.id}`)} />
       )}
 
       <AddCampaignModal

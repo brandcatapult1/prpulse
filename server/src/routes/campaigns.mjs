@@ -212,8 +212,8 @@ campaignsRouter.post('/:id/populate', requireAuth, requireCampaignWriteAccess('i
     const results = [];
     for (const contactId of contact_ids) {
       const { rows } = await client.query(
-        `INSERT INTO engagements (contact_id, campaign_id, assigned_manager, created_by)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO engagements (contact_id, campaign_id, assigned_manager, collaboration_type, created_by)
+         VALUES ($1, $2, $3, 'barter', $4)
          ON CONFLICT (contact_id, campaign_id) DO NOTHING
          RETURNING *`,
         [contactId, req.params.id, managerId, req.user.id],

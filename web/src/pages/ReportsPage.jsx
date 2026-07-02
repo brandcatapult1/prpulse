@@ -115,6 +115,18 @@ export function ReportsPage() {
     loadReport(cycleId);
   }, [cycleId, loadReport]);
 
+  useEffect(() => {
+    const rows = report?.collaborations ?? [];
+    for (const collab of rows) {
+      if (!normalizeCollaborationType(collab?.collaboration_type)) {
+        console.warn(
+          '[Reports] Missing collaboration_type for completed engagement',
+          { engagementId: collab?.id, contactName: collab?.contact_name },
+        );
+      }
+    }
+  }, [report?.collaborations]);
+
   const hero = report?.hero;
   const stats = report?.stats;
   const heroHealth = hero?.cycle_health ?? 'not_set';

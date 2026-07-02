@@ -538,7 +538,7 @@ async function upsertEngagement(client, { contactId, campaignId, managerId, plan
     visit_outlet: plan.visit_outlet ?? null,
     visit_notes: plan.visit_notes ?? null,
     visit_completed_date: plan.visit_completed_date ?? null,
-    collaboration_type: plan.collaboration_type ?? null,
+    collaboration_type: plan.collaboration_type ?? 'barter',
     agreed_fee: plan.agreed_fee ?? null,
     primary_collaboration_reason: plan.primary_collaboration_reason ?? null,
     dropped_from: plan.dropped_from ?? null,
@@ -763,7 +763,7 @@ async function applyEngagementPlan(client, { plan, campaignIds, contactIds, user
            collaboration_type = COALESCE($3, collaboration_type),
            next_follow_up_date = NULL
        WHERE id = $1`,
-      [engagementId, plan.primary_collaboration_reason ?? 'expert', plan.collaboration_type ?? null],
+      [engagementId, plan.primary_collaboration_reason ?? 'expert', plan.collaboration_type ?? 'barter'],
     );
   } else if (plan.status === 'collaboration_complete' && isAlreadyComplete) {
     await client.query(
@@ -777,7 +777,7 @@ async function applyEngagementPlan(client, { plan, campaignIds, contactIds, user
         engagementId,
         plan.primary_collaboration_reason ?? 'expert',
         plan.visit_completed_date ?? null,
-        plan.collaboration_type ?? null,
+        plan.collaboration_type ?? 'barter',
       ],
     );
   }

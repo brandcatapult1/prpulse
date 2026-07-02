@@ -117,7 +117,9 @@ export async function loadCycleReport(client, cycleId) {
   }
 
   const { rows: engagementRows } = await client.query(
-    `SELECT e.id, e.contact_id, e.collaboration_type, c.full_name AS contact_name,
+    `SELECT e.id, e.contact_id,
+            e.collaboration_type AS engagement_collaboration_type,
+            c.full_name AS contact_name,
             (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date AS completed_at_ist
      FROM engagements e
      JOIN contacts c ON c.id = e.contact_id
@@ -186,7 +188,7 @@ export async function loadCycleReport(client, cycleId) {
       id: eng.id,
       contact_id: eng.contact_id,
       contact_name: eng.contact_name,
-      collaboration_type: normalizeCollaborationType(eng.collaboration_type),
+      collaboration_type: normalizeCollaborationType(eng.engagement_collaboration_type),
       completed_at_ist: eng.completed_at_ist,
       proof: buildDeliverableProofItems(deliverablesByEngagement.get(eng.id) ?? []),
     }));

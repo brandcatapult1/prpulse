@@ -1,4 +1,4 @@
-import { addDaysToIsoDate } from './dates.js';
+import { addDaysToIsoDate, todayIstIso } from './dates.js';
 
 const IST = 'Asia/Kolkata';
 
@@ -19,6 +19,22 @@ export function formatCycleSelectorLabel(cycle, { campaignType, termMonths } = {
     return `Cycle ${cycle.cycle_number} of ${Number(termMonths)} · ${range}`;
   }
   return range ? `Cycle ${cycle.cycle_number} · ${range}` : `Cycle ${cycle.cycle_number}`;
+}
+
+/** Reports selector — current and past cycles only (cycle_start on or before today IST). */
+export function filterCyclesForReportSelector(cycles, todayIso = todayIstIso()) {
+  return (cycles ?? []).filter((cycle) => cycle?.cycle_start && cycle.cycle_start <= todayIso);
+}
+
+/** Default Reports cycle: current cycle when reportable, else latest started cycle. */
+export function defaultReportCycleId(cycles, currentCycle, todayIso = todayIstIso()) {
+  const selectable = filterCyclesForReportSelector(cycles, todayIso);
+  if (!selectable.length) return '';
+  const currentId = currentCycle?.id;
+  if (currentId && selectable.some((cycle) => cycle.id === currentId)) {
+    return currentId;
+  }
+  return selectable[selectable.length - 1].id;
 }
 
 export function formatCycleRangeLabel(cycle) {

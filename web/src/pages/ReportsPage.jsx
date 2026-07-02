@@ -4,7 +4,7 @@ import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { HealthBadge } from '../components/ui/HealthBadge.jsx';
 import { MetricTile } from '../components/campaign/CampaignMetricTiles.jsx';
 import { DeliverableProofList } from '../components/deliverables/DeliverableProofList.jsx';
-import { formatCycleSelectorLabel } from '../lib/campaignCycles.js';
+import { defaultReportCycleId, filterCyclesForReportSelector, formatCycleSelectorLabel } from '../lib/campaignCycles.js';
 import { formatDate } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
 import {
@@ -35,6 +35,10 @@ export function ReportsPage() {
 
   const cycles = cyclesPayload?.cycles ?? [];
   const currentCycleId = cyclesPayload?.current_cycle?.id ?? null;
+  const selectableCycles = useMemo(
+    () => filterCyclesForReportSelector(cycles),
+    [cycles],
+  );
 
   useEffect(() => {
     setLoadingNav(true);
@@ -79,8 +83,7 @@ export function ReportsPage() {
     fetchReportCampaignCycles(campaignId)
       .then((payload) => {
         setCyclesPayload(payload);
-        const defaultCycle = payload?.current_cycle?.id ?? payload?.cycles?.[0]?.id ?? '';
-        setCycleId(defaultCycle);
+        setCycleId(defaultReportCycleId(payload?.cycles, payload?.current_cycle));
       })
       .catch((err) => {
         setCyclesPayload(null);
@@ -183,8 +186,8 @@ export function ReportsPage() {
             label="Cycle"
             value={cycleId}
             onChange={setCycleId}
-            disabled={loadingNav || !campaignId || !cycles.length}
-            options={cycles.map((c) => ({
+            disabled={loadingNav || !campaignId || !selectableCycles.length}
+            options={selectableCycles.map((c) => ({
               value: c.id,
               label: formatCycleSelectorLabel(c, {
                 campaignType: selectedCampaign?.campaign_type,

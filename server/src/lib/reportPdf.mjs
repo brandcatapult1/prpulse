@@ -81,6 +81,19 @@ function sectionTitle(doc, title) {
   doc.font('Helvetica');
 }
 
+function healthLabel(health) {
+  if (health === 'green') return 'On track';
+  if (health === 'amber') return 'At risk';
+  if (health === 'red') return 'Behind';
+  return 'No target set';
+}
+
+function proofUnitCount(item) {
+  const match = String(item?.label ?? '').match(/×\s*(\d+)/);
+  const n = Number(match?.[1] ?? NaN);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 function fileSafe(value) {
   return String(value ?? '')
     .trim()
@@ -132,7 +145,7 @@ export async function buildCycleReportPdf({ report, logoUrl }) {
   const heroLine = `${hero.completed_collaborations ?? 0} / ${hero.target ?? '—'} complete`;
   doc.font('Helvetica-Bold').fontSize(24).fillColor('#101828').text(heroLine);
   doc.font('Helvetica').fontSize(11).fillColor('#475467')
-    .text(`${Math.round(Number(hero.achievement_pct ?? 0))}% achieved · Health: ${hero.cycle_health ?? 'not_set'}`);
+    .text(`${Math.round(Number(hero.achievement_pct ?? 0))}% achieved · Health: ${healthLabel(hero.cycle_health)}`);
   doc.moveDown(0.4);
 
   const cardY = doc.y;
@@ -161,7 +174,10 @@ export async function buildCycleReportPdf({ report, logoUrl }) {
       doc.font('Helvetica').fontSize(10).fillColor('#475467').text(collabType, { continued: false });
     }
     if (collab.completed_at_ist) {
-      doc.font('Helvetica').fontSize(9).fillColor('#667085').text(`Completed ${formatIstDate(collab.completed_at_ist)}`);
+      const completedLabel = formatIstDate(collab.completed_at_ist);
+      if (completedLabel) {
+        doc.font('Helvetica').fontSize(9).fillColor('#667085').text(`Completed ${completedLabel}`);
+      }
     }
     doc.moveDown(0.2);
 
@@ -176,7 +192,8 @@ export async function buildCycleReportPdf({ report, logoUrl }) {
       ensurePageSpace(doc, 72);
       const posted = formatIstDate(item.posted_date);
       doc.font('Helvetica-Bold').fontSize(10).fillColor('#101828').text(item.label);
-      if (posted) {
+      const isStory = String(item.deliverable_type ?? '').toLowerCase() === 'story';
+      if (posted && !isStory) {
         doc.font('Helvetica').fontSize(9).fillColor('#667085').text(`Posted ${posted}`);
       }
 
@@ -186,14 +203,17 @@ export async function buildCycleReportPdf({ report, logoUrl }) {
         doc.fillColor('#155eef').fontSize(9).text(link, { link, underline: true });
       }
 
-      const isStory = String(item.deliverable_type ?? '').toLowerCase() === 'story';
       const shots = Array.isArray(item.screenshots) ? item.screenshots : [];
       if (isStory && shots.length) {
+        const expectedUnits = proofUnitCount(item);
+        const selectedShots = expectedUnits ? shots.slice(0, expectedUnits) : shots;
         const maxWidth = 88;
         const maxHeight = 156;
+        const rowStartY = doc.y + 6;
         let x = doc.page.margins.left;
-        let y = doc.y + 6;
-        for (const shot of shots) {
+        let y = rowStartY;
+        ensurePageSpace(doc, maxHeight + 44);
+        for (const shot of selectedShots) {
           if (x + maxWidth > doc.page.width - doc.page.margins.right) {
             x = doc.page.margins.left;
             y += maxHeight + 28;

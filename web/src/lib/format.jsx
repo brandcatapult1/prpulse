@@ -56,6 +56,20 @@ export function formatDate(d) {
   return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
+/** Posted date label for proof display — day + month in IST. */
+export function formatPostedDateIst(iso) {
+  if (!iso) return null;
+  const date = typeof iso === 'string'
+    ? iso.slice(0, 10)
+    : new Date(iso).toISOString().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',
+    month: 'short',
+  }).format(new Date(`${date}T12:00:00`));
+}
+
 export function formatFee(fee) {
   if (fee == null) return '—';
   return `₹${Number(fee).toLocaleString('en-IN')}`;

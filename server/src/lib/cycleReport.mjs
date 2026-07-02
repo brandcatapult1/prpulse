@@ -111,7 +111,7 @@ export async function loadCycleReport(client, cycleId) {
   }
 
   const { rows: engagementRows } = await client.query(
-    `SELECT e.id, e.contact_id, c.full_name AS contact_name,
+    `SELECT e.id, e.contact_id, e.collaboration_type, c.full_name AS contact_name,
             (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date AS completed_at_ist
      FROM engagements e
      JOIN contacts c ON c.id = e.contact_id
@@ -130,7 +130,7 @@ export async function loadCycleReport(client, cycleId) {
   if (engagementIds.length) {
     const { rows: dels } = await client.query(
       `SELECT d.id, d.engagement_id, d.deliverable_type, d.quantity, d.posted_quantity,
-              d.unit_proofs, d.status, d.content_link
+              d.unit_proofs, d.status, d.content_link, d.published_date
        FROM deliverables d
        WHERE d.engagement_id = ANY($1::uuid[])`,
       [engagementIds],
@@ -168,6 +168,7 @@ export async function loadCycleReport(client, cycleId) {
         unit_proofs: Array.isArray(row.unit_proofs) ? row.unit_proofs : [],
         status: row.status,
         content_link: row.content_link,
+        published_date: row.published_date,
         screenshots: screenshotsById.get(row.id) ?? [],
       };
       const list = deliverablesByEngagement.get(row.engagement_id) ?? [];
@@ -179,6 +180,7 @@ export async function loadCycleReport(client, cycleId) {
       id: eng.id,
       contact_id: eng.contact_id,
       contact_name: eng.contact_name,
+      collaboration_type: eng.collaboration_type,
       completed_at_ist: eng.completed_at_ist,
       proof: buildDeliverableProofItems(deliverablesByEngagement.get(eng.id) ?? []),
     }));

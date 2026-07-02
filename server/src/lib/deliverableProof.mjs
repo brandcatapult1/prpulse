@@ -1,3 +1,19 @@
+function toIsoDate(value) {
+  if (!value) return null;
+  if (typeof value === 'string') return value.slice(0, 10);
+  return value.toISOString().slice(0, 10);
+}
+
+function resolveDeliverablePostedDate(deliverable, unitProofs) {
+  const fromRow = toIsoDate(deliverable.published_date);
+  if (fromRow) return fromRow;
+  for (let i = unitProofs.length - 1; i >= 0; i -= 1) {
+    const unitDate = toIsoDate(unitProofs[i]?.published_date);
+    if (unitDate) return unitDate;
+  }
+  return null;
+}
+
 function screenshotHasUrl(shot) {
   const url = shot?.url ?? shot?.file_path;
   return Boolean(String(url ?? '').trim());
@@ -57,6 +73,7 @@ export function buildDeliverableProofItems(deliverables) {
     .filter((d) => isDeliverableFullyPosted(d) && deliverableHasProof(d))
     .map((d) => {
       const unitProofs = Array.isArray(d.unit_proofs) ? d.unit_proofs : [];
+      const postedDate = resolveDeliverablePostedDate(d, unitProofs);
 
       const links = [];
       const addLink = (link) => {
@@ -68,21 +85,30 @@ export function buildDeliverableProofItems(deliverables) {
 
       const screenshots = [];
       const seen = new Set();
-      const addShot = (s) => {
+      const addShot = (s, shotPostedDate) => {
         if (!s) return;
         const url = s.url ?? s.file_path ?? null;
         const key = url ?? s.id ?? s.label;
         if (!key || seen.has(key)) return;
         seen.add(key);
-        screenshots.push({ id: s.id ?? key, label: s.label ?? 'Screenshot', url });
+        screenshots.push({
+          id: s.id ?? key,
+          label: s.label ?? 'Screenshot',
+          url,
+          posted_date: shotPostedDate ?? postedDate,
+        });
       };
-      (d.screenshots ?? []).forEach(addShot);
-      unitProofs.forEach((u) => (u.screenshots ?? []).forEach(addShot));
+      (d.screenshots ?? []).forEach((s) => addShot(s, postedDate));
+      unitProofs.forEach((u) => {
+        const unitDate = toIsoDate(u.published_date) ?? postedDate;
+        (u.screenshots ?? []).forEach((s) => addShot(s, unitDate));
+      });
 
       return {
         id: d.id,
         label: `${d.deliverable_type} ×${d.quantity}`,
         deliverable_type: d.deliverable_type,
+        posted_date: postedDate,
         links,
         screenshots,
       };

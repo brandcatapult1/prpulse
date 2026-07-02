@@ -97,3 +97,16 @@ export function contactFiltersActive(filters, { query = '', includeStatus = true
     || query.trim(),
   );
 }
+
+/** Count distinct active facet dimensions (excludes free-text search). */
+export function activeFacetFilterCount(filters, { includeStatus = true } = {}) {
+  let count = 0;
+  if (includeStatus && filters.status) count += 1;
+  if (filters.classification) count += 1;
+  if (filters.city) count += 1;
+  if (filters.openToPaid) count += 1;
+  if (filters.openToBarter) count += 1;
+  if ((filters.tagIds?.length ?? 0) > 0) count += 1;
+  if ((filters.primaryCategoryIds?.length ?? 0) > 0) count += 1;
+  return count;
+}

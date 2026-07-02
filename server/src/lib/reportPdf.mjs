@@ -94,6 +94,29 @@ function proofUnitCount(item) {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+function estimateCreatorBlockHeight(collab) {
+  const proofItems = Array.isArray(collab?.proof) ? collab.proof : [];
+  let h = 58;
+  for (const item of proofItems) {
+    h += 28;
+    const isStory = String(item?.deliverable_type ?? '').toLowerCase() === 'story';
+    if (isStory) {
+      const shots = Array.isArray(item?.screenshots) ? item.screenshots : [];
+      const expectedUnits = proofUnitCount(item);
+      const count = expectedUnits ? Math.min(expectedUnits, shots.length) : shots.length;
+      if (count > 0) {
+        const perRow = 4;
+        h += Math.ceil(count / perRow) * 188;
+      }
+    } else {
+      const links = Array.isArray(item?.links) ? item.links : [];
+      h += links.length * 12;
+    }
+    h += 10;
+  }
+  return h + 16;
+}
+
 function fileSafe(value) {
   return String(value ?? '')
     .trim()
@@ -119,26 +142,35 @@ export async function buildCycleReportPdf({ report, logoUrl }) {
   doc.on('data', (chunk) => chunks.push(chunk));
   const done = new Promise((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
 
+  const left = doc.page.margins.left;
+  const right = doc.page.width - doc.page.margins.right;
+  const contentWidth = right - left;
+
   const logoBuffer = await fetchBuffer(logoUrl, 8000);
+  const headerTop = doc.y;
   if (logoBuffer) {
     try {
-      doc.image(logoBuffer, doc.page.margins.left, doc.y, { fit: [140, 38] });
-      doc.y += 42;
+      doc.image(logoBuffer, left, headerTop, { fit: [120, 34] });
     } catch {
-      doc.fontSize(10).fillColor('#667085').text('Brand Catapult');
-      doc.moveDown(0.5);
+      doc.fontSize(10).fillColor('#667085').text('Brand Catapult', left, headerTop);
     }
   } else {
-    doc.fontSize(10).fillColor('#667085').text('Brand Catapult');
-    doc.moveDown(0.5);
+    doc.fontSize(10).fillColor('#667085').text('Brand Catapult', left, headerTop);
   }
 
   const cycleLabel = report?.campaign?.campaign_type === 'monthly' && Number(report?.campaign?.term_months)
     ? `Cycle ${report.cycle.cycle_number} of ${Number(report.campaign.term_months)}`
     : `Cycle ${report?.cycle?.cycle_number ?? '—'}`;
   const title = `${report.brand.brand_name} · ${report.campaign.campaign_name} · ${cycleLabel} · ${cycleRangeLabel(report.cycle)}`;
-  doc.font('Helvetica-Bold').fontSize(15).fillColor('#101828').text(title);
-  doc.moveDown(0.2);
+
+  const titleX = logoBuffer ? left + 132 : left;
+  const titleWidth = logoBuffer ? contentWidth - 132 : contentWidth;
+  doc.font('Helvetica-Bold').fontSize(14).fillColor('#101828').text(title, titleX, headerTop, {
+    width: titleWidth,
+  });
+  doc.y = Math.max(headerTop + 40, doc.y + 6);
+  doc.moveTo(left, doc.y).lineTo(right, doc.y).strokeColor('#d0d5dd').lineWidth(1).stroke();
+  doc.moveDown(0.5);
 
   sectionTitle(doc, 'Cycle performance');
   const hero = report.hero ?? {};
@@ -150,10 +182,10 @@ export async function buildCycleReportPdf({ report, logoUrl }) {
 
   const cardY = doc.y;
   const cardGap = 10;
-  const cardWidth = (doc.page.width - doc.page.margins.left - doc.page.margins.right - cardGap * 2) / 3;
-  drawStatCard(doc, doc.page.margins.left, cardY, cardWidth, 'Collaborations complete', Number(report.stats?.collaborations_complete ?? 0));
-  drawStatCard(doc, doc.page.margins.left + cardWidth + cardGap, cardY, cardWidth, 'Deliverables awaited', Number(report.stats?.deliverables_awaited ?? 0));
-  drawStatCard(doc, doc.page.margins.left + (cardWidth + cardGap) * 2, cardY, cardWidth, 'Successful visits', Number(report.stats?.visits_completed ?? 0));
+  const cardWidth = (contentWidth - cardGap * 2) / 3;
+  drawStatCard(doc, left, cardY, cardWidth, 'Collaborations complete', Number(report.stats?.collaborations_complete ?? 0));
+  drawStatCard(doc, left + cardWidth + cardGap, cardY, cardWidth, 'Deliverables awaited', Number(report.stats?.deliverables_awaited ?? 0));
+  drawStatCard(doc, left + (cardWidth + cardGap) * 2, cardY, cardWidth, 'Successful visits', Number(report.stats?.visits_completed ?? 0));
   doc.y = cardY + 66;
 
   sectionTitle(doc, 'Proof of delivery');
@@ -163,93 +195,120 @@ export async function buildCycleReportPdf({ report, logoUrl }) {
   }
 
   for (const collab of collaborations) {
-    ensurePageSpace(doc, 100);
-    doc.roundedRect(doc.page.margins.left, doc.y, doc.page.width - doc.page.margins.left - doc.page.margins.right, 1, 1)
-      .fill('#eaecf0');
-    doc.moveDown(0.5);
+    ensurePageSpace(doc, estimateCreatorBlockHeight(collab));
+    const blockTop = doc.y;
 
     const collabType = collab.collaboration_type === 'paid' ? 'Paid' : collab.collaboration_type === 'barter' ? 'Barter' : null;
-    doc.font('Helvetica-Bold').fontSize(12).fillColor('#101828').text(collab.contact_name);
+    doc.font('Helvetica-Bold').fontSize(12).fillColor('#101828').text(collab.contact_name, left, blockTop, {
+      width: contentWidth * 0.66,
+      lineBreak: false,
+    });
+
+    const completedLabel = collab.completed_at_ist ? formatIstDate(collab.completed_at_ist) : null;
+    if (completedLabel) {
+      doc.font('Helvetica').fontSize(9).fillColor('#667085').text(`Completed ${completedLabel}`, left, blockTop + 2, {
+        width: contentWidth,
+        align: 'right',
+      });
+    }
+
+    let yAfterHeader = blockTop + 16;
     if (collabType) {
-      doc.font('Helvetica').fontSize(10).fillColor('#475467').text(collabType, { continued: false });
+      const pillW = doc.widthOfString(collabType, { font: 'Helvetica', size: 9 }) + 14;
+      const pillY = blockTop + 16;
+      doc.roundedRect(left, pillY, pillW, 14, 4).fillAndStroke('#eef4ff', '#d0d5dd');
+      doc.fillColor('#1d4ed8').font('Helvetica').fontSize(9).text(collabType, left + 7, pillY + 3, {
+        width: pillW - 10,
+        align: 'left',
+      });
+      yAfterHeader = pillY + 16;
     }
-    if (collab.completed_at_ist) {
-      const completedLabel = formatIstDate(collab.completed_at_ist);
-      if (completedLabel) {
-        doc.font('Helvetica').fontSize(9).fillColor('#667085').text(`Completed ${completedLabel}`);
-      }
-    }
-    doc.moveDown(0.2);
+    doc.y = yAfterHeader + 6;
 
     const proofItems = Array.isArray(collab.proof) ? collab.proof : [];
     if (!proofItems.length) {
-      doc.fontSize(10).fillColor('#667085').text('No proof captured.');
-      doc.moveDown(0.5);
-      continue;
-    }
+      doc.fontSize(10).fillColor('#667085').text('No proof captured.', left, doc.y);
+      doc.y += 8;
+    } else {
+      for (const item of proofItems) {
+        ensurePageSpace(doc, 72);
+        const posted = formatIstDate(item.posted_date);
+        const isStory = String(item.deliverable_type ?? '').toLowerCase() === 'story';
 
-    for (const item of proofItems) {
-      ensurePageSpace(doc, 72);
-      const posted = formatIstDate(item.posted_date);
-      doc.font('Helvetica-Bold').fontSize(10).fillColor('#101828').text(item.label);
-      const isStory = String(item.deliverable_type ?? '').toLowerCase() === 'story';
-      if (posted && !isStory) {
-        doc.font('Helvetica').fontSize(9).fillColor('#667085').text(`Posted ${posted}`);
-      }
-
-      const links = Array.isArray(item.links) ? item.links : [];
-      for (const link of links) {
-        ensurePageSpace(doc, 14);
-        doc.fillColor('#155eef').fontSize(9).text(link, { link, underline: true });
-      }
-
-      const shots = Array.isArray(item.screenshots) ? item.screenshots : [];
-      if (isStory && shots.length) {
-        const expectedUnits = proofUnitCount(item);
-        const selectedShots = expectedUnits ? shots.slice(0, expectedUnits) : shots;
-        const maxWidth = 88;
-        const maxHeight = 156;
-        const rowStartY = doc.y + 6;
-        let x = doc.page.margins.left;
-        let y = rowStartY;
-        ensurePageSpace(doc, maxHeight + 44);
-        for (const shot of selectedShots) {
-          if (x + maxWidth > doc.page.width - doc.page.margins.right) {
-            x = doc.page.margins.left;
-            y += maxHeight + 28;
-          }
-          ensurePageSpace(doc, (y - doc.y) + maxHeight + 34);
-          const shotBuffer = await fetchBuffer(shot.url, 10000);
-          doc.roundedRect(x, y, maxWidth, maxHeight, 4).stroke('#d0d5dd');
-          if (shotBuffer) {
-            try {
-              doc.image(shotBuffer, x, y, { fit: [maxWidth, maxHeight], align: 'center', valign: 'center' });
-            } catch {
-              doc.fontSize(8).fillColor('#667085').text('Image unavailable', x + 6, y + maxHeight / 2 - 6, {
-                width: maxWidth - 12,
-                align: 'center',
-              });
-            }
-          } else {
-            doc.fontSize(8).fillColor('#667085').text('Image unavailable', x + 6, y + maxHeight / 2 - 6, {
-              width: maxWidth - 12,
-              align: 'center',
-            });
-          }
-          const shotDate = formatIstDate(shot.posted_date ?? item.posted_date);
-          if (shotDate) {
-            doc.fontSize(8).fillColor('#667085').text(`Posted ${shotDate}`, x, y + maxHeight + 4, {
-              width: maxWidth,
-              align: 'center',
-            });
-          }
-          x += maxWidth + 12;
+        doc.font('Helvetica-Bold').fontSize(10).fillColor('#101828').text(item.label, left, doc.y, {
+          width: contentWidth,
+        });
+        if (posted && !isStory) {
+          doc.font('Helvetica').fontSize(9).fillColor('#667085').text(`Posted ${posted}`, left, doc.y + 1, {
+            width: contentWidth,
+          });
         }
-        doc.y = Math.max(doc.y, y + maxHeight + 24);
-      }
+        doc.moveDown(0.15);
 
-      doc.moveDown(0.3);
+        const links = Array.isArray(item.links) ? item.links : [];
+        for (const link of links) {
+          ensurePageSpace(doc, 14);
+          doc.fillColor('#155eef').fontSize(9).text(link, left, doc.y, {
+            width: contentWidth,
+            link,
+            underline: true,
+          });
+        }
+
+        const shots = Array.isArray(item.screenshots) ? item.screenshots : [];
+        if (isStory && shots.length) {
+          const expectedUnits = proofUnitCount(item);
+          const selectedShots = expectedUnits ? shots.slice(0, expectedUnits) : shots;
+          const shotW = 132;
+          const shotH = 235;
+          const colGap = 12;
+          const perRow = Math.max(1, Math.floor((contentWidth + colGap) / (shotW + colGap)));
+          let idx = 0;
+          while (idx < selectedShots.length) {
+            ensurePageSpace(doc, shotH + 28);
+            const rowY = doc.y + 4;
+            for (let col = 0; col < perRow && idx < selectedShots.length; col += 1, idx += 1) {
+              const shot = selectedShots[idx];
+              const x = left + col * (shotW + colGap);
+              const shotBuffer = await fetchBuffer(shot.url, 10000);
+              doc.roundedRect(x, rowY, shotW, shotH, 4).stroke('#d0d5dd');
+              if (shotBuffer) {
+                try {
+                  doc.image(shotBuffer, x, rowY, { fit: [shotW, shotH], align: 'center', valign: 'center' });
+                } catch {
+                  doc.fontSize(8).fillColor('#667085').text('Image unavailable', x + 6, rowY + shotH / 2 - 6, {
+                    width: shotW - 12,
+                    align: 'center',
+                  });
+                }
+              } else {
+                doc.fontSize(8).fillColor('#667085').text('Image unavailable', x + 6, rowY + shotH / 2 - 6, {
+                  width: shotW - 12,
+                  align: 'center',
+                });
+              }
+              const shotDate = formatIstDate(shot.posted_date ?? item.posted_date);
+              if (shotDate) {
+                doc.fontSize(8).fillColor('#667085').text(`Posted ${shotDate}`, x, rowY + shotH + 5, {
+                  width: shotW,
+                  align: 'center',
+                });
+              }
+            }
+            doc.y = rowY + shotH + 18;
+          }
+        }
+
+        doc.moveDown(0.25);
+      }
     }
+
+    doc.moveTo(left, doc.y + 4)
+      .lineTo(right, doc.y + 4)
+      .strokeColor('#eaecf0')
+      .lineWidth(1)
+      .stroke();
+    doc.y += 10;
   }
 
   doc.end();

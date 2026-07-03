@@ -1,5 +1,5 @@
 import { columnIdForStatus } from './campaignKanban.js';
-import { canMarkDidntDeliver } from './campaignPermissions.js';
+import { canMarkDidntDeliver, canReopenComplete } from './campaignPermissions.js';
 import { isValidDropReason, isDroppedStatus } from './dropTransitions.js';
 import {
   DIDNT_DELIVER_DROP_REASON,
@@ -19,6 +19,7 @@ export const DRAWER_MOVE = {
   COMPLETE: 'drawer:complete',
   DIDNT_DELIVER: 'drawer:didnt_deliver',
   REOPEN: 'drawer:reopen',
+  REOPEN_COMPLETE: 'drawer:reopen_complete',
 };
 
 export function drawerCurrentStageLabel(engagement, formatStatus) {
@@ -119,6 +120,19 @@ export function getCampaignDrawerMoveTargets(engagement, { canComplete, role }) 
       });
     }
     return targets;
+  }
+
+  if (columnId === 'complete' && status === 'collaboration_complete') {
+    if (canReopenComplete(role)) {
+      return [
+        {
+          value: DRAWER_MOVE.REOPEN_COMPLETE,
+          label: 'Reopen',
+          needsConfirm: 'reopen_complete',
+        },
+      ];
+    }
+    return [];
   }
 
   if (columnId === 'dropped' && isDroppedStatus(status)) {

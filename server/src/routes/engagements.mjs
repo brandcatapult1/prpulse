@@ -5,6 +5,7 @@ import { requireAuth } from '../middleware/auth.mjs';
 import {
   requireDidntDeliverPermission,
   requireEngagementWriteAccess,
+  requireSeniorOrAdmin,
 } from '../middleware/permissions.mjs';
 import { isCloudinaryConfigured, uploadProofScreenshot } from '../lib/cloudinary.mjs';
 import {
@@ -133,6 +134,69 @@ engagementsRouter.get('/:id', requireAuth, async (req, res) => {
 engagementsRouter.patch('/:id', requireAuth, requireEngagementWriteAccess('id'), requireDidntDeliverPermission, patchEngagement);
 engagementsRouter.patch('/:id/status', requireAuth, requireEngagementWriteAccess('id'), requireDidntDeliverPermission, patchEngagement);
 
+const REOPEN_COMPLETE_STATUS = 'awaiting_final_deliverables';
+
+/**
+ * Sanctioned reopen from Collaboration Complete → Awaiting Final Deliverables.
+ * Admin / Senior Manager only. Status UPDATE fires trg_engagement_after_status →
+ * fn_refresh_engagement_completion (metrics + campaign tags). completed_at retained.
+ */
+engagementsRouter.post(
+  '/:id/reopen',
+  requireAuth,
+  requireEngagementWriteAccess('id'),
+  requireSeniorOrAdmin,
+  async (req, res) => {
+    try {
+      const updated = await withUserTransaction(req.user.id, async (client) => {
+        const current = await client.query('SELECT * FROM engagements WHERE id = $1', [req.params.id]);
+        if (!current.rows[0]) throw Object.assign(new Error('Not found'), { status: 404 });
+        const cur = current.rows[0];
+
+        if (cur.conversation_status !== 'collaboration_complete') {
+          throw Object.assign(
+            new Error('Only a completed collaboration can be reopened'),
+            { status: 409 },
+          );
+        }
+
+        const patch = { conversation_status: REOPEN_COMPLETE_STATUS };
+        const { rows } = await client.query(
+          `UPDATE engagements
+           SET conversation_status = $2,
+               last_status_change_at = now(),
+               updated_at = now()
+           WHERE id = $1
+           RETURNING *`,
+          [req.params.id, REOPEN_COMPLETE_STATUS],
+        );
+
+        await recordEngagementPatchActivity(client, req.user, cur, rows[0], patch);
+        return loadEngagementRow(client, req.params.id);
+      });
+      res.json(updated);
+    } catch (err) {
+      res.status(err.status ?? 500).json({ error: err.message });
+    }
+  },
+);
+
+async function assertDeliverablesEditable(client, engagementId) {
+  const { rows } = await client.query(
+    'SELECT conversation_status FROM engagements WHERE id = $1',
+    [engagementId],
+  );
+  if (!rows[0]) {
+    throw Object.assign(new Error('Engagement not found'), { status: 404 });
+  }
+  if (rows[0].conversation_status === 'collaboration_complete') {
+    throw Object.assign(
+      new Error('Deliverables are locked while collaboration is complete. Reopen the engagement to amend.'),
+      { status: 409 },
+    );
+  }
+}
+
 engagementsRouter.post('/:id/schedule', requireAuth, requireEngagementWriteAccess('id'), async (req, res) => {
   try {
     const result = await withUserTransaction(req.user.id, async (client) =>
@@ -177,6 +241,17 @@ async function patchEngagement(req, res) {
 
       if (Object.prototype.hasOwnProperty.call(patch, 'visit_time')) {
         patch.visit_time = normalizeVisitTime(patch.visit_time);
+      }
+
+      if (
+        cur.conversation_status === 'collaboration_complete'
+        && patch.conversation_status
+        && patch.conversation_status !== 'collaboration_complete'
+      ) {
+        throw Object.assign(
+          new Error('Use Reopen to move an engagement out of Collaboration Complete'),
+          { status: 409 },
+        );
       }
 
       const newStatus = patch.conversation_status ?? cur.conversation_status;
@@ -337,6 +412,7 @@ engagementsRouter.post(
 engagementsRouter.post('/:id/deliverables', requireAuth, requireEngagementWriteAccess('id'), async (req, res) => {
   try {
     const row = await withUserTransaction(req.user.id, async (client) => {
+      await assertDeliverablesEditable(client, req.params.id);
       const eng = await client.query('SELECT id, campaign_id FROM engagements WHERE id = $1', [req.params.id]);
       if (!eng.rows[0]) throw Object.assign(new Error('Engagement not found'), { status: 404 });
 
@@ -379,6 +455,7 @@ engagementsRouter.post('/:id/deliverables', requireAuth, requireEngagementWriteA
 engagementsRouter.patch('/:engagementId/deliverables/:deliverableId', requireAuth, requireEngagementWriteAccess('engagementId'), async (req, res) => {
   try {
     const row = await withUserTransaction(req.user.id, async (client) => {
+      await assertDeliverablesEditable(client, req.params.engagementId);
       const cur = await client.query(
         `SELECT d.*, e.campaign_id FROM deliverables d
          JOIN engagements e ON e.id = d.engagement_id
@@ -454,6 +531,7 @@ engagementsRouter.patch('/:engagementId/deliverables/:deliverableId', requireAut
 engagementsRouter.delete('/:engagementId/deliverables/:deliverableId', requireAuth, requireEngagementWriteAccess('engagementId'), async (req, res) => {
   try {
     await withUserTransaction(req.user.id, async (client) => {
+      await assertDeliverablesEditable(client, req.params.engagementId);
       const { rowCount } = await client.query(
         'DELETE FROM deliverables WHERE id = $1 AND engagement_id = $2',
         [req.params.deliverableId, req.params.engagementId],

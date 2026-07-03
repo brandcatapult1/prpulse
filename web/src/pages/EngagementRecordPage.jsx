@@ -25,11 +25,18 @@ import { addDaysIso, toDateInputValue } from '../lib/dates.js';
 import { engagementsApi } from '../lib/api.js';
 import {
   patchEngagement,
+  reopenEngagement,
   syncDeliverables,
   fetchDeliverables,
   fetchFeedback,
   fetchEngagementTimeline,
 } from '../lib/persistence.js';
+import { useAuth } from '../context/AuthContext.jsx';
+import { canReopenComplete } from '../lib/campaignPermissions.js';
+import {
+  reopenCompleteToastMessage,
+  REOPEN_COMPLETE_CONFIRM,
+} from '../lib/outreachLogging.js';
 import { updateEngagementDeliverables } from '../lib/deliverablesCache.js';
 import { getCachedContact, mergeContactsCache } from '../lib/contactsCache.js';
 import { isContactBlacklisted } from '../lib/contactsHelpers.js';
@@ -80,8 +87,11 @@ function cloneDeliverables(list) {
 
 export function EngagementRecordPage() {
   const { id } = useParams();
+  const { user } = useAuth();
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState(null);
+  const [reopenConfirm, setReopenConfirm] = useState(false);
+  const [reopening, setReopening] = useState(false);
   const [followUpSuggestion, setFollowUpSuggestion] = useState(null);
   const [engagement, setEngagement] = useState(null);
   const [deliverables, setDeliverables] = useState([]);
@@ -224,11 +234,43 @@ export function EngagementRecordPage() {
     formatStatus,
   });
 
+  const handleReopenComplete = async () => {
+    if (reopening || !id) return;
+    setReopening(true);
+    try {
+      const saved = await reopenEngagement(id);
+      setEngagement((prev) => ({
+        ...prev,
+        ...saved,
+        contact_name: prev?.contact_name ?? saved.contact_name,
+        campaign_name: prev?.campaign_name ?? saved.campaign_name,
+        brand_name: prev?.brand_name ?? saved.brand_name,
+        owner_name: prev?.owner_name ?? saved.owner_name,
+        campaign_id: prev?.campaign_id ?? saved.campaign_id,
+      }));
+      const dels = await fetchDeliverables(id).catch(() => null);
+      if (Array.isArray(dels)) {
+        setDeliverables(cloneDeliverables(dels));
+        setSavedDeliverables(cloneDeliverables(dels));
+        updateEngagementDeliverables(id, dels);
+      }
+      const tl = await fetchEngagementTimeline(id).catch(() => null);
+      if (Array.isArray(tl)) setTimeline(tl);
+      setReopenConfirm(false);
+      setToast(reopenCompleteToastMessage());
+    } catch (err) {
+      setToast(err.message ?? 'Could not reopen');
+    } finally {
+      setReopening(false);
+    }
+  };
+
   const handleStatusChange = (next) => {
     if (next === 'scheduled') {
       setModal('visit');
       return;
     }
+    if (isComplete(engagement?.conversation_status)) return;
 
     const patch = { conversation_status: next, ...sideEffectsOnStatusChange(next) };
 
@@ -374,14 +416,53 @@ export function EngagementRecordPage() {
                   value={engagement.conversation_status}
                   options={statusChoices}
                   onChange={handleStatusChange}
+                  disabled={isComplete(status)}
                   hint={
                     isComplete(status)
-                      ? 'Change status to reopen and edit fee or deliverables'
+                      ? canReopenComplete(user?.role)
+                        ? 'Use Reopen to amend deliverables or fee'
+                        : 'Collaboration complete — Senior Manager or Admin can reopen'
                       : !canComplete
                         ? 'Complete unlocks when all deliverables are Posted'
                         : undefined
                   }
                 />
+                {isComplete(status) && canReopenComplete(user?.role) && (
+                  <div className="mt-3">
+                    {reopenConfirm ? (
+                      <div className="rounded-lg border border-line bg-canvas px-3 py-3">
+                        <p className="text-2xs font-medium text-ink">{REOPEN_COMPLETE_CONFIRM.title}</p>
+                        <p className="mt-1 text-2xs text-ink-secondary">{REOPEN_COMPLETE_CONFIRM.body}</p>
+                        <div className="mt-3 flex gap-2">
+                          <button
+                            type="button"
+                            className="btn-secondary flex-1"
+                            disabled={reopening}
+                            onClick={() => setReopenConfirm(false)}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-primary flex-1"
+                            disabled={reopening}
+                            onClick={handleReopenComplete}
+                          >
+                            {reopening ? 'Reopening…' : 'Confirm'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => setReopenConfirm(true)}
+                      >
+                        Reopen
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="mb-2 block text-2xs font-medium uppercase tracking-wide text-ink-tertiary">

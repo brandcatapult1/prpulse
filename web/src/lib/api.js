@@ -96,6 +96,7 @@ export const engagementsApi = {
   assignedToMe: () => api('/engagements/assigned/me'),
   get: (id) => api(`/engagements/${id}`),
   update: (id, body) => api(`/engagements/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  reopen: (id) => api(`/engagements/${id}/reopen`, { method: 'POST', body: JSON.stringify({}) }),
   deliverables: (id) => api(`/engagements/${id}/deliverables`),
   createDeliverable: (id, body) =>
     api(`/engagements/${id}/deliverables`, { method: 'POST', body: JSON.stringify(body) }),

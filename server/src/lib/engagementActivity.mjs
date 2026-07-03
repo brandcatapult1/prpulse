@@ -83,6 +83,20 @@ function inferDiscreteEngagementEvents(before, patch) {
     });
   }
 
+  if (
+    before.conversation_status === 'collaboration_complete'
+    && patch.conversation_status === 'awaiting_final_deliverables'
+  ) {
+    events.push({
+      action: ACTIVITY_ACTION.REOPEN,
+      details: {
+        fromStage: 'collaboration_complete',
+        toStage: 'awaiting_final_deliverables',
+        reason: 'complete_reopen',
+      },
+    });
+  }
+
   return events;
 }
 

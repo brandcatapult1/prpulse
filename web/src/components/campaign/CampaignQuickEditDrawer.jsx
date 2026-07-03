@@ -8,6 +8,7 @@ import { addDeliverableToList, deliverableListUnitTotals, removeDeliverableFromL
 import { engagementsApi } from '../../lib/api.js';
 import {
   patchEngagement,
+  reopenEngagement,
   syncDeliverables,
   patchContact,
   fetchDeliverables,
@@ -28,7 +29,10 @@ import {
   firstOutreachToastMessage,
   rejectProfileToastMessage,
   reopenToastMessage,
+  reopenCompleteToastMessage,
+  REOPEN_COMPLETE_CONFIRM,
 } from '../../lib/outreachLogging.js';
+import { canReopenComplete } from '../../lib/campaignPermissions.js';
 import { STAGE, transitionStage, formatScheduledBlockMessage, getScheduledPrerequisitesMissing, SCHEDULED_PREREQUISITE } from '../../lib/engagementTransitions.js';
 import { buildVisitDoneTransition, visitDoneToastMessage } from '../../lib/visitLogging.js';
 import { buildRepliedContactLogPatch, repliedContactToastMessage } from '../../lib/contactLogging.js';
@@ -834,6 +838,31 @@ export function CampaignQuickEditDrawer({
       if (await applyTransition(result, reopenToastMessage(droppedFromLabel(droppedFrom)))) {
         resetMoveUi();
       }
+      return;
+    }
+
+    if (pendingMove.needsConfirm === 'reopen_complete') {
+      if (!canReopenComplete(user?.role)) {
+        setToast('Senior Manager or Admin required to reopen');
+        resetMoveUi();
+        return;
+      }
+      try {
+        const updated = await reopenEngagement(engagementId);
+        const merged = { ...engagement, ...updated };
+        setEngagement(merged);
+        setEngagementBaseline(engagementFieldsBaseline(merged));
+        const list = await fetchDeliverables(engagementId).catch(() => deliverables);
+        setDeliverables(Array.isArray(list) ? list : []);
+        setDeliverablesBaseline(Array.isArray(list) ? structuredClone(list) : []);
+        updateEngagementDeliverables(engagementId, Array.isArray(list) ? list : []);
+        onUpdated?.();
+        setToast(reopenCompleteToastMessage());
+        resetMoveUi();
+      } catch (err) {
+        setToast(err.message ?? 'Could not reopen');
+        resetMoveUi();
+      }
     }
   }
 
@@ -988,11 +1017,14 @@ export function CampaignQuickEditDrawer({
                     ? 'Mark collaboration complete?'
                     : confirmOpen === 'didnt_deliver'
                       ? "Mark as didn't deliver?"
-                      : 'Reopen engagement?'}
+                      : confirmOpen === 'reopen_complete'
+                        ? REOPEN_COMPLETE_CONFIRM.title
+                        : 'Reopen engagement?'}
                 </SectionLabel>
                 <p className="text-2xs text-ink-secondary">
                   {confirmOpen === 'complete' && 'All deliverables are posted with proof.'}
                   {confirmOpen === 'didnt_deliver' && 'This will drop the engagement and can blacklist the creator.'}
+                  {confirmOpen === 'reopen_complete' && REOPEN_COMPLETE_CONFIRM.body}
                   {confirmOpen === 'reopen' && (
                     <>
                       Return to{' '}

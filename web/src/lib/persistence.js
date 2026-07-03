@@ -11,6 +11,11 @@ export async function patchEngagement(id, patch) {
   return engagementsApi.update(id, patch);
 }
 
+/** Sanctioned reopen from Collaboration Complete (Admin / Senior Manager). */
+export async function reopenEngagement(id) {
+  return engagementsApi.reopen(id);
+}
+
 export async function fetchEngagementsForCampaign(campaignId) {
   return engagementsApi.byCampaign(campaignId);
 }

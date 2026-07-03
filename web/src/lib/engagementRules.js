@@ -190,6 +190,14 @@ export function sideEffectsOnStatusChange(nextStatus) {
 }
 
 export function getStatusOptions({ current, canComplete, formatStatus }) {
+  // Complete is a one-way trapdoor in the status control — use sanctioned Reopen.
+  if (isComplete(current)) {
+    return [{
+      value: 'collaboration_complete',
+      label: formatStatus('collaboration_complete'),
+    }];
+  }
+
   const all = CONVERSATION_STATUSES.map((v) => ({
     value: v,
     label: formatStatus(v),

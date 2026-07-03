@@ -22,3 +22,13 @@ export function rejectProfileToastMessage() {
 export function reopenToastMessage(stageLabel) {
   return `Reopened — back to ${stageLabel}`;
 }
+
+export function reopenCompleteToastMessage() {
+  return 'Reopened — back to Awaiting Deliverables';
+}
+
+export const REOPEN_COMPLETE_CONFIRM = {
+  title: 'Reopen this collaboration?',
+  body:
+    'This engagement will leave Collaboration Complete and no longer count toward the campaign’s completed total. Any campaign tag it earned for the creator may be removed. Deliverables will be editable again.',
+};

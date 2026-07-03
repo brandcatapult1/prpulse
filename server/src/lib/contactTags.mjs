@@ -1,4 +1,4 @@
-/** Sync contact_tags with audit logging for manual assignment changes. */
+/** Contact/campaign tag sync. Campaign-type contact_tags are system-derived only. */
 
 export async function logContactTagAudit(
   client,
@@ -17,17 +17,32 @@ export async function logContactTagAudit(
   );
 }
 
+/**
+ * Manual/user contact-edit write path.
+ * Reconciles ONLY influencer-type contact_tags against incoming tag_ids.
+ * Campaign-type rows are left untouched (owned by recompute_contact_campaign_tags).
+ * Campaign-type ids in the incoming payload are ignored.
+ */
 export async function syncContactTags(client, contactId, tagIds, { userId, extra = {} } = {}) {
+  const incomingIds = [...new Set((tagIds ?? []).filter(Boolean))];
+
+  const { rows: influencerIncoming } = incomingIds.length
+    ? await client.query(
+      `SELECT id FROM tags WHERE id = ANY($1::uuid[]) AND type = 'influencer'`,
+      [incomingIds],
+    )
+    : { rows: [] };
+  const nextIds = influencerIncoming.map((r) => r.id);
+
   const { rows: existing } = await client.query(
     `SELECT ct.tag_id, t.name
      FROM contact_tags ct
      JOIN tags t ON t.id = ct.tag_id
-     WHERE ct.contact_id = $1`,
+     WHERE ct.contact_id = $1 AND t.type = 'influencer'`,
     [contactId],
   );
 
   const existingIds = new Set(existing.map((r) => r.tag_id));
-  const nextIds = [...new Set((tagIds ?? []).filter(Boolean))];
 
   for (const row of existing) {
     if (!nextIds.includes(row.tag_id)) {
@@ -71,6 +86,7 @@ export async function syncContactTags(client, contactId, tagIds, { userId, extra
   }
 }
 
+/** Replace campaign_tags, then re-derive campaign-type tags on counted-complete contacts. */
 export async function syncCampaignTags(client, campaignId, tagIds) {
   const nextIds = [...new Set((tagIds ?? []).filter(Boolean))];
 
@@ -82,6 +98,7 @@ export async function syncCampaignTags(client, campaignId, tagIds) {
         [campaignId, tagId],
       );
     }
+    await client.query('SELECT recompute_contacts_for_campaign_tags($1::uuid)', [campaignId]);
   }
 }
 

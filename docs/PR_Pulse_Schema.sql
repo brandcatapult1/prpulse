@@ -669,65 +669,90 @@ BEGIN
   WHERE c.id = p_contact_id;
 END $$;
 
--- Set completed_at once, propagate campaign tags on first count, refresh rollups.
-CREATE OR REPLACE FUNCTION propagate_campaign_tags_to_contact(p_engagement_id uuid)
+-- System-derived campaign-type tags on contacts (union across counted-complete
+-- engagements). Keys off fn_engagement_counted (live), not completed_at.
+CREATE OR REPLACE FUNCTION recompute_contact_campaign_tags(p_contact_id uuid)
 RETURNS void LANGUAGE plpgsql AS $$
-DECLARE
-  v_campaign uuid; v_contact uuid; v_user uuid; v_campaign_name text;
-  v_actor_name text; v_actor_role text; v_tag record; v_inserted uuid;
 BEGIN
-  SELECT e.campaign_id, e.contact_id INTO v_campaign, v_contact
-  FROM engagements e WHERE e.id = p_engagement_id;
-  IF v_campaign IS NULL OR v_contact IS NULL THEN RETURN; END IF;
-
-  v_user := nullif(current_setting('app.current_user_id', true), '')::uuid;
-  SELECT campaign_name INTO v_campaign_name FROM campaigns WHERE id = v_campaign;
-  IF v_user IS NOT NULL THEN
-    SELECT full_name, role::text INTO v_actor_name, v_actor_role FROM users WHERE id = v_user;
+  IF p_contact_id IS NULL THEN
+    RETURN;
   END IF;
 
-  FOR v_tag IN
-    SELECT t.id, t.name FROM campaign_tags ct
-    JOIN tags t ON t.id = ct.tag_id WHERE ct.campaign_id = v_campaign
+  INSERT INTO contact_tags (contact_id, tag_id)
+  SELECT DISTINCT p_contact_id, t.id
+  FROM engagements e
+  JOIN campaign_tags ct ON ct.campaign_id = e.campaign_id
+  JOIN tags t ON t.id = ct.tag_id AND t.type = 'campaign'
+  WHERE e.contact_id = p_contact_id
+    AND fn_engagement_counted(e.id)
+  ON CONFLICT DO NOTHING;
+
+  DELETE FROM contact_tags ct
+  USING tags t
+  WHERE ct.contact_id = p_contact_id
+    AND ct.tag_id = t.id
+    AND t.type = 'campaign'
+    AND NOT EXISTS (
+      SELECT 1
+      FROM engagements e
+      JOIN campaign_tags cgt ON cgt.campaign_id = e.campaign_id
+      WHERE e.contact_id = p_contact_id
+        AND cgt.tag_id = ct.tag_id
+        AND fn_engagement_counted(e.id)
+    );
+END $$;
+
+CREATE OR REPLACE FUNCTION recompute_contacts_for_campaign_tags(p_campaign_id uuid)
+RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  r record;
+BEGIN
+  IF p_campaign_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  FOR r IN
+    SELECT DISTINCT e.contact_id
+    FROM engagements e
+    WHERE e.campaign_id = p_campaign_id
+      AND fn_engagement_counted(e.id)
   LOOP
-    INSERT INTO contact_tags (contact_id, tag_id) VALUES (v_contact, v_tag.id)
-    ON CONFLICT DO NOTHING RETURNING tag_id INTO v_inserted;
-    IF v_inserted IS NULL THEN CONTINUE; END IF;
-
-    INSERT INTO audit_logs(user_id, entity_type, entity_id, action_type, previous_value, new_value)
-    VALUES (v_user, 'contact', v_contact, 'tag_added', NULL,
-      jsonb_build_object('tag_id', v_tag.id, 'tag_name', v_tag.name,
-        'campaign_id', v_campaign, 'campaign_name', v_campaign_name,
-        'engagement_id', p_engagement_id, 'source', 'campaign_completion'));
-
-    IF v_user IS NOT NULL AND v_actor_name IS NOT NULL THEN
-      INSERT INTO activity_events(campaign_id, engagement_id, actor_user_id, actor_name, actor_role, action, details)
-      VALUES (v_campaign, p_engagement_id, v_user, v_actor_name,
-        coalesce(v_actor_role, 'campaign_manager'), 'contact_tags_added',
-        jsonb_build_object('contact_id', v_contact, 'tag_id', v_tag.id,
-          'tag_name', v_tag.name, 'campaign_name', v_campaign_name));
-    END IF;
+    PERFORM recompute_contact_campaign_tags(r.contact_id);
   END LOOP;
 END $$;
 
+-- Legacy name: full recompute (no audit/activity — system-managed).
+CREATE OR REPLACE FUNCTION propagate_campaign_tags_to_contact(p_engagement_id uuid)
+RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  v_contact uuid;
+BEGIN
+  SELECT contact_id INTO v_contact FROM engagements WHERE id = p_engagement_id;
+  PERFORM recompute_contact_campaign_tags(v_contact);
+END $$;
+
+-- Stamp completed_at once (retained on reopen), refresh rollups, re-derive campaign tags.
 CREATE OR REPLACE FUNCTION fn_refresh_engagement_completion(p_engagement_id uuid)
 RETURNS void LANGUAGE plpgsql AS $$
-DECLARE v_campaign uuid; v_contact uuid; v_stamped uuid;
+DECLARE
+  v_campaign uuid;
+  v_contact uuid;
 BEGIN
   SELECT campaign_id, contact_id INTO v_campaign, v_contact
   FROM engagements WHERE id = p_engagement_id;
 
+  IF v_campaign IS NULL OR v_contact IS NULL THEN
+    RETURN;
+  END IF;
+
   IF fn_engagement_counted(p_engagement_id) THEN
     UPDATE engagements SET completed_at = now()
-     WHERE id = p_engagement_id AND completed_at IS NULL
-     RETURNING id INTO v_stamped;
-    IF v_stamped IS NOT NULL THEN
-      PERFORM propagate_campaign_tags_to_contact(p_engagement_id);
-    END IF;
+     WHERE id = p_engagement_id AND completed_at IS NULL;
   END IF;
 
   PERFORM recompute_campaign_metrics(v_campaign);
   PERFORM recompute_contact_summary(v_contact);
+  PERFORM recompute_contact_campaign_tags(v_contact);
 END $$;
 
 -- =====================================================================

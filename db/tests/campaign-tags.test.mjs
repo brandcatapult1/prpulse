@@ -1,5 +1,5 @@
 /**
- * Campaign tags + propagation on first counted collaboration.
+ * Campaign-type contact tags are system-derived from counted-complete engagements.
  * Run: npm run db:test:campaign-tags
  */
 import pg from 'pg';
@@ -47,6 +47,11 @@ async function main() {
     );
     const tagId = tag.rows[0].id;
 
+    const influencerTag = await client.query(
+      `INSERT INTO tags (name, type) VALUES ('Manual Influencer', 'influencer') RETURNING id`,
+    );
+    const influencerTagId = influencerTag.rows[0].id;
+
     await client.query(
       `INSERT INTO campaign_tags (campaign_id, tag_id) VALUES ($1, $2)`,
       [campaignId, tagId],
@@ -58,6 +63,11 @@ async function main() {
       [userId],
     );
     const contactId = contact.rows[0].id;
+
+    await client.query(
+      `INSERT INTO contact_tags (contact_id, tag_id) VALUES ($1, $2)`,
+      [contactId, influencerTagId],
+    );
 
     const engagement = await client.query(
       `INSERT INTO engagements (contact_id, campaign_id, assigned_manager, conversation_status, created_by)
@@ -72,61 +82,108 @@ async function main() {
       [engagementId],
     );
 
-    // Population alone must not propagate
     const beforePop = await client.query(
-      `SELECT count(*)::int AS n FROM contact_tags WHERE contact_id = $1`,
+      `SELECT count(*)::int AS n FROM contact_tags ct
+       JOIN tags t ON t.id = ct.tag_id
+       WHERE ct.contact_id = $1 AND t.type = 'campaign'`,
       [contactId],
     );
-    assert(beforePop.rows[0].n === 0, 'no tags before completion');
+    assert(beforePop.rows[0].n === 0, 'no campaign tags before completion');
 
-    // Status still open — posting alone must not propagate
     await client.query(
       `UPDATE deliverables SET status = 'posted', published_date = CURRENT_DATE WHERE engagement_id = $1`,
       [engagementId],
     );
     const afterPostOnly = await client.query(
-      `SELECT count(*)::int AS n FROM contact_tags WHERE contact_id = $1`,
+      `SELECT count(*)::int AS n FROM contact_tags ct
+       JOIN tags t ON t.id = ct.tag_id
+       WHERE ct.contact_id = $1 AND t.type = 'campaign'`,
       [contactId],
     );
-    assert(afterPostOnly.rows[0].n === 0, 'posted deliverable alone does not propagate');
+    assert(afterPostOnly.rows[0].n === 0, 'posted deliverable alone does not derive campaign tags');
 
-    // Mark complete → first counted → propagate (trigger calls fn_refresh)
     await client.query(
       `UPDATE engagements SET conversation_status = 'collaboration_complete' WHERE id = $1`,
       [engagementId],
     );
 
     const after = await client.query(
-      `SELECT t.name FROM contact_tags ct JOIN tags t ON t.id = ct.tag_id WHERE ct.contact_id = $1`,
+      `SELECT t.name, t.type FROM contact_tags ct
+       JOIN tags t ON t.id = ct.tag_id WHERE ct.contact_id = $1 ORDER BY t.type, t.name`,
       [contactId],
     );
-    assert(after.rows.length === 1, 'tag propagated once');
-    assert(after.rows[0].name === 'Luxury Prop', 'correct tag propagated');
+    assert(after.rows.length === 2, 'influencer + campaign tag present');
+    assert(after.rows.some((r) => r.name === 'Luxury Prop' && r.type === 'campaign'), 'campaign tag derived');
+    assert(after.rows.some((r) => r.name === 'Manual Influencer' && r.type === 'influencer'), 'influencer tag preserved');
 
     const audit = await client.query(
-      `SELECT action_type, new_value FROM audit_logs
-       WHERE entity_type = 'contact' AND entity_id = $1 AND action_type = 'tag_added'`,
+      `SELECT action_type FROM audit_logs
+       WHERE entity_type = 'contact' AND entity_id = $1 AND action_type = 'tag_added'
+         AND new_value->>'source' = 'campaign_completion'`,
       [contactId],
     );
-    assert(audit.rows.length === 1, 'audit row for propagated tag');
-    assert(audit.rows[0].new_value?.source === 'campaign_completion', 'audit marks campaign completion');
+    assert(audit.rows.length === 0, 'no audit flood for derived campaign tags');
 
-    // Idempotent — re-run refresh does not duplicate
-    await client.query(`SELECT fn_refresh_engagement_completion($1)`, [engagementId]);
-    const again = await client.query(
-      `SELECT count(*)::int AS n FROM contact_tags WHERE contact_id = $1`,
-      [contactId],
-    );
-    assert(again.rows[0].n === 1, 'still one tag after recompute');
-
-    // User removes tag — no re-add until another counted completion (new engagement)
+    // Self-correct: manual delete is restored on recompute
     await client.query(`DELETE FROM contact_tags WHERE contact_id = $1 AND tag_id = $2`, [contactId, tagId]);
     await client.query(`SELECT fn_refresh_engagement_completion($1)`, [engagementId]);
-    const afterRemove = await client.query(
-      `SELECT count(*)::int AS n FROM contact_tags WHERE contact_id = $1`,
+    const restored = await client.query(
+      `SELECT count(*)::int AS n FROM contact_tags WHERE contact_id = $1 AND tag_id = $2`,
+      [contactId, tagId],
+    );
+    assert(restored.rows[0].n === 1, 'recompute restores derived campaign tag');
+
+    // Reopen (no longer counted) removes campaign tag; influencer remains
+    await client.query(
+      `UPDATE engagements SET conversation_status = 'awaiting_final_deliverables' WHERE id = $1`,
+      [engagementId],
+    );
+    const afterReopen = await client.query(
+      `SELECT t.type, t.name FROM contact_tags ct
+       JOIN tags t ON t.id = ct.tag_id WHERE ct.contact_id = $1`,
       [contactId],
     );
-    assert(afterRemove.rows[0].n === 0, 'removed tag stays removed on recompute');
+    assert(afterReopen.rows.length === 1, 'only influencer tag after reopen');
+    assert(afterReopen.rows[0].type === 'influencer', 'influencer tag untouched on reopen');
+
+    // Re-complete restores campaign tag
+    await client.query(
+      `UPDATE engagements SET conversation_status = 'collaboration_complete' WHERE id = $1`,
+      [engagementId],
+    );
+    const afterRecomplete = await client.query(
+      `SELECT count(*)::int AS n FROM contact_tags WHERE contact_id = $1 AND tag_id = $2`,
+      [contactId, tagId],
+    );
+    assert(afterRecomplete.rows[0].n === 1, 're-complete restores campaign tag');
+
+    // Campaign tag-set change: remove tag from campaign → contact loses it
+    await client.query(`DELETE FROM campaign_tags WHERE campaign_id = $1 AND tag_id = $2`, [campaignId, tagId]);
+    await client.query(`SELECT recompute_contacts_for_campaign_tags($1)`, [campaignId]);
+    const afterUntag = await client.query(
+      `SELECT count(*)::int AS n FROM contact_tags WHERE contact_id = $1 AND tag_id = $2`,
+      [contactId, tagId],
+    );
+    assert(afterUntag.rows[0].n === 0, 'untagging campaign removes derived contact tag');
+
+    // Backfill: add tag to campaign with existing completion → contact gains it
+    await client.query(
+      `INSERT INTO campaign_tags (campaign_id, tag_id) VALUES ($1, $2)`,
+      [campaignId, tagId],
+    );
+    await client.query(`SELECT recompute_contacts_for_campaign_tags($1)`, [campaignId]);
+    const afterBackfill = await client.query(
+      `SELECT count(*)::int AS n FROM contact_tags WHERE contact_id = $1 AND tag_id = $2`,
+      [contactId, tagId],
+    );
+    assert(afterBackfill.rows[0].n === 1, 'backfill adds campaign tag to completed creators');
+
+    // Influencer tag still present throughout
+    const influencerStill = await client.query(
+      `SELECT count(*)::int AS n FROM contact_tags WHERE contact_id = $1 AND tag_id = $2`,
+      [contactId, influencerTagId],
+    );
+    assert(influencerStill.rows[0].n === 1, 'influencer tag never touched by campaign recompute');
 
     await client.query('ROLLBACK');
     console.log('campaign-tags tests passed.');

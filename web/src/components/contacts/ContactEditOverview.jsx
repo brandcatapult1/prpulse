@@ -14,6 +14,7 @@ import {
   COLLABORATION_PREFERENCE_ERROR,
 } from '../../lib/collaborationPrefs.js';
 import { incompletePlatformLinkIndexes } from '../../lib/contactDraft.js';
+import { TagSelectChips } from '../tags/TagSelectChips.jsx';
 
 export function ContactEditOverview({
   contact,
@@ -34,16 +35,6 @@ export function ContactEditOverview({
     onDraftChange((d) => {
       const stillValid = citiesForCountry(cityOptions, countryCode).some((c) => c.name === d.city);
       return { ...d, country: countryCode, city: stillValid ? d.city : '' };
-    });
-  };
-
-  const toggleId = (field, id) => {
-    onDraftChange((d) => {
-      const list = d[field] ?? [];
-      return {
-        ...d,
-        [field]: list.includes(id) ? list.filter((x) => x !== id) : [...list, id],
-      };
     });
   };
 
@@ -381,29 +372,12 @@ export function ContactEditOverview({
             <dt className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">Tags</dt>
             <dd className="mt-2">
               {editing ? (
-                tagOptions.length === 0 ? (
-                  <p className="text-2xs text-ink-secondary">No tags configured — ask an Admin to add tags.</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {tagOptions.map((tag) => {
-                      const selected = (draft.tag_ids ?? []).includes(tag.id);
-                      return (
-                        <button
-                          key={tag.id}
-                          type="button"
-                          onClick={() => toggleId('tag_ids', tag.id)}
-                          className={`rounded-lg border px-3 py-1.5 text-2xs font-medium transition-colors ${
-                            selected
-                              ? 'border-brand bg-brand-soft text-brand'
-                              : 'border-line bg-white text-ink-secondary hover:border-zinc-300'
-                          }`}
-                        >
-                          {tag.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )
+                <TagSelectChips
+                  tags={tagOptions}
+                  appliedTags={Array.isArray(contact.tags) ? contact.tags : []}
+                  selectedIds={draft.tag_ids ?? []}
+                  onChange={(tag_ids) => onDraftChange((d) => ({ ...d, tag_ids }))}
+                />
               ) : tagLabels.length > 0 ? (
                 <div className="flex flex-wrap gap-1">
                   {tagLabels.map((t) => (

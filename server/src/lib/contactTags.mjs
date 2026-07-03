@@ -87,7 +87,7 @@ export async function syncCampaignTags(client, campaignId, tagIds) {
 
 export async function loadCampaignTags(client, campaignId) {
   const { rows } = await client.query(
-    `SELECT t.id, t.name
+    `SELECT t.id, t.name, t.type, t.is_active
      FROM campaign_tags ct
      JOIN tags t ON t.id = ct.tag_id
      WHERE ct.campaign_id = $1
@@ -99,7 +99,7 @@ export async function loadCampaignTags(client, campaignId) {
 
 export async function loadContactDetailTags(client, contactId) {
   const { rows } = await client.query(
-    `SELECT t.id, t.name
+    `SELECT t.id, t.name, t.type, t.is_active
      FROM contact_tags ct
      JOIN tags t ON t.id = ct.tag_id
      WHERE ct.contact_id = $1

@@ -184,7 +184,15 @@ export async function loadContactDetail(client, contactId) {
             pc.name AS primary_category_name,
             COALESCE(
               (
-                SELECT json_agg(json_build_object('id', t.id, 'name', t.name) ORDER BY t.name)
+                SELECT json_agg(
+                  json_build_object(
+                    'id', t.id,
+                    'name', t.name,
+                    'type', t.type,
+                    'is_active', t.is_active
+                  )
+                  ORDER BY t.name
+                )
                 FROM contact_tags ct
                 JOIN tags t ON t.id = ct.tag_id
                 WHERE ct.contact_id = c.id

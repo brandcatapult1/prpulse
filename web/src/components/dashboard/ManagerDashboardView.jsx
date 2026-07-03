@@ -685,6 +685,8 @@ function DeliverableRow({ row, onOpen, onLog }) {
           <>
             <span className="capitalize">{row.deliverableType}</span>
             <span className="text-ink-tertiary/60"> · </span>
+            {row.campaignName}
+            <span className="text-ink-tertiary/60"> · </span>
             <span className={situationTextClass(row.situation, row.urgency)}>{row.situation}</span>
           </>
         )}

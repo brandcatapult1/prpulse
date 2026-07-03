@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { roleLabel } from '../../lib/format.jsx';
 import { NAV_ITEMS } from '../../lib/modules.js';
 import { canAccessAdmin } from '../../lib/adminPermissions.js';
+import { canAccessSettings } from '../../lib/settingsRegistry.js';
 import { SidebarBrand } from './SidebarBrand.jsx';
 
 const DESKTOP_LINK =
@@ -27,7 +28,11 @@ export function NavSidebarContent({
   onNavClick,
   mobile = false,
 }) {
-  const items = NAV_ITEMS.filter((item) => item.to !== '/admin' || canAccessAdmin(user?.role));
+  const items = NAV_ITEMS.filter((item) => {
+    if (item.to === '/admin') return canAccessAdmin(user?.role);
+    if (item.to === '/settings') return canAccessSettings(user?.role);
+    return true;
+  });
 
   return (
     <>

@@ -75,6 +75,12 @@ export const MODULES = {
     subtitle: 'Users, roles, and audit log',
     path: '/admin',
   },
+  settings: {
+    navLabel: 'Settings',
+    pageTitle: 'Settings',
+    subtitle: 'Organization configuration',
+    path: '/settings',
+  },
 };
 
 export const NAV_ITEMS = [
@@ -84,6 +90,7 @@ export const NAV_ITEMS = [
   MODULES.brands,
   MODULES.registration,
   MODULES.reporting,
+  MODULES.settings,
   MODULES.admin,
 ].map((m) => ({ to: m.path, label: m.navLabel, end: m.path === '/' }));
 

@@ -175,3 +175,11 @@ export const lookupApi = {
   cities: (country) =>
     api(`/lookup/cities${country ? `?country=${encodeURIComponent(country)}` : ''}`),
 };
+
+/** Admin / Senior Manager tags master list (`/api/tags`). */
+export const tagsApi = {
+  list: (includeArchived = false) =>
+    api(`/tags${includeArchived ? '?includeArchived=true' : ''}`),
+  create: (body) => api('/tags', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id, body) => api(`/tags/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+};

@@ -327,6 +327,7 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
           <div className="mt-1.5">
             <TagSelectChips
               tags={tagOptions}
+              allowedTypes={['campaign']}
               selectedIds={form.tag_ids}
               onChange={(tag_ids) => setForm((f) => ({ ...f, tag_ids }))}
             />

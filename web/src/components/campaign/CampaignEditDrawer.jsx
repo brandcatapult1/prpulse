@@ -176,6 +176,7 @@ export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
             <div className="mt-2">
               <TagSelectChips
                 tags={tagOptions}
+                allowedTypes={['campaign']}
                 appliedTags={campaign.tags ?? []}
                 selectedIds={draft.tag_ids}
                 onChange={(tag_ids) => setDraft((d) => ({ ...d, tag_ids }))}

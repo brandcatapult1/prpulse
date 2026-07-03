@@ -305,6 +305,7 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
             <div className="mt-1">
               <TagSelectChips
                 tags={tagOptions}
+                allowedTypes={['influencer']}
                 selectedIds={form.tag_ids}
                 onChange={(ids) => updateField('tag_ids', ids)}
               />

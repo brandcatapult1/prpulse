@@ -374,6 +374,7 @@ export function ContactEditOverview({
               {editing ? (
                 <TagSelectChips
                   tags={tagOptions}
+                  allowedTypes={['influencer']}
                   appliedTags={Array.isArray(contact.tags) ? contact.tags : []}
                   selectedIds={draft.tag_ids ?? []}
                   onChange={(tag_ids) => onDraftChange((d) => ({ ...d, tag_ids }))}

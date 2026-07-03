@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Toast } from '../ui/Primitives.jsx';
 import { contactsApi, campaignsApi, lookupApi } from '../../lib/api.js';
+import { filterTagsByType } from '../tags/TagSelectChips.jsx';
 
 const EMPTY_DRAFT = {
   campaignId: '',
@@ -34,6 +35,11 @@ export function ContactBatchActionBar({
     lookupApi.tags().then((data) => setTags(Array.isArray(data) ? data : [])).catch(() => setTags([]));
     lookupApi.categories().then((data) => setCategories(Array.isArray(data) ? data : [])).catch(() => setCategories([]));
   }, [selectedIds.length]);
+
+  const influencerTags = useMemo(
+    () => filterTagsByType(tags, ['influencer']),
+    [tags],
+  );
 
   if (selectedIds.length === 0) return null;
 
@@ -193,7 +199,7 @@ export function ContactBatchActionBar({
                 onChange={(e) => updateDraft({ tagId: e.target.value })}
               >
                 <option value="">— Skip —</option>
-                {tags.map((t) => (
+                {influencerTags.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </select>

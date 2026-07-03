@@ -330,6 +330,7 @@ function ReviewDrawer({ registration, contacts, onClose, onApprove, onReject, on
             <dd className="mt-1">
               <TagSelectChips
                 tags={tagOptions}
+                allowedTypes={['influencer']}
                 selectedIds={tagIds}
                 onChange={setTagIds}
                 emptyMessage="No tags configured — ask an Admin to add tags."

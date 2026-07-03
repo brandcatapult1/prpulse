@@ -111,9 +111,13 @@ CREATE TABLE users (
 
 CREATE TABLE tags (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name       citext UNIQUE NOT NULL,         -- admin-configurable
+  name       text NOT NULL,                  -- admin-configurable; unique on lower(name)
+  type       text NOT NULL CHECK (type IN ('influencer', 'campaign')),
+  is_active  boolean NOT NULL DEFAULT true,   -- soft-archive; never strips contact_tags
+  created_by uuid REFERENCES users(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE UNIQUE INDEX tags_name_lower_uidx ON tags (lower(name));
 
 CREATE TABLE categories (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),

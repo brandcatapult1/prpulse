@@ -22,6 +22,7 @@ import { adminRouter } from './routes/admin.mjs';
 import { orgRouter } from './routes/org.mjs';
 import { reportsRouter } from './routes/reports.mjs';
 import { lookupRouter } from './routes/lookup.mjs';
+import { tagsRouter } from './routes/tags.mjs';
 import { attachUser } from './middleware/auth.mjs';
 import { devAuthMiddleware } from './middleware/devAuth.mjs';
 import { requireDatabase } from './middleware/database.mjs';
@@ -67,6 +68,7 @@ app.use('/api/import', importRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/org', orgRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/tags', tagsRouter);
 app.use('/api/lookup', lookupRouter);
 
 const webDist = path.join(rootDir, 'web/dist');

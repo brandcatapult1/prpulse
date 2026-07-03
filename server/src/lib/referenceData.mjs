@@ -54,7 +54,9 @@ export async function ensureReferenceData(client) {
   if (tagRows[0].n === 0) {
     for (const name of DEFAULT_TAGS) {
       await client.query(
-        `INSERT INTO tags (name) VALUES ($1) ON CONFLICT (name) DO NOTHING`,
+        `INSERT INTO tags (name, type, is_active)
+         VALUES ($1, 'influencer', true)
+         ON CONFLICT ((lower(name))) DO NOTHING`,
         [name],
       );
     }

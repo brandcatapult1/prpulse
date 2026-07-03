@@ -221,33 +221,6 @@ adminRouter.patch('/org-branding', async (req, res) => {
   }
 });
 
-adminRouter.post('/tags', async (req, res) => {
-  const name = req.body?.name?.trim();
-  if (!name) return res.status(400).json({ error: 'Tag name is required' });
-
-  try {
-    const { rows } = await pool.query(
-      `INSERT INTO tags (name) VALUES ($1)
-       ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-       RETURNING id, name, created_at`,
-      [name],
-    );
-    res.status(201).json(rows[0]);
-  } catch (err) {
-    res.status(503).json({ error: err.message ?? 'Could not create tag' });
-  }
-});
-
-adminRouter.delete('/tags/:id', async (req, res) => {
-  try {
-    const { rowCount } = await pool.query('DELETE FROM tags WHERE id = $1', [req.params.id]);
-    if (rowCount === 0) return res.status(404).json({ error: 'Tag not found' });
-    res.status(204).end();
-  } catch (err) {
-    res.status(503).json({ error: err.message ?? 'Could not delete tag' });
-  }
-});
-
 adminRouter.post('/categories', async (req, res) => {
   const name = req.body?.name?.trim();
   if (!name) return res.status(400).json({ error: 'Category name is required' });

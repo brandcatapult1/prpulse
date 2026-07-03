@@ -42,7 +42,9 @@ async function main() {
     );
     const campaignId = campaign.rows[0].id;
 
-    const tag = await client.query(`INSERT INTO tags (name) VALUES ('Luxury Prop') RETURNING id, name`);
+    const tag = await client.query(
+      `INSERT INTO tags (name, type) VALUES ('Luxury Prop', 'campaign') RETURNING id, name`,
+    );
     const tagId = tag.rows[0].id;
 
     await client.query(

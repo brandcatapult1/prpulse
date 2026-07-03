@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable } from '../components/ui/DataKit.jsx';
 import { Drawer, EmptyState, Toast } from '../components/ui/Primitives.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
+import { TagSelectChips } from '../components/tags/TagSelectChips.jsx';
 import { Pill, formatDate } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
-import { contactsApi, registrationsApi } from '../lib/api.js';
+import { contactsApi, lookupApi, registrationsApi } from '../lib/api.js';
 import { findContactByMobile } from '../lib/phone.js';
 import { formatPrimaryCategory } from '../lib/creatorCategories.js';
 import { todayIso } from '../lib/dates.js';
@@ -102,13 +103,14 @@ export function RegistrationsPage() {
     }
   };
 
-  const handleApprove = (registration, linkToContactId = null) => {
+  const handleApprove = (registration, linkToContactId = null, tag_ids = []) => {
     applyAction(
       registration.id,
       {
         status: 'approved',
         linked_contact_id: linkToContactId,
         reviewed_at: todayIso(),
+        ...(tag_ids.length > 0 ? { tag_ids } : {}),
       },
       linkToContactId
         ? `Approved and linked to existing contact`
@@ -132,12 +134,12 @@ export function RegistrationsPage() {
     );
   };
 
-  const onApproveClick = (registration) => {
+  const onApproveClick = (registration, tag_ids = []) => {
     const match = findContactByMobile(registration.mobile_number, contacts);
     if (match) {
-      setApproveChoice({ registration, match });
+      setApproveChoice({ registration, match, tag_ids });
     } else {
-      handleApprove(registration);
+      handleApprove(registration, null, tag_ids);
     }
   };
 
@@ -200,7 +202,7 @@ export function RegistrationsPage() {
         registration={selected}
         contacts={contacts}
         onClose={() => setSelected(null)}
-        onApprove={() => selected && onApproveClick(selected)}
+        onApprove={(tag_ids) => selected && onApproveClick(selected, tag_ids)}
         onReject={() => selected && handleReject(selected)}
         onMarkDuplicate={(contactId) => selected && handleMarkDuplicate(selected, contactId)}
       />
@@ -217,7 +219,7 @@ export function RegistrationsPage() {
             <button
               type="button"
               className="btn-secondary"
-              onClick={() => approveChoice && handleApprove(approveChoice.registration)}
+              onClick={() => approveChoice && handleApprove(approveChoice.registration, null, approveChoice.tag_ids ?? [])}
             >
               Create new contact
             </button>
@@ -225,7 +227,11 @@ export function RegistrationsPage() {
               type="button"
               className="btn-primary"
               onClick={() =>
-                approveChoice && handleApprove(approveChoice.registration, approveChoice.match.id)
+                approveChoice && handleApprove(
+                  approveChoice.registration,
+                  approveChoice.match.id,
+                  approveChoice.tag_ids ?? [],
+                )
               }
             >
               Link to {approveChoice?.match.full_name}
@@ -249,6 +255,19 @@ export function RegistrationsPage() {
 }
 
 function ReviewDrawer({ registration, contacts, onClose, onApprove, onReject, onMarkDuplicate }) {
+  const [tagIds, setTagIds] = useState([]);
+  const [tagOptions, setTagOptions] = useState([]);
+
+  useEffect(() => {
+    lookupApi.tags()
+      .then((rows) => setTagOptions(Array.isArray(rows) ? rows : []))
+      .catch(() => setTagOptions([]));
+  }, []);
+
+  useEffect(() => {
+    setTagIds([]);
+  }, [registration?.id]);
+
   if (!registration) return null;
 
   const duplicate = findContactByMobile(registration.mobile_number, contacts);
@@ -275,7 +294,7 @@ function ReviewDrawer({ registration, contacts, onClose, onApprove, onReject, on
                   Mark duplicate
                 </button>
               )}
-              <button type="button" className="btn-primary" onClick={onApprove}>
+              <button type="button" className="btn-primary" onClick={() => onApprove(tagIds)}>
                 Approve
               </button>
             </div>
@@ -305,6 +324,19 @@ function ReviewDrawer({ registration, contacts, onClose, onApprove, onReject, on
         <Detail label="Instagram" value={registration.instagram_link ?? '—'} link />
         <Detail label="YouTube" value={registration.youtube_link ?? '—'} link />
         <Detail label="Primary category" value={formatPrimaryCategory(registration)} />
+        {isPending && (
+          <div>
+            <dt className="text-2xs font-medium text-ink-tertiary">Tags</dt>
+            <dd className="mt-1">
+              <TagSelectChips
+                tags={tagOptions}
+                selectedIds={tagIds}
+                onChange={setTagIds}
+                emptyMessage="No tags configured — ask an Admin to add tags."
+              />
+            </dd>
+          </div>
+        )}
         <Detail
           label="Preferences"
           value={[

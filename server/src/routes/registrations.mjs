@@ -8,9 +8,8 @@ import { assertValidCity, loadCities } from '../lib/cities.mjs';
 import { assertValidCategoryId, loadCategories } from '../lib/categories.mjs';
 import { collaborationPreferenceError } from '../lib/collaborationPrefs.mjs';
 import { profileLinkError } from '../lib/registrationValidation.mjs';
-import {
-  checkExistingRegistrationByMobile,
-} from '../lib/registrationDuplicateCheck.mjs';
+import { checkExistingRegistrationByMobile } from '../lib/registrationDuplicateCheck.mjs';
+import { syncContactTags } from '../lib/contactTags.mjs';
 
 export const registrationsRouter = Router();
 
@@ -197,10 +196,13 @@ registrationsRouter.get('/', requireAuth, async (_req, res) => {
 });
 
 registrationsRouter.patch('/:id', requireAuth, requireSeniorOrAdmin, async (req, res) => {
-  const { status, linked_contact_id } = req.body ?? {};
+  const { status, linked_contact_id, tag_ids } = req.body ?? {};
   const allowed = ['pending_review', 'approved', 'rejected', 'duplicate'];
   if (!allowed.includes(status)) {
     return res.status(400).json({ error: 'Invalid status' });
+  }
+  if (tag_ids !== undefined && tag_ids !== null && !Array.isArray(tag_ids)) {
+    return res.status(400).json({ error: 'tag_ids must be an array' });
   }
 
   try {
@@ -262,6 +264,13 @@ registrationsRouter.patch('/:id', requireAuth, requireSeniorOrAdmin, async (req,
 
         if (finalLinkedId) {
           await applyPrimaryCategoryToContact(client, finalLinkedId, sub.primary_category_id);
+          if (Array.isArray(tag_ids) && tag_ids.length > 0) {
+            const ids = [...new Set(tag_ids.filter(Boolean))];
+            await syncContactTags(client, finalLinkedId, ids, {
+              userId: req.user.id,
+              extra: { source: 'registration_approve' },
+            });
+          }
         }
       }
 

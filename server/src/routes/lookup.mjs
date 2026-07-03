@@ -12,8 +12,13 @@ lookupRouter.use(requireAuth);
 lookupRouter.get('/tags', async (_req, res) => {
   try {
     await ensureReferenceData(pool);
+    // Live query of active tags only — no in-memory tag list cache.
+    // Archived tags must not appear as selectable options in pickers/filters.
     const { rows } = await pool.query(
-      `SELECT id, name, created_at FROM tags ORDER BY name`,
+      `SELECT id, name, type, created_at
+       FROM tags
+       WHERE is_active = true
+       ORDER BY lower(name)`,
     );
     res.json(rows);
   } catch (err) {

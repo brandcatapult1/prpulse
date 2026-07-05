@@ -1,4 +1,8 @@
 import { deliverableTypeFromDb, deliverableTypeToDb } from './deliverableTypes.mjs';
+import {
+  deliverablePostedProofSatisfied,
+  deliverableProofRequirementMessage,
+} from './deliverableProofRules.mjs';
 
 export function mapDeliverableRow(row, screenshots = []) {
   if (!row) return null;
@@ -87,4 +91,39 @@ export function deliverableInsertFields(body) {
     brand_tag_verified: body.brand_tag_verified ?? null,
     internal_rating: body.internal_rating ?? null,
   };
+}
+
+/**
+ * Reject transitions to status=posted when type proof is not met.
+ * Existing posted rows may be amended without re-check (going-forward rule).
+ */
+export async function assertDeliverablePostedTransition(
+  client,
+  { before, fields, deliverableId, bodyScreenshots },
+) {
+  const wasPosted = before?.status === 'posted';
+  const willBePosted = fields.status === 'posted';
+  if (!willBePosted || wasPosted) return;
+
+  let screenshots = bodyScreenshots;
+  if (screenshots === undefined && deliverableId) {
+    const map = await loadScreenshotsForDeliverables(client, [deliverableId]);
+    screenshots = map.get(deliverableId) ?? [];
+  }
+
+  const satisfied = deliverablePostedProofSatisfied({
+    deliverable_type: fields.deliverable_type,
+    content_link: fields.content_link,
+    unit_proofs: fields.unit_proofs,
+    screenshots: screenshots ?? [],
+    quantity: fields.quantity,
+    status: fields.status,
+  });
+
+  if (!satisfied) {
+    throw Object.assign(
+      new Error(deliverableProofRequirementMessage(fields.deliverable_type)),
+      { status: 422 },
+    );
+  }
 }

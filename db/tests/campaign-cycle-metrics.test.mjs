@@ -27,8 +27,8 @@ async function seedCountedEngagement(client, { campaignId, userId, completedAt }
   );
   const engagementId = engagement.rows[0].id;
   await client.query(
-    `INSERT INTO deliverables (engagement_id, deliverable_type, quantity, status)
-     VALUES ($1, 'reel', 1, 'posted')`,
+    `INSERT INTO deliverables (engagement_id, deliverable_type, quantity, status, content_link)
+     VALUES ($1, 'reel', 1, 'posted', 'https://instagram.com/p/cycle-metrics')`,
     [engagementId],
   );
   await client.query(

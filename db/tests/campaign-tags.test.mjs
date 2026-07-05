@@ -91,7 +91,9 @@ async function main() {
     assert(beforePop.rows[0].n === 0, 'no campaign tags before completion');
 
     await client.query(
-      `UPDATE deliverables SET status = 'posted', published_date = CURRENT_DATE WHERE engagement_id = $1`,
+      `UPDATE deliverables
+       SET status = 'posted', published_date = CURRENT_DATE, content_link = 'https://instagram.com/p/tag-test'
+       WHERE engagement_id = $1`,
       [engagementId],
     );
     const afterPostOnly = await client.query(

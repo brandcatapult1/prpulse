@@ -166,7 +166,11 @@ export function LogDeliverableDrawer({ deliverable, open, onClose, onConfirm }) 
 
   if (!deliverable) return null;
 
-  const canSubmit = canMarkDeliverablePosted({ contentLink, screenshots });
+  const canSubmit = canMarkDeliverablePosted({
+    contentLink,
+    screenshots,
+    deliverableType: deliverable.deliverable_type,
+  });
 
   function resetAndClose() {
     setContentLink('');

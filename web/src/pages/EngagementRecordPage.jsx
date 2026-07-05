@@ -61,6 +61,8 @@ import {
   terminalBanner,
   visitRules,
 } from '../lib/engagementRules.js';
+import { deliverableHasProof, isDeliverableFullyPosted } from '../lib/deliverableLogging.js';
+import { deliverableProofRequirementMessage } from '../lib/deliverableProofRules.js';
 import { formatCollaborationReason } from '../lib/collaborationReasons.js';
 import { addDeliverableToList, deliverableListUnitTotals, removeDeliverableFromList } from '../lib/deliverableList.js';
 import {
@@ -159,6 +161,16 @@ export function EngagementRecordPage() {
       );
       return;
     }
+    if (patch.status === 'posted') {
+      const item = deliverables.find((d) => d.id === delId);
+      if (item && item.status !== 'posted') {
+        const merged = { ...item, ...patch };
+        if (!deliverableHasProof({ ...merged, status: 'posted' })) {
+          setToast(deliverableProofRequirementMessage(merged.deliverable_type));
+          return;
+        }
+      }
+    }
     setDeliverables((rows) => rows.map((d) => (d.id === delId ? { ...d, ...patch } : d)));
   };
 
@@ -212,7 +224,8 @@ export function EngagementRecordPage() {
   }
 
   const canComplete =
-    savedDeliverables.length > 0 && savedDeliverables.every((d) => d.status === 'posted');
+    savedDeliverables.length > 0
+    && savedDeliverables.every((d) => isDeliverableFullyPosted(d) && deliverableHasProof(d));
 
   const deliverablesDirty =
     deliverablesSnapshot(deliverables) !== deliverablesSnapshot(savedDeliverables);

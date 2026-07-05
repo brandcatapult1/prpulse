@@ -17,6 +17,7 @@ import {
   listActivityEventsForEngagement,
 } from '../lib/activityEvents.mjs';
 import {
+  assertDeliverablePostedTransition,
   deliverableInsertFields,
   loadDeliverablesForEngagement,
   loadScreenshotsForDeliverables,
@@ -423,6 +424,12 @@ engagementsRouter.post('/:id/deliverables', requireAuth, requireEngagementWriteA
       if (!eng.rows[0]) throw Object.assign(new Error('Engagement not found'), { status: 404 });
 
       const fields = deliverableInsertFields(req.body);
+      await assertDeliverablePostedTransition(client, {
+        before: null,
+        fields,
+        deliverableId: null,
+        bodyScreenshots: req.body.screenshots,
+      });
       const { rows } = await client.query(
         `INSERT INTO deliverables (
            engagement_id, deliverable_type, quantity, posted_quantity, unit_proofs,
@@ -472,6 +479,14 @@ engagementsRouter.patch('/:engagementId/deliverables/:deliverableId', requireAut
       const before = cur.rows[0];
 
       const fields = deliverableInsertFields({ ...before, ...req.body });
+      await assertDeliverablePostedTransition(client, {
+        before,
+        fields,
+        deliverableId: req.params.deliverableId,
+        bodyScreenshots: Object.prototype.hasOwnProperty.call(req.body, 'screenshots')
+          ? req.body.screenshots
+          : undefined,
+      });
       const { rows } = await client.query(
         `UPDATE deliverables SET
            deliverable_type = $3,

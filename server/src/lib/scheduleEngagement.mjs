@@ -1,4 +1,5 @@
 import {
+  assertDeliverablePostedTransition,
   deliverableInsertFields,
   loadDeliverablesForEngagement,
   syncDeliverableScreenshots,
@@ -38,6 +39,12 @@ export async function syncDeliverablesInTransaction(client, engagementId, desire
     const isNew = isTempDeliverableId(item.id) || !beforeById.has(item.id);
 
     if (isNew) {
+      await assertDeliverablePostedTransition(client, {
+        before: null,
+        fields,
+        deliverableId: null,
+        bodyScreenshots: item.screenshots,
+      });
       const { rows } = await client.query(
         `INSERT INTO deliverables (
            engagement_id, deliverable_type, quantity, posted_quantity, unit_proofs,
@@ -65,6 +72,14 @@ export async function syncDeliverablesInTransaction(client, engagementId, desire
       }
       continue;
     }
+
+    const beforeRow = beforeById.get(item.id);
+    await assertDeliverablePostedTransition(client, {
+      before: beforeRow,
+      fields,
+      deliverableId: item.id,
+      bodyScreenshots: item.screenshots,
+    });
 
     const { rows } = await client.query(
       `UPDATE deliverables SET

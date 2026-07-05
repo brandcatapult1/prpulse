@@ -1,15 +1,12 @@
 import { formatDate } from './format.jsx';
+import {
+  deliverablePostedProofSatisfied,
+  deliverableProofRequirementMessage,
+  deliverableProofSatisfied,
+  screenshotHasUrl,
+} from './deliverableProofRules.js';
 
-export function screenshotHasUrl(shot) {
-  const url = shot?.url ?? shot?.file_path;
-  return Boolean(String(url ?? '').trim());
-}
-
-export function unitProofHasEvidence(unit) {
-  const link = unit?.content_link?.trim();
-  const shots = unit?.screenshots ?? [];
-  return Boolean(link) || shots.some(screenshotHasUrl);
-}
+export { screenshotHasUrl, deliverableProofRequirementMessage };
 
 /** How many units on this row have been logged with proof. */
 export function deliverablePostedUnits(deliverable) {
@@ -30,42 +27,46 @@ export function isDeliverableFullyPosted(deliverable) {
 }
 
 export function deliverableHasProof(deliverable) {
-  const qty = deliverableTotalUnits(deliverable);
-  const unitProofs = deliverable?.unit_proofs ?? [];
-
-  if (unitProofs.length >= qty) {
-    return unitProofs.slice(0, qty).every(unitProofHasEvidence);
-  }
-
-  if (deliverable?.status === 'posted' && unitProofs.length === 0) {
-    const link = deliverable?.content_link?.trim();
-    const shots = deliverable?.screenshots?.length ?? 0;
-    return Boolean(link) || shots > 0;
-  }
-
-  return false;
+  if (!deliverable) return false;
+  return deliverablePostedProofSatisfied({
+    deliverable_type: deliverable.deliverable_type,
+    content_link: deliverable.content_link,
+    unit_proofs: deliverable.unit_proofs,
+    screenshots: deliverable.screenshots,
+    quantity: deliverable.quantity,
+    status: deliverable.status,
+  });
 }
 
 export function deliverableProofEmphasis(type) {
-  const normalized = (type ?? '').toLowerCase();
+  const normalized = String(type ?? '').toLowerCase();
   if (normalized === 'story') {
     return {
       linkLabel: 'Post link (optional)',
-      screenshotLabel: 'Screenshot — needed, stories expire',
+      screenshotLabel: 'Screenshot — required',
       screenshotPrimary: true,
     };
   }
+  if (normalized === 'reel' || normalized === 'carousel' || normalized === 'static_carousel_post') {
+    return {
+      linkLabel: 'Post link — required',
+      screenshotLabel: 'Screenshot (optional)',
+      screenshotPrimary: false,
+    };
+  }
   return {
-    linkLabel: 'Post link — needed',
+    linkLabel: 'Post link or screenshot — one required',
     screenshotLabel: 'Screenshot (optional)',
     screenshotPrimary: false,
   };
 }
 
-export function canMarkDeliverablePosted({ contentLink, screenshots }) {
-  const link = contentLink?.trim();
-  const hasShot = (screenshots ?? []).some(screenshotHasUrl);
-  return Boolean(link) || hasShot;
+export function canMarkDeliverablePosted({ contentLink, screenshots, deliverableType }) {
+  return deliverableProofSatisfied(deliverableType, {
+    content_link: contentLink,
+    screenshots,
+    unit_proofs: [{ content_link: contentLink, screenshots }],
+  });
 }
 
 /** Log one unit; marks the row posted when all units are logged. */

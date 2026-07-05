@@ -132,11 +132,29 @@ async function runTests() {
       );
     });
 
-    await test('valid completion increments campaign count and stamps completed_at', async () => {
-      const { engagementId, campaignId } = await seedBase(client);
+    await test('blocks completion when posted reel lacks required link', async () => {
+      const { engagementId } = await seedBase(client);
       await client.query(
         `INSERT INTO deliverables (engagement_id, deliverable_type, status)
          VALUES ($1, 'reel', 'posted')`,
+        [engagementId],
+      );
+      await expectDbError(
+        client,
+        `UPDATE engagements
+         SET conversation_status = 'collaboration_complete',
+             primary_collaboration_reason = 'expert'
+         WHERE id = $1`,
+        [engagementId],
+        'type proof on file',
+      );
+    });
+
+    await test('valid completion increments campaign count and stamps completed_at', async () => {
+      const { engagementId, campaignId } = await seedBase(client);
+      await client.query(
+        `INSERT INTO deliverables (engagement_id, deliverable_type, status, content_link)
+         VALUES ($1, 'reel', 'posted', 'https://instagram.com/p/test-reel')`,
         [engagementId],
       );
       const { rows: before } = await client.query(
@@ -169,8 +187,8 @@ async function runTests() {
     await test('reopening a completed engagement decrements campaign count', async () => {
       const { engagementId, campaignId } = await seedBase(client);
       await client.query(
-        `INSERT INTO deliverables (engagement_id, deliverable_type, status)
-         VALUES ($1, 'reel', 'posted')`,
+        `INSERT INTO deliverables (engagement_id, deliverable_type, status, content_link)
+         VALUES ($1, 'reel', 'posted', 'https://instagram.com/p/test-reel')`,
         [engagementId],
       );
       await client.query(
@@ -234,8 +252,8 @@ async function runTests() {
     await test('agreed fee frozen while completed', async () => {
       const { engagementId } = await seedBase(client);
       await client.query(
-        `INSERT INTO deliverables (engagement_id, deliverable_type, status)
-         VALUES ($1, 'reel', 'posted')`,
+        `INSERT INTO deliverables (engagement_id, deliverable_type, status, content_link)
+         VALUES ($1, 'reel', 'posted', 'https://instagram.com/p/test-reel')`,
         [engagementId],
       );
       await client.query(

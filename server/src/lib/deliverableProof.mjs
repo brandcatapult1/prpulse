@@ -1,3 +1,8 @@
+import {
+  deliverablePostedProofSatisfied,
+  screenshotHasUrl,
+} from './deliverableProofRules.mjs';
+
 function toIsoDate(value) {
   if (!value) return null;
   if (typeof value === 'string') return value.slice(0, 10);
@@ -12,17 +17,6 @@ function resolveDeliverablePostedDate(deliverable, unitProofs) {
     if (unitDate) return unitDate;
   }
   return null;
-}
-
-function screenshotHasUrl(shot) {
-  const url = shot?.url ?? shot?.file_path;
-  return Boolean(String(url ?? '').trim());
-}
-
-function unitProofHasEvidence(unit) {
-  const link = unit?.content_link?.trim?.() ?? unit?.content_link;
-  const shots = unit?.screenshots ?? [];
-  return Boolean(link) || shots.some(screenshotHasUrl);
 }
 
 export function deliverablePostedUnits(deliverable) {
@@ -44,20 +38,15 @@ export function isDeliverableFullyPosted(deliverable) {
 }
 
 export function deliverableHasProof(deliverable) {
-  const qty = deliverableTotalUnits(deliverable);
-  const unitProofs = Array.isArray(deliverable?.unit_proofs) ? deliverable.unit_proofs : [];
-
-  if (unitProofs.length >= qty) {
-    return unitProofs.slice(0, qty).every(unitProofHasEvidence);
-  }
-
-  if (deliverable?.status === 'posted' && unitProofs.length === 0) {
-    const link = deliverable?.content_link?.trim?.() ?? deliverable?.content_link;
-    const shots = deliverable?.screenshots?.length ?? 0;
-    return Boolean(link) || shots > 0;
-  }
-
-  return false;
+  if (!deliverable) return false;
+  return deliverablePostedProofSatisfied({
+    deliverable_type: deliverable.deliverable_type,
+    content_link: deliverable.content_link,
+    unit_proofs: deliverable.unit_proofs,
+    screenshots: deliverable.screenshots,
+    quantity: deliverable.quantity,
+    status: deliverable.status,
+  });
 }
 
 export function deliverableAwaitedUnits(deliverable) {
@@ -114,3 +103,5 @@ export function buildDeliverableProofItems(deliverables) {
       };
     });
 }
+
+export { screenshotHasUrl };

@@ -46,17 +46,41 @@ export function reconcileDeliverableProofStores(deliverable) {
   };
 }
 
+/** Coerce node-pg numerics (often strings) before sum/compare. */
+export function coerceDeliverableNumeric(value, { field = 'value', deliverableId } = {}) {
+  if (value == null || value === '') return 0;
+  const n = Number(value);
+  if (Number.isFinite(n)) return n;
+  console.warn(
+    `[deliverable] non-numeric ${field}${deliverableId ? ` on ${deliverableId}` : ''}:`,
+    value,
+  );
+  return 0;
+}
+
 /** How many units on this row have been logged with proof. */
 export function deliverablePostedUnits(deliverable) {
   if (!deliverable) return 0;
-  if (typeof deliverable.posted_quantity === 'number') {
-    return deliverable.posted_quantity;
+  const postedQty = deliverable.posted_quantity;
+  if (postedQty != null && postedQty !== '') {
+    return coerceDeliverableNumeric(postedQty, {
+      field: 'posted_quantity',
+      deliverableId: deliverable.id,
+    });
   }
-  return deliverable.status === 'posted' ? (deliverable.quantity ?? 1) : 0;
+  return deliverable.status === 'posted' ? deliverableTotalUnits(deliverable) : 0;
 }
 
 export function deliverableTotalUnits(deliverable) {
-  return Number(deliverable?.quantity) || 1;
+  const qty = deliverable?.quantity;
+  if (qty == null || qty === '') return 1;
+  const n = Number(qty);
+  if (Number.isFinite(n) && n > 0) return n;
+  console.warn(
+    `[deliverable] non-numeric quantity${deliverable?.id ? ` on ${deliverable.id}` : ''}:`,
+    qty,
+  );
+  return 1;
 }
 
 export function isDeliverableFullyPosted(deliverable) {

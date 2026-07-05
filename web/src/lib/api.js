@@ -15,9 +15,25 @@ export async function api(path, options = {}) {
   return res.json();
 }
 
+const PG_ERROR_HUMANIZERS = [
+  {
+    test: (msg) => /primary_collaboration_reason_check|primary_collaboration_reason is not null/i.test(msg),
+    message: 'Add a collaboration reason before completing — set it on the campaign board.',
+  },
+];
+
+function humanizeServerErrorMessage(msg) {
+  const text = String(msg ?? '').trim();
+  for (const { test, message } of PG_ERROR_HUMANIZERS) {
+    if (test(text)) return message;
+  }
+  return text;
+}
+
 /**
  * User-facing text from a failed api() call.
- * HTTP rejections (err.status set, body.error → err.message) are returned verbatim.
+ * HTTP rejections (err.status set, body.error → err.message) are returned verbatim
+ * unless a known Postgres constraint should be shown in plain language.
  * Network / unreachable server → networkFallback (distinct from validation rejections).
  */
 export function apiErrorMessage(
@@ -26,10 +42,10 @@ export function apiErrorMessage(
 ) {
   const msg = String(err?.message ?? '').trim();
   if (err?.status != null && msg) {
-    return msg;
+    return humanizeServerErrorMessage(msg);
   }
   if (msg && msg !== 'Failed to fetch') {
-    return msg;
+    return humanizeServerErrorMessage(msg);
   }
   return networkFallback;
 }

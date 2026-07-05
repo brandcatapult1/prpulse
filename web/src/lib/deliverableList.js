@@ -1,11 +1,15 @@
 import { buildNewDeliverable } from './deliverableTypes.js';
-import { deliverablePostedUnits } from './deliverableLogging.js';
+import { deliverablePostedUnits, deliverableTotalUnits } from './deliverableLogging.js';
 
 /** Sum asset units across deliverable rows (not row count). */
 export function deliverableListUnitTotals(list) {
-  const total = (list ?? []).reduce((sum, d) => sum + (d.quantity ?? 1), 0);
-  const posted = (list ?? []).reduce((sum, d) => sum + deliverablePostedUnits(d), 0);
-  return { posted, total };
+  return (list ?? []).reduce(
+    (acc, d) => ({
+      total: acc.total + deliverableTotalUnits(d),
+      posted: acc.posted + deliverablePostedUnits(d),
+    }),
+    { posted: 0, total: 0 },
+  );
 }
 
 /**
@@ -32,8 +36,9 @@ export function removeDeliverableFromList(list, delId) {
   const item = rows.find((d) => d.id === delId);
   if (!item) return rows;
 
-  if ((item.quantity ?? 1) > 1) {
-    const nextQty = item.quantity - 1;
+  const itemQty = deliverableTotalUnits(item);
+  if (itemQty > 1) {
+    const nextQty = itemQty - 1;
     const posted = Math.min(deliverablePostedUnits(item), nextQty);
     const unitProofs = (item.unit_proofs ?? []).slice(0, posted);
     return rows.map((d) => {

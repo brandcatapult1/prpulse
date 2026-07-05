@@ -334,9 +334,11 @@ export function EngagementRecordPage() {
     );
   }
 
-  const canComplete =
+  const hasCollaborationReason = Boolean(engagement?.primary_collaboration_reason);
+  const deliverablesReady =
     savedDeliverables.length > 0
     && savedDeliverables.every((d) => isDeliverableFullyPosted(d) && deliverableHasProof(d));
+  const canComplete = hasCollaborationReason && deliverablesReady;
 
   const deliverablesDirty =
     deliverablesSnapshot(deliverables) !== deliverablesSnapshot(savedDeliverables);
@@ -403,6 +405,17 @@ export function EngagementRecordPage() {
     }
     if (isComplete(engagement?.conversation_status)) return;
 
+    if (next === 'collaboration_complete') {
+      if (!engagement.primary_collaboration_reason) {
+        setToast('Add a collaboration reason before completing — set it on the campaign board.');
+        return;
+      }
+      if (!deliverablesReady) {
+        setToast('Complete when all deliverables are Posted with proof');
+        return;
+      }
+    }
+
     const patch = { conversation_status: next, ...sideEffectsOnStatusChange(next) };
 
     const rule = followUpSuggestionForStatus(next);
@@ -445,7 +458,7 @@ export function EngagementRecordPage() {
     setDeliverables((rows) => removeDeliverableFromList(rows, delId));
   };
 
-  const { posted: postedUnits, total: totalUnits } = deliverableListUnitTotals(deliverables);
+  const { posted: postedUnits, total: totalUnits } = deliverableListUnitTotals(savedDeliverables);
 
   const blacklisted = engagement.contact_id && isContactBlacklisted(engagement.contact_id);
   const contactRecord = engagement.contact_id ? getCachedContact(engagement.contact_id) : null;
@@ -553,8 +566,10 @@ export function EngagementRecordPage() {
                       ? canReopenComplete(user?.role)
                         ? 'Use Reopen to amend deliverables or fee'
                         : 'Collaboration complete — Senior Manager or Admin can reopen'
+                      : !hasCollaborationReason && deliverablesReady
+                        ? 'Add a collaboration reason on the campaign board before completing'
                       : !canComplete
-                        ? 'Complete unlocks when all deliverables are Posted'
+                        ? 'Complete unlocks when all deliverables are Posted with proof'
                         : undefined
                   }
                 />
@@ -645,9 +660,16 @@ export function EngagementRecordPage() {
                   What content did you agree on with this creator?
                 </p>
               </div>
-              <Pill tone={deliverables.length ? 'info' : 'muted'}>
-                {postedUnits}/{totalUnits} posted
-              </Pill>
+              <div className="flex flex-col items-end gap-1">
+                <Pill tone={savedDeliverables.length ? 'info' : 'muted'}>
+                  {postedUnits}/{totalUnits} posted
+                </Pill>
+                {deliverablesDirty && (
+                  <span className="text-2xs text-health-amber">
+                    Unsaved changes — save deliverables first
+                  </span>
+                )}
+              </div>
             </div>
 
             {deliverablesRule.lockedReason && (

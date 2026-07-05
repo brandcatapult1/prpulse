@@ -318,6 +318,10 @@ async function patchEngagement(req, res) {
 
       if (sets.length === 0) return loadEngagementRow(client, req.params.id);
 
+      const switchingToBarter =
+        patch.collaboration_type === 'barter'
+        && cur.collaboration_type !== 'barter';
+
       const { rows } = await client.query(
         `UPDATE engagements SET ${sets.join(', ')}, updated_at = now()
          WHERE id = $1
@@ -326,6 +330,12 @@ async function patchEngagement(req, res) {
       );
 
       const updated = rows[0];
+      if (switchingToBarter) {
+        await client.query(
+          'UPDATE deliverables SET line_fee = NULL WHERE engagement_id = $1 AND line_fee IS NOT NULL',
+          [req.params.id],
+        );
+      }
       await recordEngagementPatchActivity(client, req.user, cur, updated, patch);
       if (
         patch.drop_reason === 'didnt_deliver'
@@ -420,8 +430,8 @@ engagementsRouter.post('/:id/deliverables', requireAuth, requireEngagementWriteA
         `INSERT INTO deliverables (
            engagement_id, deliverable_type, quantity, posted_quantity, unit_proofs,
            due_date, status, published_date, content_link,
-           brief_compliance, brand_tag_verified, internal_rating
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+           brief_compliance, brand_tag_verified, internal_rating, line_fee
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
          RETURNING *`,
         [
           req.params.id,
@@ -436,6 +446,7 @@ engagementsRouter.post('/:id/deliverables', requireAuth, requireEngagementWriteA
           resolvedFields.brief_compliance,
           resolvedFields.brand_tag_verified,
           resolvedFields.internal_rating,
+          resolvedFields.line_fee,
         ],
       );
       const inserted = rows[0];
@@ -486,6 +497,7 @@ engagementsRouter.patch('/:engagementId/deliverables/:deliverableId', requireAut
            brief_compliance = $11,
            brand_tag_verified = $12,
            internal_rating = $13,
+           line_fee = $14,
            updated_at = now()
          WHERE id = $1 AND engagement_id = $2
          RETURNING *`,
@@ -503,6 +515,7 @@ engagementsRouter.patch('/:engagementId/deliverables/:deliverableId', requireAut
           fields.brief_compliance,
           fields.brand_tag_verified,
           fields.internal_rating,
+          fields.line_fee,
         ],
       );
 

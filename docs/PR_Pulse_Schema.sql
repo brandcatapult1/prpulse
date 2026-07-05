@@ -330,6 +330,7 @@ CREATE TABLE deliverables (
   brief_compliance   boolean,
   brand_tag_verified boolean,
   internal_rating    integer CHECK (internal_rating IS NULL OR internal_rating BETWEEN 1 AND 5),
+  line_fee           numeric(12,2),
   created_at         timestamptz NOT NULL DEFAULT now(),
   updated_at         timestamptz NOT NULL DEFAULT now()
 );
@@ -920,6 +921,26 @@ BEGIN
   RETURN NEW;
 END $$;
 
+-- Deliverable BEFORE UPDATE: line_fee frozen while parent engagement is Completed.
+CREATE OR REPLACE FUNCTION fn_deliverable_before() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE
+  eng_status conversation_status;
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    IF NEW.line_fee IS DISTINCT FROM OLD.line_fee THEN
+      SELECT conversation_status INTO eng_status
+      FROM engagements WHERE id = NEW.engagement_id;
+      IF eng_status = 'collaboration_complete' THEN
+        RAISE EXCEPTION
+          'Line fee is frozen while the engagement is Completed; reopen it to amend'
+          USING ERRCODE = 'check_violation';
+      END IF;
+    END IF;
+  END IF;
+  RETURN NEW;
+END $$;
+
 -- Engagement AFTER INSERT or status change: refresh completion/rollups + timeline.
 CREATE OR REPLACE FUNCTION fn_engagement_after_status() RETURNS trigger
 LANGUAGE plpgsql AS $$
@@ -1006,6 +1027,7 @@ CREATE TRIGGER trg_brands_touch       BEFORE UPDATE ON brands       FOR EACH ROW
 CREATE TRIGGER trg_campaigns_touch    BEFORE UPDATE ON campaigns    FOR EACH ROW EXECUTE FUNCTION fn_touch_updated_at();
 CREATE TRIGGER trg_engagements_touch  BEFORE UPDATE ON engagements  FOR EACH ROW EXECUTE FUNCTION fn_touch_updated_at();
 CREATE TRIGGER trg_deliverables_touch BEFORE UPDATE ON deliverables FOR EACH ROW EXECUTE FUNCTION fn_touch_updated_at();
+CREATE TRIGGER trg_deliverables_before BEFORE UPDATE ON deliverables FOR EACH ROW EXECUTE FUNCTION fn_deliverable_before();
 CREATE TRIGGER trg_feedback_touch     BEFORE UPDATE ON feedback     FOR EACH ROW EXECUTE FUNCTION fn_touch_updated_at();
 
 -- Engagement guards & rollups

@@ -70,6 +70,8 @@ export function deliverablesRules(status) {
     return {
       canAdd: false,
       canEditStatus: false,
+      canEditProof: false,
+      canShowProofUI: true,
       canMarkPosted: false,
       lockedReason: 'Reopen to edit',
     };
@@ -78,6 +80,8 @@ export function deliverablesRules(status) {
     return {
       canAdd: false,
       canEditStatus: false,
+      canEditProof: false,
+      canShowProofUI: true,
       canMarkPosted: false,
       lockedReason: 'Engagement dropped',
     };
@@ -86,6 +90,8 @@ export function deliverablesRules(status) {
     return {
       canAdd: true,
       canEditStatus: true,
+      canEditProof: true,
+      canShowProofUI: true,
       canMarkPosted: true,
       lockedReason: null,
     };
@@ -94,6 +100,8 @@ export function deliverablesRules(status) {
     return {
       canAdd: true,
       canEditStatus: true,
+      canEditProof: false,
+      canShowProofUI: false,
       canMarkPosted: false,
       lockedReason: null,
       hint: 'Plan deliverables here — move to Awaiting Final Deliverables before content goes live',
@@ -102,6 +110,8 @@ export function deliverablesRules(status) {
   return {
     canAdd: false,
     canEditStatus: false,
+    canEditProof: false,
+    canShowProofUI: false,
     canMarkPosted: false,
     lockedReason: 'Start outreach first',
   };

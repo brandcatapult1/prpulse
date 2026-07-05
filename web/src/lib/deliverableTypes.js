@@ -35,5 +35,6 @@ export function buildNewDeliverable({ type, quantity = 1, dueDate, engagementSta
     brief_compliance: null,
     brand_tag_verified: null,
     internal_rating: null,
+    line_fee: null,
   };
 }

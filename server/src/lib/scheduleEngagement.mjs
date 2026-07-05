@@ -56,8 +56,8 @@ export async function syncDeliverablesInTransaction(client, engagementId, desire
         `INSERT INTO deliverables (
            engagement_id, deliverable_type, quantity, posted_quantity, unit_proofs,
            due_date, status, published_date, content_link,
-           brief_compliance, brand_tag_verified, internal_rating
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+           brief_compliance, brand_tag_verified, internal_rating, line_fee
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
          RETURNING *`,
         [
           engagementId,
@@ -72,6 +72,7 @@ export async function syncDeliverablesInTransaction(client, engagementId, desire
           resolvedFields.brief_compliance,
           resolvedFields.brand_tag_verified,
           resolvedFields.internal_rating,
+          resolvedFields.line_fee,
         ],
       );
       if (item.screenshots?.length) {
@@ -104,6 +105,7 @@ export async function syncDeliverablesInTransaction(client, engagementId, desire
          brief_compliance = $11,
          brand_tag_verified = $12,
          internal_rating = $13,
+         line_fee = $14,
          updated_at = now()
        WHERE id = $1 AND engagement_id = $2
        RETURNING *`,
@@ -121,6 +123,7 @@ export async function syncDeliverablesInTransaction(client, engagementId, desire
         resolvedFields.brief_compliance,
         resolvedFields.brand_tag_verified,
         resolvedFields.internal_rating,
+        resolvedFields.line_fee,
       ],
     );
     if (item.screenshots?.length) {
@@ -229,6 +232,12 @@ export async function commitScheduleEngagement(client, user, engagementId, body,
     params,
   );
   const updated = updatedRows[0];
+  if (patch.collaboration_type === 'barter' && cur.collaboration_type !== 'barter') {
+    await client.query(
+      'UPDATE deliverables SET line_fee = NULL WHERE engagement_id = $1 AND line_fee IS NOT NULL',
+      [engagementId],
+    );
+  }
   await recordEngagementPatchActivity(client, user, cur, updated, patch);
 
   const engagement = await loadEngagementRow(client, engagementId);

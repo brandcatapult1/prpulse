@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { deliverableTypeLabel } from '../../lib/deliverableTypes.js';
+import { formatFee } from '../../lib/format.jsx';
 import {
   canMarkDeliverablePosted,
   deliverableProofEmphasis,
@@ -258,6 +259,9 @@ export function DeliverableProofSection({
 export function DeliverableRow({
   deliverable,
   canEditProof,
+  canShowProofUI = false,
+  showLineFee = false,
+  lineFeeEditable = false,
   canRemove = false,
   onUpdate,
   onRemove,
@@ -269,11 +273,12 @@ export function DeliverableRow({
   markPostedBusy = false,
 }) {
   const displayProof = mergeDeliverableProofForDisplay(deliverable);
+  const hasProofData = Boolean(
+    displayProof.content_link || (displayProof.screenshots?.length ?? 0) > 0,
+  );
   const showProof =
-    canEditProof
-    || canMarkPosted
-    || displayProof.content_link
-    || (displayProof.screenshots?.length ?? 0) > 0;
+    canShowProofUI
+    && (canEditProof || canMarkPosted || hasProofData);
 
   return (
     <div className="rounded-lg border border-line bg-canvas px-3 py-3">
@@ -287,7 +292,7 @@ export function DeliverableRow({
               Due {formatDateShort(deliverable.due_date)}
             </span>
           )}
-          {!compact && displayProof.content_link && (
+          {!compact && canShowProofUI && displayProof.content_link && (
             <p className="mt-1 truncate text-2xs text-brand">{displayProof.content_link}</p>
           )}
         </div>
@@ -312,6 +317,36 @@ export function DeliverableRow({
           )}
         </div>
       </div>
+
+      {showLineFee && (
+        <div className="mt-2 border-t border-line/60 pt-2">
+          <label className="block text-2xs text-ink-tertiary">
+            Optional line fee
+            {lineFeeEditable ? (
+              <input
+                type="number"
+                min={0}
+                className="input-field mt-1 max-w-[160px]"
+                value={deliverable.line_fee ?? ''}
+                placeholder="Optional"
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  onUpdate?.(deliverable.id, {
+                    line_fee: raw === '' ? null : Number(raw),
+                  });
+                }}
+              />
+            ) : (
+              <span className="mt-1 block text-sm font-medium text-ink">
+                {deliverable.line_fee != null ? formatFee(deliverable.line_fee) : '—'}
+              </span>
+            )}
+          </label>
+          <p className="mt-1 text-2xs text-ink-tertiary">
+            Independent detail — does not need to match the agreed fee total.
+          </p>
+        </div>
+      )}
 
       {showProof && (
         <DeliverableProofSection

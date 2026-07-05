@@ -318,6 +318,31 @@ async function runTests() {
       );
     });
 
+    await test('line fee frozen while completed', async () => {
+      const { engagementId } = await seedBase(client);
+      const del = await client.query(
+        `INSERT INTO deliverables (engagement_id, deliverable_type, status, content_link, line_fee)
+         VALUES ($1, 'reel', 'posted', 'https://instagram.com/p/test-reel', 3000)
+         RETURNING id`,
+        [engagementId],
+      );
+      const deliverableId = del.rows[0].id;
+      await client.query(
+        `UPDATE engagements
+         SET conversation_status = 'collaboration_complete',
+             primary_collaboration_reason = 'expert',
+             agreed_fee = 5000
+         WHERE id = $1`,
+        [engagementId],
+      );
+      await expectDbError(
+        client,
+        `UPDATE deliverables SET line_fee = 4000 WHERE id = $1`,
+        [deliverableId],
+        'Line fee is frozen while the engagement is Completed',
+      );
+    });
+
     await test('blacklist record flips is_blacklisted on contact', async () => {
       const user = await client.query(
         `INSERT INTO users (email, full_name, role)

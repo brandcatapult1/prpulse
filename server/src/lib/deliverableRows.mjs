@@ -24,6 +24,7 @@ export function mapDeliverableRow(row, screenshots = []) {
     brief_compliance: row.brief_compliance,
     brand_tag_verified: row.brand_tag_verified,
     internal_rating: row.internal_rating,
+    line_fee: row.line_fee != null ? Number(row.line_fee) : null,
     is_overdue: row.is_overdue ?? false,
     screenshots: merged.screenshots,
     created_at: row.created_at,
@@ -81,6 +82,12 @@ export async function syncDeliverableScreenshots(client, deliverableId, screensh
   }
 }
 
+function coerceLineFee(value) {
+  if (value === '' || value == null) return null;
+  const n = Number(value);
+  return Number.isNaN(n) ? null : n;
+}
+
 export function deliverableInsertFields(body) {
   return {
     deliverable_type: deliverableTypeToDb(body.deliverable_type),
@@ -94,6 +101,7 @@ export function deliverableInsertFields(body) {
     brief_compliance: body.brief_compliance ?? null,
     brand_tag_verified: body.brand_tag_verified ?? null,
     internal_rating: body.internal_rating ?? null,
+    line_fee: coerceLineFee(body.line_fee),
   };
 }
 

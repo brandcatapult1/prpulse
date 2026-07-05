@@ -578,6 +578,8 @@ export function EngagementRecordPage() {
     : '—';
   const statusDropReasonOptions = getDropReasonOptionsForStatus(status);
   const collabType = engagement.collaboration_type === 'paid' ? 'paid' : 'barter';
+  const showLineFee = collabType === 'paid';
+  const lineFeeEditable = showLineFee && !feeRule.frozen && deliverablesRule.canEditStatus;
   const commercialsFrozen = !commercialsRule.editable;
 
   function startLogFirstOutreach() {
@@ -650,10 +652,17 @@ export function EngagementRecordPage() {
   async function makeBarter() {
     if (commercialsFrozen) return;
     setAgreedFeeDraft('');
-    await persistEngagement(
+    const ok = await persistEngagement(
       { collaboration_type: 'barter', agreed_fee: null },
       { successMessage: 'Switched to barter' },
     );
+    if (ok) {
+      const dels = await fetchDeliverables(id);
+      const cleared = cloneDeliverables(dels ?? []);
+      setDeliverables(cleared);
+      setSavedDeliverables(cloneDeliverables(cleared));
+      updateEngagementDeliverables(id, cleared);
+    }
   }
 
   return (
@@ -1031,7 +1040,10 @@ export function EngagementRecordPage() {
                     key={d.id}
                     deliverable={d}
                     engagementId={id}
-                    canEditProof={deliverablesRule.canEditStatus}
+                    canEditProof={deliverablesRule.canEditProof}
+                    canShowProofUI={deliverablesRule.canShowProofUI}
+                    showLineFee={showLineFee}
+                    lineFeeEditable={lineFeeEditable}
                     canMarkPosted={deliverablesRule.canMarkPosted}
                     canRemove={canRemoveDeliverable(status, d)}
                     onUpdate={updateDeliverable}
@@ -1162,7 +1174,10 @@ export function EngagementRecordPage() {
         deliverables={deliverables}
         deliverablesDirty={deliverablesDirty}
         canAdd={deliverablesRule.canAdd}
-        canEditProof={deliverablesRule.canEditStatus}
+        canEditProof={deliverablesRule.canEditProof}
+        canShowProofUI={deliverablesRule.canShowProofUI}
+        showLineFee={showLineFee}
+        lineFeeEditable={lineFeeEditable}
         canMarkPosted={deliverablesRule.canMarkPosted}
         onAddType={addDeliverable}
         onRemove={removeDeliverable}
@@ -1420,6 +1435,9 @@ function DeliverablesDrawer({
   deliverablesDirty,
   canAdd,
   canEditProof,
+  canShowProofUI = false,
+  showLineFee = false,
+  lineFeeEditable = false,
   canMarkPosted = false,
   onAddType,
   onRemove,
@@ -1478,6 +1496,9 @@ function DeliverablesDrawer({
               deliverable={d}
               engagementId={engagementId}
               canEditProof={canEditProof}
+              canShowProofUI={canShowProofUI}
+              showLineFee={showLineFee}
+              lineFeeEditable={lineFeeEditable}
               canMarkPosted={canMarkPosted}
               canRemove={canRemoveDeliverable(engagementStatus, d)}
               onUpdate={onUpdate}

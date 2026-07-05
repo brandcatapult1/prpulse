@@ -1,8 +1,7 @@
 import { Link } from 'react-router-dom';
-import { ExpandableSection } from '../ui/DataKit.jsx';
 import { Pill, formatFee } from '../../lib/format.jsx';
 import { formatClassification, CLASSIFICATION_OPTIONS, classificationSelectLabel } from '../../lib/classifications.js';
-import { formatContactStatus, CONTACT_STATUS_OPTIONS } from '../../lib/contactLifecycle.js';
+import { CONTACT_STATUS_OPTIONS } from '../../lib/contactLifecycle.js';
 import { MobileNumberField } from './MobileNumberField.jsx';
 import { CityCountryField } from './CityCountryField.jsx';
 import { countryLabel, citiesForCountry } from '../../lib/locations.js';
@@ -61,13 +60,13 @@ export function ContactEditOverview({
   }
 
   return (
-    <div className="space-y-3">
-      <ExpandableSection title="Vital information" defaultOpen>
+    <div className="grid gap-3 sm:grid-cols-2">
+      <ReadCard title="Contact & classification">
         <dl className="grid gap-4 sm:grid-cols-2 text-sm">
           <ProfileField
             label="Full name"
             editing={editing}
-            value={editing ? draft.full_name : contact.full_name}
+            value={contact.full_name}
             input={
               <input
                 className="input-field mt-1 w-full"
@@ -89,10 +88,10 @@ export function ContactEditOverview({
                   onNumberChange={(value) => setField('mobile_number', value)}
                   onBlur={() => onCheckMobile?.()}
                 />
-                {editing && draft.mobile_number && !isMobileValid(draft.mobile_number, draft.mobile_country_code) && (
+                {draft.mobile_number && !isMobileValid(draft.mobile_number, draft.mobile_country_code) && (
                   <p className="mt-1 text-2xs text-red-700">Enter a valid mobile number for the selected country.</p>
                 )}
-                {editing && duplicate && duplicate.id !== contactId && (
+                {duplicate && duplicate.id !== contactId && (
                   <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-2xs text-amber-900">
                     Matches existing contact: <strong>{duplicate.full_name}</strong>
                     <Link to={`/contacts/${duplicate.id}`} className="ml-1 text-brand hover:underline">
@@ -146,145 +145,28 @@ export function ContactEditOverview({
               />
             }
           />
-        </dl>
-      </ExpandableSection>
-
-      <ExpandableSection title="Social links">
-        <dl className="grid gap-4 sm:grid-cols-2 text-sm">
           <ProfileField
-            label="Instagram"
+            label="Classification"
             editing={editing}
-            value={linkOrDash(extras.instagram_url ?? contact.instagram_url)}
+            value={formatClassification(contact.classification)}
             input={
-              <input
+              <select
                 className="input-field mt-1 w-full"
-                value={draft.instagram_url ?? ''}
-                onChange={(e) => setField('instagram_url', e.target.value)}
-                placeholder="https://instagram.com/…"
-              />
-            }
-          />
-          <ProfileField
-            label="YouTube"
-            editing={editing}
-            value={linkOrDash(extras.youtube_url ?? contact.youtube_url)}
-            input={
-              <input
-                className="input-field mt-1 w-full"
-                value={draft.youtube_url ?? ''}
-                onChange={(e) => setField('youtube_url', e.target.value)}
-                placeholder="https://youtube.com/…"
-              />
-            }
-          />
-        </dl>
-        <div className="mt-4">
-          <p className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">Other platforms</p>
-          {editing ? (
-            <div className="mt-2 space-y-2">
-              {(draft.other_platform_links ?? []).map((link, index) => {
-                const incomplete = incompleteLinkIndexes.includes(index);
-                return (
-                  <div key={index}>
-                    <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-                      <input
-                        className={`input-field ${incomplete ? 'border-red-400' : ''}`}
-                        placeholder="Label"
-                        value={link.label ?? ''}
-                        onChange={(e) => {
-                          onDraftChange((d) => {
-                            const links = [...(d.other_platform_links ?? [])];
-                            links[index] = { ...links[index], label: e.target.value };
-                            return { ...d, other_platform_links: links };
-                          });
-                        }}
-                      />
-                      <input
-                        className={`input-field ${incomplete ? 'border-red-400' : ''}`}
-                        placeholder="URL"
-                        value={link.url ?? ''}
-                        onChange={(e) => {
-                          onDraftChange((d) => {
-                            const links = [...(d.other_platform_links ?? [])];
-                            links[index] = { ...links[index], url: e.target.value };
-                            return { ...d, other_platform_links: links };
-                          });
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className="btn-secondary text-2xs"
-                        onClick={() => {
-                          onDraftChange((d) => ({
-                            ...d,
-                            other_platform_links: (d.other_platform_links ?? []).filter((_, i) => i !== index),
-                          }));
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                    {incomplete && (
-                      <p className="mt-1 text-2xs text-red-700">
-                        Add both a label and a URL, or remove this row.
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-              <button
-                type="button"
-                className="btn-secondary text-2xs"
-                onClick={() => {
-                  onDraftChange((d) => ({
-                    ...d,
-                    other_platform_links: [...(d.other_platform_links ?? []), { label: '', url: '' }],
-                  }));
-                }}
+                value={draft.classification ?? ''}
+                onChange={(e) => setField('classification', e.target.value)}
               >
-                + Add platform
-              </button>
-            </div>
-          ) : (
-            <ul className="mt-2 space-y-1 text-sm">
-              {(extras.other_platform_links ?? contact.other_platform_links ?? []).length === 0 ? (
-                <li className="text-ink-secondary">—</li>
-              ) : (
-                (extras.other_platform_links ?? contact.other_platform_links ?? []).map((link, i) => (
-                  <li key={i}>
-                    <span className="text-ink-secondary">{link.label}: </span>
-                    <a href={link.url} target="_blank" rel="noreferrer" className="text-brand hover:underline">
-                      {link.url.replace(/^https?:\/\//, '')}
-                    </a>
-                  </li>
-                ))
-              )}
-            </ul>
-          )}
-        </div>
-      </ExpandableSection>
+                <option value="">— None —</option>
+                {CLASSIFICATION_OPTIONS.map(({ value }) => (
+                  <option key={value} value={value}>{classificationSelectLabel(value)}</option>
+                ))}
+              </select>
+            }
+          />
+        </dl>
+      </ReadCard>
 
-      <ExpandableSection title="Profile & categories">
+      <ReadCard title="Collaboration terms">
         <dl className="grid gap-4 sm:grid-cols-2 text-sm">
-          <div className="sm:col-span-2">
-            <dt className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">Primary category</dt>
-            <dd className="mt-1">
-              {editing ? (
-                <select
-                  className="input-field w-full max-w-md"
-                  value={draft.primary_category_id ?? ''}
-                  onChange={(e) => setField('primary_category_id', e.target.value)}
-                >
-                  <option value="">— None —</option>
-                  {categoryOptions.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              ) : (
-                <span className="text-ink">{contact.primary_category?.name ?? extras.primary_category?.name ?? '—'}</span>
-              )}
-            </dd>
-          </div>
           <ProfileField
             label="Open to barter"
             editing={editing}
@@ -319,112 +201,184 @@ export function ContactEditOverview({
             <p className="sm:col-span-2 text-2xs text-red-700">{COLLABORATION_PREFERENCE_ERROR}</p>
           )}
         </dl>
-      </ExpandableSection>
+        {indicativeRatesVisible && (
+          <>
+            <p className="mt-4 text-2xs text-ink-tertiary">
+              Current indicative rates only — not historical. Changing these does not alter past engagement fees.
+            </p>
+            <dl className="mt-3 grid gap-4 sm:grid-cols-2 text-sm">
+              {['reel_rate', 'story_rate', 'post_rate', 'other_rate'].map((key) => (
+                <ProfileField
+                  key={key}
+                  label={rateLabel(key)}
+                  editing={editing}
+                  value={extras[key] != null ? formatFee(extras[key]) : '—'}
+                  input={
+                    <input
+                      className="input-field mt-1 w-full"
+                      type="number"
+                      min={0}
+                      value={draft[key] ?? ''}
+                      onChange={(e) => setField(key, e.target.value)}
+                      placeholder="₹"
+                    />
+                  }
+                />
+              ))}
+            </dl>
+          </>
+        )}
+      </ReadCard>
 
-      {indicativeRatesVisible && (
-        <ExpandableSection title="Indicative rates">
-          <p className="mb-3 text-2xs text-ink-tertiary">
-            Current indicative rates only — not historical. Changing these does not alter past engagement fees.
-          </p>
-          <dl className="grid gap-4 sm:grid-cols-2 text-sm">
-            {['reel_rate', 'story_rate', 'post_rate', 'other_rate'].map((key) => (
-              <ProfileField
-                key={key}
-                label={rateLabel(key)}
-                editing={editing}
-                value={extras[key] != null ? formatFee(extras[key]) : '—'}
-                input={
-                  <input
-                    className="input-field mt-1 w-full"
-                    type="number"
-                    min={0}
-                    value={draft[key] ?? ''}
-                    onChange={(e) => setField(key, e.target.value)}
-                    placeholder="₹"
-                  />
-                }
-              />
-            ))}
-          </dl>
-        </ExpandableSection>
-      )}
-
-      <ExpandableSection title="Classification & tags">
+      <ReadCard title="Categories, tags & socials" className="sm:col-span-2">
         <dl className="grid gap-4 sm:grid-cols-2 text-sm">
-          <ProfileField
-            label="Classification"
-            editing={editing}
-            value={formatClassification(contact.classification)}
-            input={
+          <div className="sm:col-span-2">
+            <dt className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">Primary category</dt>
+            <dd className="mt-1">
               <select
-                className="input-field mt-1 w-full"
-                value={draft.classification ?? ''}
-                onChange={(e) => setField('classification', e.target.value)}
+                className="input-field w-full max-w-md"
+                value={draft.primary_category_id ?? ''}
+                onChange={(e) => setField('primary_category_id', e.target.value)}
               >
                 <option value="">— None —</option>
-                {CLASSIFICATION_OPTIONS.map(({ value }) => (
-                  <option key={value} value={value}>{classificationSelectLabel(value)}</option>
+                {categoryOptions.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
-            }
-          />
+            </dd>
+          </div>
           <div className="sm:col-span-2">
             <dt className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">Tags</dt>
             <dd className="mt-2">
-              {editing ? (
-                <TagSelectChips
-                  tags={tagOptions}
-                  allowedTypes={['influencer']}
-                  appliedTags={Array.isArray(contact.tags) ? contact.tags : []}
-                  selectedIds={draft.tag_ids ?? []}
-                  onChange={(tag_ids) => onDraftChange((d) => ({ ...d, tag_ids }))}
-                />
-              ) : tagLabels.length > 0 ? (
-                <div className="flex flex-wrap gap-1">
-                  {tagLabels.map((t) => (
-                    <Pill key={t} tone="info">{t}</Pill>
-                  ))}
-                </div>
-              ) : (
-                <span className="text-ink-secondary">—</span>
-              )}
+              <TagSelectChips
+                tags={tagOptions}
+                allowedTypes={['influencer']}
+                appliedTags={Array.isArray(contact.tags) ? contact.tags : []}
+                selectedIds={draft.tag_ids ?? []}
+                onChange={(tag_ids) => onDraftChange((d) => ({ ...d, tag_ids }))}
+              />
             </dd>
           </div>
+          <ProfileField
+            label="Instagram"
+            editing={editing}
+            value={linkOrDash(extras.instagram_url ?? contact.instagram_url)}
+            input={
+              <input
+                className="input-field mt-1 w-full"
+                value={draft.instagram_url ?? ''}
+                onChange={(e) => setField('instagram_url', e.target.value)}
+                placeholder="https://instagram.com/…"
+              />
+            }
+          />
+          <ProfileField
+            label="YouTube"
+            editing={editing}
+            value={linkOrDash(extras.youtube_url ?? contact.youtube_url)}
+            input={
+              <input
+                className="input-field mt-1 w-full"
+                value={draft.youtube_url ?? ''}
+                onChange={(e) => setField('youtube_url', e.target.value)}
+                placeholder="https://youtube.com/…"
+              />
+            }
+          />
         </dl>
-      </ExpandableSection>
-
-      <ExpandableSection title="Lifecycle status">
-        {editing ? (
-          <div className="flex flex-wrap gap-2">
-            {CONTACT_STATUS_OPTIONS.map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setField('status', value)}
-                className={`rounded-lg border px-3 py-2 text-2xs font-medium transition-colors ${
-                  draft.status === value
-                    ? 'border-brand bg-brand-soft text-brand'
-                    : 'border-line bg-white text-ink-secondary hover:border-zinc-300'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+        <div className="mt-4">
+          <p className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">Other platforms</p>
+          <div className="mt-2 space-y-2">
+            {(draft.other_platform_links ?? []).map((link, index) => {
+              const incomplete = incompleteLinkIndexes.includes(index);
+              return (
+                <div key={index}>
+                  <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                    <input
+                      className={`input-field ${incomplete ? 'border-red-400' : ''}`}
+                      placeholder="Label"
+                      value={link.label ?? ''}
+                      onChange={(e) => {
+                        onDraftChange((d) => {
+                          const links = [...(d.other_platform_links ?? [])];
+                          links[index] = { ...links[index], label: e.target.value };
+                          return { ...d, other_platform_links: links };
+                        });
+                      }}
+                    />
+                    <input
+                      className={`input-field ${incomplete ? 'border-red-400' : ''}`}
+                      placeholder="URL"
+                      value={link.url ?? ''}
+                      onChange={(e) => {
+                        onDraftChange((d) => {
+                          const links = [...(d.other_platform_links ?? [])];
+                          links[index] = { ...links[index], url: e.target.value };
+                          return { ...d, other_platform_links: links };
+                        });
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn-secondary text-2xs"
+                      onClick={() => {
+                        onDraftChange((d) => ({
+                          ...d,
+                          other_platform_links: (d.other_platform_links ?? []).filter((_, i) => i !== index),
+                        }));
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  {incomplete && (
+                    <p className="mt-1 text-2xs text-red-700">
+                      Add both a label and a URL, or remove this row.
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+            <button
+              type="button"
+              className="btn-secondary text-2xs"
+              onClick={() => {
+                onDraftChange((d) => ({
+                  ...d,
+                  other_platform_links: [...(d.other_platform_links ?? []), { label: '', url: '' }],
+                }));
+              }}
+            >
+              + Add platform
+            </button>
           </div>
-        ) : (
-          <Pill tone={contact.status === 'active' ? 'success' : contact.status === 'archived' ? 'muted' : 'warning'}>
-            {formatContactStatus(contact.status)}
-          </Pill>
-        )}
-      </ExpandableSection>
+        </div>
+      </ReadCard>
+
+      <ReadCard title="Lifecycle status" className="sm:col-span-2">
+        <div className="flex flex-wrap gap-2">
+          {CONTACT_STATUS_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setField('status', value)}
+              className={`rounded-lg border px-3 py-2 text-2xs font-medium transition-colors ${
+                draft.status === value
+                  ? 'border-brand bg-brand-soft text-brand'
+                  : 'border-line bg-white text-ink-secondary hover:border-zinc-300'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </ReadCard>
     </div>
   );
 }
 
 /**
- * Compact READ view — same data as the edit accordions, but grouped into a few
- * glass cards (matching the Campaign View treatment) and with empty fields
- * hidden rather than rendered as rows of "—".
+ * Compact READ view — grouped into glass cards; empty fields hidden rather than "—".
  */
 function ContactReadOverview({ contact, extras, tagLabels }) {
   const email = extras.email ?? contact.email ?? null;

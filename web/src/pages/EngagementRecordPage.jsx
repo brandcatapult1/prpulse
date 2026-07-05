@@ -96,6 +96,16 @@ function cloneDeliverables(list) {
   return structuredClone(list ?? []);
 }
 
+function deliverableDraftSavedToast(saved, beforeList) {
+  if (saved.some((d) => d.proof_demoted)) return null;
+  const newlyPosted = saved.some((row) => {
+    const prior = beforeList.find((d) => d.id === row.id);
+    return row.status === 'posted' && prior?.status !== 'posted';
+  });
+  if (newlyPosted) return 'Deliverables saved';
+  return 'Deliverables saved — proof updated (use Save & mark posted to mark Posted)';
+}
+
 export function EngagementRecordPage() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -140,6 +150,34 @@ export function EngagementRecordPage() {
     }
   };
 
+  const refreshAfterDeliverableDemotion = async () => {
+    const [eng, tl] = await Promise.all([
+      engagementsApi.get(id),
+      fetchEngagementTimeline(id),
+    ]);
+    setEngagement(eng);
+    setTimeline(Array.isArray(tl) ? tl : []);
+  };
+
+  const applySavedDeliverableRow = async (delId, saved, { refreshTimelineOnDemotion = false } = {}) => {
+    setDeliverables((rows) => {
+      const next = rows.map((d) => (d.id === delId ? saved : d));
+      updateEngagementDeliverables(id, next);
+      return next;
+    });
+    setSavedDeliverables((rows) => rows.map((d) => (d.id === delId ? structuredClone(saved) : d)));
+    if (saved.proof_demoted) {
+      const message = saved.proof_demote_message
+        || deliverableProofDemotionMessage(saved.deliverable_type);
+      setToast(message);
+      if (refreshTimelineOnDemotion) {
+        await refreshAfterDeliverableDemotion();
+      }
+      return 'demoted';
+    }
+    return 'saved';
+  };
+
   const persistDeliverables = async (list) => {
     try {
       const prepared = list.map(reconcileDeliverableProofStores);
@@ -165,18 +203,13 @@ export function EngagementRecordPage() {
           .map((d) => d.proof_demote_message || deliverableProofDemotionMessage(d.deliverable_type))
           .join(' · ');
         setToast(message);
-        const [eng, tl] = await Promise.all([
-          engagementsApi.get(id),
-          fetchEngagementTimeline(id),
-        ]);
-        setEngagement(eng);
-        setTimeline(Array.isArray(tl) ? tl : []);
+        await refreshAfterDeliverableDemotion();
       }
 
       setDeliverables(saved);
       setSavedDeliverables(cloneDeliverables(saved));
       updateEngagementDeliverables(id, saved);
-      return saved;
+      return { saved, beforeList };
     } catch (err) {
       const message = err.deliverable
         ? deliverableProofRejectMessage(err.deliverable, err.message)
@@ -187,10 +220,10 @@ export function EngagementRecordPage() {
   };
 
   const commitDeliverablesDraft = async () => {
-    const saved = await persistDeliverables(deliverables);
-    if (saved && !saved.some((d) => d.proof_demoted)) {
-      setToast('Deliverables saved — proof and status updated (not marked Posted unless already posted)');
-    }
+    const result = await persistDeliverables(deliverables);
+    if (!result?.saved) return;
+    const toastMessage = deliverableDraftSavedToast(result.saved, result.beforeList);
+    if (toastMessage) setToast(toastMessage);
   };
 
   const saveAndMarkDeliverablePosted = async (delId) => {
@@ -215,25 +248,8 @@ export function EngagementRecordPage() {
     try {
       const toSave = buildMarkPostedDeliverableForSave(item);
       const saved = await logDeliverableProof(id, toSave);
-
-      setDeliverables((rows) => {
-        const next = rows.map((d) => (d.id === delId ? saved : d));
-        updateEngagementDeliverables(id, next);
-        return next;
-      });
-      setSavedDeliverables((rows) => rows.map((d) => (d.id === delId ? structuredClone(saved) : d)));
-
-      if (saved.proof_demoted) {
-        const message = saved.proof_demote_message
-          || deliverableProofDemotionMessage(saved.deliverable_type);
-        setToast(message);
-        const [eng, tl] = await Promise.all([
-          engagementsApi.get(id),
-          fetchEngagementTimeline(id),
-        ]);
-        setEngagement(eng);
-        setTimeline(Array.isArray(tl) ? tl : []);
-      } else {
+      const outcome = await applySavedDeliverableRow(delId, saved, { refreshTimelineOnDemotion: true });
+      if (outcome === 'saved') {
         setToast(markDeliverablePostedToastMessage(saved));
       }
     } catch (err) {
@@ -248,9 +264,11 @@ export function EngagementRecordPage() {
 
   const discardDeliverablesDraft = () => {
     setDeliverables(cloneDeliverables(savedDeliverables));
+    setMarkPostedErrors({});
   };
 
   const updateDeliverable = (delId, patch) => {
+    if (!engagement) return;
     const engagementStatus = engagement.conversation_status;
     if (patch.status === 'posted') {
       setToast('Use Save & mark posted to mark this deliverable Posted');

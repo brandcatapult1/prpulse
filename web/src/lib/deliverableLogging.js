@@ -56,7 +56,7 @@ export function deliverablePostedUnits(deliverable) {
 }
 
 export function deliverableTotalUnits(deliverable) {
-  return deliverable?.quantity ?? 1;
+  return Number(deliverable?.quantity) || 1;
 }
 
 export function isDeliverableFullyPosted(deliverable) {
@@ -107,11 +107,12 @@ export function canMarkDeliverablePosted({ contentLink, screenshots, deliverable
   });
 }
 
-export function buildMarkPostedDeliverableForSave(deliverable) {
-  const prepared = buildUnitPostedPatch(deliverable, {
-    contentLink: deliverable.content_link,
-    screenshots: deliverable.screenshots ?? [],
-    publishedDate: deliverable.published_date ?? todayIstIso(),
+export function buildMarkPostedDeliverableForSave(deliverable, proofDraft = null) {
+  const source = proofDraft ? { ...deliverable, ...proofDraft } : deliverable;
+  const prepared = buildUnitPostedPatch(source, {
+    contentLink: source.content_link,
+    screenshots: source.screenshots ?? [],
+    publishedDate: source.published_date ?? todayIstIso(),
   });
   return reconcileDeliverableProofStores(prepared);
 }

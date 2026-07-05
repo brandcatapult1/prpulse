@@ -100,8 +100,19 @@ export function DeliverableProofSection({
       <p className="text-2xs text-ink-tertiary">{introMessage}</p>
 
       <div>
-        <label className="mb-1.5 block text-2xs font-medium text-ink-secondary">
-          {emphasis.linkLabel}
+        <label className="block text-2xs text-ink-secondary">
+          <span className={emphasis.screenshotPrimary ? 'font-normal text-ink-tertiary' : 'font-medium text-ink'}>
+            {emphasis.linkLabel}
+          </span>
+          {editable && (
+            <input
+              type="url"
+              className="input-field mt-1 w-full"
+              placeholder="https://instagram.com/p/…"
+              value={contentLink}
+              onChange={(e) => onUpdate({ content_link: e.target.value || null })}
+            />
+          )}
         </label>
         {contentLink && !editable && (
           <a
@@ -113,15 +124,6 @@ export function DeliverableProofSection({
             {contentLink}
           </a>
         )}
-        {editable && (
-          <input
-            type="url"
-            className="input-field w-full"
-            placeholder="https://instagram.com/p/…"
-            value={contentLink}
-            onChange={(e) => onUpdate({ content_link: e.target.value || null })}
-          />
-        )}
         {!contentLink && !editable && (
           <p className="text-2xs text-ink-tertiary">No link attached</p>
         )}
@@ -130,8 +132,8 @@ export function DeliverableProofSection({
       <div>
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <span
-            className={`text-2xs ${
-              emphasis.screenshotPrimary ? 'font-medium text-ink-secondary' : 'font-medium text-ink-secondary'
+            className={`text-2xs font-medium ${
+              emphasis.screenshotPrimary ? 'text-ink' : 'text-ink-secondary'
             }`}
           >
             {emphasis.screenshotLabel}

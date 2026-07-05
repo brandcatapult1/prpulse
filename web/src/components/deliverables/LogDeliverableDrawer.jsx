@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Drawer } from '../ui/Primitives.jsx';
 import {
-  buildUnitPostedPatch,
+  buildMarkPostedDeliverableForSave,
   canMarkDeliverablePosted,
   deliverableProofEmphasis,
   deliverablePostedUnits,
   deliverableTotalUnits,
 } from '../../lib/deliverableLogging.js';
 import { deliverableProofIntroMessage, deliverableProofRequirementMessage } from '../../lib/deliverableProofRules.js';
-import { todayIso } from '../../lib/dates.js';
+import { todayIstIso } from '../../lib/dates.js';
 import { uploadProofScreenshot } from '../../lib/proofUpload.js';
 
 function deliverableDrawerTitle(deliverable) {
@@ -152,7 +152,7 @@ export function LogDeliverableForm({
 export function LogDeliverableDrawer({ deliverable, open, onClose, onConfirm }) {
   const [contentLink, setContentLink] = useState('');
   const [screenshots, setScreenshots] = useState([]);
-  const [publishedDate, setPublishedDate] = useState(todayIso());
+  const [publishedDate, setPublishedDate] = useState(todayIstIso());
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
@@ -163,7 +163,7 @@ export function LogDeliverableDrawer({ deliverable, open, onClose, onConfirm }) 
     if (!deliverable?.id || !open) return;
     setContentLink('');
     setScreenshots([]);
-    setPublishedDate(todayIso());
+    setPublishedDate(todayIstIso());
     setSubmitError(null);
   }, [open, deliverable?.id]);
 
@@ -183,16 +183,16 @@ export function LogDeliverableDrawer({ deliverable, open, onClose, onConfirm }) 
   function resetAndClose() {
     setContentLink('');
     setScreenshots([]);
-    setPublishedDate(todayIso());
+    setPublishedDate(todayIstIso());
     onClose();
   }
 
   async function handleConfirm() {
     if (!canSubmit || submitting) return;
-    const next = buildUnitPostedPatch(deliverable, {
-      contentLink,
+    const next = buildMarkPostedDeliverableForSave(deliverable, {
+      content_link: contentLink?.trim() || null,
       screenshots,
-      publishedDate,
+      published_date: publishedDate,
     });
     setSubmitting(true);
     setSubmitError(null);

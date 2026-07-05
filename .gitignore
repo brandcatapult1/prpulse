@@ -11,6 +11,7 @@ dist/
 build/
 .next/
 web/dist/
+web/dist-check/
 package-lock.json
 
 # OS / editor noise

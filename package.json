@@ -25,6 +25,7 @@
     "db:seed:demo:reset": "node scripts/seed-demo.mjs --reset",
     "db:seed:demo:repair": "node scripts/seed-demo.mjs --repair",
     "build": "npm run build --workspace=web",
+    "check:web": "node scripts/check-web-build.mjs",
     "start": "node server/src/index.mjs",
     "dev": "npm run dev --workspace=web",
     "render-build": "npm install && npm run build"

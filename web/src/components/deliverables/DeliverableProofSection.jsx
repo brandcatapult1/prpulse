@@ -6,14 +6,24 @@ import { uploadProofScreenshot } from '../../lib/proofUpload.js';
 /**
  * Inline proof capture for a deliverable — content link + screenshots (PRD Module 6).
  */
-export function DeliverableProofSection({ deliverable, editable, onUpdate, onSaved }) {
+export function DeliverableProofSection({
+  deliverable,
+  editable,
+  onUpdate,
+  onSaved,
+  engagementId: engagementIdProp = null,
+}) {
   const fileRef = useRef(null);
   const [linkDraft, setLinkDraft] = useState(deliverable.content_link ?? '');
   const [urlDraft, setUrlDraft] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
 
-  const engagementId = deliverable?.engagement_id ?? deliverable?.engagementId ?? null;
+  const engagementId =
+    engagementIdProp
+    ?? deliverable?.engagement_id
+    ?? deliverable?.engagementId
+    ?? null;
 
   const screenshots = deliverable.screenshots ?? [];
   const contentLink = deliverable.content_link ?? '';
@@ -302,6 +312,7 @@ export function DeliverableRow({
   onUpdate,
   onRemove,
   onSaved,
+  engagementId = null,
   compact = false,
 }) {
   const showProof = canEditProof || deliverable.content_link || (deliverable.screenshots?.length ?? 0) > 0;
@@ -360,6 +371,7 @@ export function DeliverableRow({
         <DeliverableProofSection
           deliverable={deliverable}
           editable={canEditProof}
+          engagementId={engagementId}
           onUpdate={(patch) => onUpdate?.(deliverable.id, patch)}
           onSaved={onSaved}
         />

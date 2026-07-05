@@ -238,24 +238,31 @@ export function EngagementRecordPage() {
     if (reopening || !id) return;
     setReopening(true);
     try {
-      const saved = await reopenEngagement(id);
+      await reopenEngagement(id);
+      // Refetch live engagement so deliverablesRules keys off confirmed status
+      // (awaiting_final_deliverables), not a stale collaboration_complete client copy.
+      const [fresh, dels, tl] = await Promise.all([
+        engagementsApi.get(id),
+        fetchDeliverables(id).catch(() => null),
+        fetchEngagementTimeline(id).catch(() => null),
+      ]);
       setEngagement((prev) => ({
         ...prev,
-        ...saved,
-        contact_name: prev?.contact_name ?? saved.contact_name,
-        campaign_name: prev?.campaign_name ?? saved.campaign_name,
-        brand_name: prev?.brand_name ?? saved.brand_name,
-        owner_name: prev?.owner_name ?? saved.owner_name,
-        campaign_id: prev?.campaign_id ?? saved.campaign_id,
+        ...fresh,
+        conversation_status: fresh.conversation_status ?? 'awaiting_final_deliverables',
+        contact_name: fresh.contact_name ?? prev?.contact_name,
+        campaign_name: fresh.campaign_name ?? prev?.campaign_name,
+        brand_name: fresh.brand_name ?? prev?.brand_name,
+        owner_name: fresh.owner_name ?? prev?.owner_name,
+        campaign_id: fresh.campaign_id ?? prev?.campaign_id,
       }));
-      const dels = await fetchDeliverables(id).catch(() => null);
       if (Array.isArray(dels)) {
         setDeliverables(cloneDeliverables(dels));
         setSavedDeliverables(cloneDeliverables(dels));
         updateEngagementDeliverables(id, dels);
       }
-      const tl = await fetchEngagementTimeline(id).catch(() => null);
       if (Array.isArray(tl)) setTimeline(tl);
+      setModal(null);
       setReopenConfirm(false);
       setToast(reopenCompleteToastMessage());
     } catch (err) {
@@ -563,6 +570,7 @@ export function EngagementRecordPage() {
                   <DeliverableRow
                     key={d.id}
                     deliverable={d}
+                    engagementId={id}
                     canEditStatus={deliverablesRule.canEditStatus}
                     canEditProof={deliverablesRule.canEditStatus}
                     canRemove={canRemoveDeliverable(status, d)}
@@ -691,6 +699,7 @@ export function EngagementRecordPage() {
         deliverableStatusOptions={deliverableStatusOptions}
         onAddType={addDeliverable}
         onRemove={removeDeliverable}
+        engagementId={id}
         engagementStatus={status}
         onStatusChange={(delId, nextStatus) => updateDeliverable(delId, { status: nextStatus })}
         onUpdate={updateDeliverable}
@@ -898,6 +907,7 @@ function DeliverablesDrawer({
   deliverableStatusOptions,
   onAddType,
   onRemove,
+  engagementId,
   engagementStatus,
   onStatusChange,
   onUpdate,
@@ -948,6 +958,7 @@ function DeliverablesDrawer({
             <DeliverableRow
               key={d.id}
               deliverable={d}
+              engagementId={engagementId}
               canEditStatus={canEditStatus}
               canEditProof={canEditStatus}
               canRemove={canRemoveDeliverable(engagementStatus, d)}

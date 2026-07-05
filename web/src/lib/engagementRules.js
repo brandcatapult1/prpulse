@@ -70,7 +70,7 @@ export function deliverablesRules(status) {
     return {
       canAdd: false,
       canEditStatus: false,
-      lockedReason: 'Locked — collaboration complete. Reopen status to amend.',
+      lockedReason: 'Locked — collaboration complete. Reopen to amend.',
     };
   }
   if (isDropped(status)) {
@@ -98,11 +98,15 @@ export function deliverablesRules(status) {
   };
 }
 
-/** Removable while the engagement allows adds and the item is not yet Posted. */
+/**
+ * Removable whenever deliverables are editable for this engagement stage.
+ * Keys off conversation_status via deliverablesRules (locked only when
+ * collaboration_complete or dropped) — never completed_at.
+ */
 export function canRemoveDeliverable(engagementStatus, deliverable) {
   const rules = deliverablesRules(engagementStatus);
   if (!rules.canAdd || !deliverable) return false;
-  return deliverable.status !== 'posted';
+  return true;
 }
 
 export const DELIVERABLE_STATUSES = ['pending', 'received', 'approved', 'posted'];
@@ -217,7 +221,7 @@ export function terminalBanner(status) {
     return {
       tone: 'success',
       title: 'Collaboration complete',
-      body: 'Follow-up and visit are closed. Deliverables and fee are locked. Add feedback or reopen status to amend.',
+      body: 'Follow-up and visit are closed. Deliverables and fee are locked. Add feedback or use Reopen to amend.',
     };
   }
   if (isDropped(status)) {

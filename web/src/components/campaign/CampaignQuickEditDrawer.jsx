@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Drawer, Toast } from '../ui/Primitives.jsx';
 import { DeliverableTypeButtons, deliverableTypeLabel } from '../deliverables/DeliverableTypeButtons.jsx';
 import { formatDate, formatStatus, Pill } from '../../lib/format.jsx';
@@ -123,7 +123,7 @@ function drawerCompleteHint(canComplete, status, deliverableCount) {
   return undefined;
 }
 
-function DeliverableChip({ deliverable, canRemove, onRemove }) {
+function DeliverableChip({ deliverable, canRemove, canEdit, onRemove, onEdit }) {
   const posted = isDeliverableFullyPosted(deliverable);
   return (
     <span
@@ -132,7 +132,19 @@ function DeliverableChip({ deliverable, canRemove, onRemove }) {
         posted ? 'bg-canvas/40 text-ink-secondary' : 'bg-white text-ink',
       ].join(' ')}
     >
-      {deliverableTypeLabel(deliverable.deliverable_type)} ×{deliverable.quantity}
+      {canEdit ? (
+        <button
+          type="button"
+          className="hover:text-brand"
+          onClick={() => onEdit?.(deliverable)}
+        >
+          {deliverableTypeLabel(deliverable.deliverable_type)} ×{deliverable.quantity}
+        </button>
+      ) : (
+        <span>
+          {deliverableTypeLabel(deliverable.deliverable_type)} ×{deliverable.quantity}
+        </span>
+      )}
       {canRemove && (
         <button
           type="button"
@@ -357,6 +369,7 @@ export function CampaignQuickEditDrawer({
   onScheduleModeCleared,
 }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [engagement, setEngagement] = useState(null);
   const [deliverables, setDeliverables] = useState([]);
   const [scheduleFlow, setScheduleFlow] = useState(false);
@@ -848,11 +861,20 @@ export function CampaignQuickEditDrawer({
         return;
       }
       try {
-        const updated = await reopenEngagement(engagementId);
-        const merged = { ...engagement, ...updated };
+        await reopenEngagement(engagementId);
+        // Refetch live engagement so deliverablesRules reads awaiting_final_deliverables.
+        const [fresh, list] = await Promise.all([
+          engagementsApi.get(engagementId),
+          fetchDeliverables(engagementId).catch(() => deliverables),
+        ]);
+        const merged = {
+          ...engagement,
+          ...fresh,
+          conversation_status: fresh.conversation_status ?? 'awaiting_final_deliverables',
+        };
         setEngagement(merged);
         setEngagementBaseline(engagementFieldsBaseline(merged));
-        const list = await fetchDeliverables(engagementId).catch(() => deliverables);
+        setVisitDraft(visitFieldsFromEngagement(merged));
         setDeliverables(Array.isArray(list) ? list : []);
         setDeliverablesBaseline(Array.isArray(list) ? structuredClone(list) : []);
         updateEngagementDeliverables(engagementId, Array.isArray(list) ? list : []);
@@ -1235,7 +1257,12 @@ export function CampaignQuickEditDrawer({
                         key={d.id}
                         deliverable={d}
                         canRemove={canRemoveDeliverable(status, d)}
+                        canEdit={deliverablesRule.canEditStatus}
                         onRemove={removeDeliverable}
+                        onEdit={() => {
+                          onClose();
+                          navigate(`/engagements/${engagementId}`);
+                        }}
                       />
                     ))}
                   </div>
@@ -1245,6 +1272,15 @@ export function CampaignQuickEditDrawer({
                   <div className="mt-2 [&_button]:h-6 [&_button]:border-dashed [&_button]:border-line/80 [&_button]:bg-white/80 [&_button]:px-2 [&_button]:text-[10px] [&_button]:font-normal [&_button]:text-ink-secondary [&_button]:hover:border-zinc-300 [&_button]:hover:text-ink">
                     <DeliverableTypeButtons onAdd={addDeliverable} className="gap-1.5" />
                   </div>
+                )}
+                {deliverablesRule.canEditStatus && (
+                  <Link
+                    to={`/engagements/${engagementId}`}
+                    className="mt-2 inline-block text-[11px] font-medium text-brand hover:underline"
+                    onClick={() => onClose()}
+                  >
+                    Edit proof & status →
+                  </Link>
                 )}
               </div>
             </SectionBlock>

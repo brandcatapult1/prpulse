@@ -394,6 +394,12 @@ engagementsRouter.post(
     }
 
     try {
+      const client = await pool.connect();
+      try {
+        await assertDeliverablesEditable(client, req.params.engagementId);
+      } finally {
+        client.release();
+      }
       const uploaded = await uploadProofScreenshot(req.file.buffer, {
         filename: req.file.originalname,
         mimeType: req.file.mimetype,

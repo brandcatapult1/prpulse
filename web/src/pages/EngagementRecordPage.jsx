@@ -45,20 +45,23 @@ import { getCachedContact, mergeContactsCache } from '../lib/contactsCache.js';
 import { isContactBlacklisted } from '../lib/contactsHelpers.js';
 import { contactsApi } from '../lib/api.js';
 import { getContactProfileExtras } from '../lib/contactProfile.js';
-import { formatTimelineEntry } from '../lib/activityTimelineLabels.js';
+import { formatTimelineEntry, formatDropReason } from '../lib/activityTimelineLabels.js';
 import {
   agreedFeeRules,
   canRemoveDeliverable,
+  commercialsRules,
   deliverablesRules,
   feedbackRules,
   followUpRules,
   followUpSuggestionForStatus,
   getStatusOptions,
   isComplete,
+  isDropped,
   notesRules,
+  outreachAdvanceRules,
   sideEffectsOnStatusChange,
   terminalBanner,
-  visitRules,
+  visitCardRules,
 } from '../lib/engagementRules.js';
 import {
   buildMarkPostedDeliverableForSave,
@@ -337,10 +340,12 @@ export function EngagementRecordPage() {
 
   const status = engagement.conversation_status;
   const followUp = followUpRules(status);
-  const visit = visitRules(status);
+  const visitCard = visitCardRules(status, { hasVisitDate: Boolean(engagement.visit_date) });
   const deliverablesRule = deliverablesRules(status);
   const feedback = feedbackRules(status);
   const feeRule = agreedFeeRules(status);
+  const commercialsRule = commercialsRules(status);
+  const outreachRule = outreachAdvanceRules(status);
   const notesRule = notesRules(status);
   const closedBanner = terminalBanner(status);
 
@@ -560,7 +565,40 @@ export function EngagementRecordPage() {
     : '—';
   const statusDropReasonOptions = getDropReasonOptionsForStatus(status);
   const collabType = engagement.collaboration_type === 'paid' ? 'paid' : 'barter';
-  const commercialsFrozen = feeRule.frozen;
+  const commercialsFrozen = !commercialsRule.editable;
+
+  function startLogFirstOutreach() {
+    setPendingStatusTransition({
+      target: STAGE.IN_CONVERSATION,
+      logFirstOutreach: true,
+    });
+    setStatusFollowUpDraft('');
+    setStatusPrompt('follow_up_date');
+  }
+
+  const visitCardSubtitle = (() => {
+    if (visitCard.mode === 'interactive' && engagement.visit_date) {
+      return [
+        formatDate(engagement.visit_date),
+        formatVisitTimeVenue(engagement.visit_time, resolveEngagementOutletName(engagement)),
+      ].filter(Boolean).join(' · ');
+    }
+    if (visitCard.mode === 'read_only') {
+      return [
+        formatDate(engagement.visit_date),
+        formatVisitTimeVenue(engagement.visit_time, resolveEngagementOutletName(engagement)),
+      ].filter(Boolean).join(' · ');
+    }
+    if (visitCard.mode === 'interactive') {
+      return 'Plan visit';
+    }
+    return visitCard.lockedReason;
+  })();
+
+  const visitCardInteractive = visitCard.mode === 'interactive';
+  const deliverablesFullyLocked = Boolean(deliverablesRule.lockedReason)
+    && !deliverablesRule.canAdd
+    && !deliverablesRule.canEditStatus;
 
   async function makePaid() {
     if (commercialsFrozen) return;
@@ -612,6 +650,12 @@ export function EngagementRecordPage() {
       {closedBanner && (
         <TerminalStateBanner {...closedBanner} />
       )}
+      {isDropped(status) && engagement.drop_reason && (
+        <div className="rounded-lg border border-line bg-canvas px-4 py-3 text-2xs text-ink-secondary">
+          <span className="font-semibold text-ink">Drop reason:</span>{' '}
+          {formatDropReason(engagement.drop_reason)}
+        </div>
+      )}
       {saving && (
         <p className="text-2xs text-ink-tertiary">Saving…</p>
       )}
@@ -633,19 +677,13 @@ export function EngagementRecordPage() {
         />
         <ActionCard
           title="Visit"
-          subtitle={
-            visit.available && engagement.visit_date
-              ? [
-                  formatDate(engagement.visit_date),
-                  formatVisitTimeVenue(
-                    engagement.visit_time,
-                    resolveEngagementOutletName(engagement),
-                  ),
-                ].filter(Boolean).join(' · ')
-              : visit.lockedReason
-          }
-          disabled={!visit.available}
-          onClick={() => visit.available && setModal('visit')}
+          subtitle={visitCardSubtitle}
+          badge={visitCard.mode === 'read_only' ? 'Completed' : undefined}
+          badgeTone="success"
+          disabled={!visitCardInteractive}
+          dimmed={visitCard.mode === 'locked'}
+          lockedLabel={visitCard.mode === 'read_only' ? null : 'Locked'}
+          onClick={() => visitCardInteractive && setModal('visit')}
         />
         <ActionCard
           title="Timeline"
@@ -656,11 +694,34 @@ export function EngagementRecordPage() {
 
       <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
         <div className="space-y-4">
-          <Card elevated className="!p-5">
-            <h2 className="text-sm font-semibold text-ink">Advance outreach</h2>
-            <p className="mt-0.5 text-2xs text-ink-secondary">Update conversation status</p>
-            <div className="mt-4">
+          <Card
+            elevated
+            className={`!p-5 ${outreachRule.lockedReason ? 'opacity-60' : ''}`}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
+                <h2 className="text-sm font-semibold text-ink">Advance outreach</h2>
+                <p className="mt-0.5 text-2xs text-ink-secondary">Update conversation status</p>
+              </div>
+              {outreachRule.lockedReason && (
+                <span className="text-2xs font-medium text-ink-tertiary shrink-0">Locked</span>
+              )}
+            </div>
+            {outreachRule.lockedReason && (
+              <LockedReasonBanner reason={outreachRule.lockedReason} />
+            )}
+            <div className={`mt-4 ${outreachRule.lockedReason ? 'pointer-events-none' : ''}`}>
+              <div>
+                {outreachRule.logFirstOutreach && (
+                  <div className="mb-4">
+                    <button type="button" className="btn-primary" onClick={startLogFirstOutreach}>
+                      Log first outreach
+                    </button>
+                    <p className="mt-2 text-2xs text-ink-tertiary">
+                      Moves to In Conversation and logs your first contact date.
+                    </p>
+                  </div>
+                )}
                 <label className="mb-2 block text-2xs font-medium uppercase tracking-wide text-ink-tertiary">
                   Status
                 </label>
@@ -668,17 +729,18 @@ export function EngagementRecordPage() {
                   value={engagement.conversation_status}
                   options={statusChoices}
                   onChange={handleStatusChange}
-                  disabled={isComplete(status)}
+                  disabled={!outreachRule.statusEditable}
                   hint={
-                    isComplete(status)
-                      ? canReopenComplete(user?.role)
-                        ? 'Use Reopen to amend deliverables or fee'
-                        : 'Collaboration complete — Senior Manager or Admin can reopen'
-                      : !hasCollaborationReason && deliverablesReady
-                        ? 'Add a collaboration reason on the campaign board before completing'
-                      : !canComplete
-                        ? 'Complete unlocks when all deliverables are Posted with proof'
-                        : undefined
+                    outreachRule.statusHint
+                      ?? (isComplete(status)
+                        ? canReopenComplete(user?.role)
+                          ? 'Use Reopen to amend deliverables or fee'
+                          : 'Collaboration complete — Senior Manager or Admin can reopen'
+                        : !hasCollaborationReason && deliverablesReady
+                          ? 'Add a collaboration reason on the campaign board before completing'
+                        : !canComplete
+                          ? 'Complete unlocks when all deliverables are Posted with proof'
+                          : undefined)
                   }
                 />
                 {statusPrompt === 'follow_up_date' && pendingStatusTransition && (
@@ -793,7 +855,10 @@ export function EngagementRecordPage() {
             </dl>
           </Card>
 
-          <Card elevated className="!p-5">
+          <Card
+            elevated
+            className={`!p-5 ${deliverablesFullyLocked ? 'opacity-60' : ''}`}
+          >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold text-ink">Deliverables</h2>
@@ -802,10 +867,13 @@ export function EngagementRecordPage() {
                 </p>
               </div>
               <div className="flex flex-col items-end gap-1">
+                {deliverablesFullyLocked && (
+                  <span className="text-2xs font-medium text-ink-tertiary">Locked</span>
+                )}
                 <Pill tone={savedDeliverables.length ? 'info' : 'muted'}>
                   {postedUnits}/{totalUnits} posted
                 </Pill>
-                {deliverablesDirty && (
+                {deliverablesDirty && deliverablesRule.canEditStatus && (
                   <span className="text-2xs text-health-amber">
                     Unsaved changes — save deliverables first
                   </span>
@@ -814,15 +882,13 @@ export function EngagementRecordPage() {
             </div>
 
             {deliverablesRule.lockedReason && (
-              <p className="mt-3 rounded-lg bg-canvas px-3 py-2 text-2xs text-ink-secondary">
-                {deliverablesRule.lockedReason}
-              </p>
+              <LockedReasonBanner reason={deliverablesRule.lockedReason} />
             )}
             {deliverablesRule.hint && (
               <p className="mt-3 text-2xs text-ink-tertiary">{deliverablesRule.hint}</p>
             )}
 
-            <div className="mt-4 border-t border-line/60 pt-4">
+            <div className={`mt-4 border-t border-line/60 pt-4 ${deliverablesFullyLocked ? 'pointer-events-none' : ''}`}>
               <p className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">The deal</p>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-2xs text-ink-secondary">
@@ -832,7 +898,9 @@ export function EngagementRecordPage() {
                   </Pill>
                 </div>
                 {commercialsFrozen ? (
-                  <span className="text-2xs text-ink-tertiary">{feeRule.frozenReason}</span>
+                  <span className="text-2xs text-ink-tertiary">
+                    {commercialsRule.lockedReason ?? feeRule.frozenReason}
+                  </span>
                 ) : collabType === 'barter' ? (
                   <button type="button" className="text-2xs text-brand hover:underline" onClick={makePaid}>
                     Make paid →
@@ -849,6 +917,15 @@ export function EngagementRecordPage() {
               </div>
             </div>
 
+            {!deliverablesRule.canAdd && deliverables.length > 0 && (
+              <div className="mt-4">
+                <button type="button" className="btn-ghost" onClick={() => setModal('deliverables')}>
+                  View deliverables
+                </button>
+              </div>
+            )}
+
+            <div className={deliverablesFullyLocked ? 'pointer-events-none' : ''}>
             {deliverablesRule.canAdd && (
               <div className="mt-4">
                 <p className="mb-2 text-2xs font-medium text-ink-tertiary">Add content type</p>
@@ -858,14 +935,6 @@ export function EngagementRecordPage() {
                     Manage all
                   </button>
                 )}
-              </div>
-            )}
-
-            {!deliverablesRule.canAdd && deliverables.length > 0 && (
-              <div className="mt-4">
-                <button type="button" className="btn-ghost" onClick={() => setModal('deliverables')}>
-                  View deliverables
-                </button>
               </div>
             )}
 
@@ -886,7 +955,7 @@ export function EngagementRecordPage() {
                     deliverable={d}
                     engagementId={id}
                     canEditProof={deliverablesRule.canEditStatus}
-                    canMarkPosted={deliverablesRule.canEditStatus}
+                    canMarkPosted={deliverablesRule.canMarkPosted}
                     canRemove={canRemoveDeliverable(status, d)}
                     onUpdate={updateDeliverable}
                     onMarkPosted={saveAndMarkDeliverablePosted}
@@ -914,6 +983,7 @@ export function EngagementRecordPage() {
                 </div>
               </div>
             )}
+            </div>
           </Card>
 
           <Card elevated className="!p-5">
@@ -1016,6 +1086,7 @@ export function EngagementRecordPage() {
         deliverablesDirty={deliverablesDirty}
         canAdd={deliverablesRule.canAdd}
         canEditProof={deliverablesRule.canEditStatus}
+        canMarkPosted={deliverablesRule.canMarkPosted}
         onAddType={addDeliverable}
         onRemove={removeDeliverable}
         engagementId={id}
@@ -1097,23 +1168,44 @@ function TerminalStateBanner({ tone, title, body }) {
   );
 }
 
-function ActionCard({ title, subtitle, badge, badgeTone = 'default', disabled = false, onClick }) {
+function LockedReasonBanner({ reason }) {
+  if (!reason) return null;
+  return (
+    <p className="mt-3 rounded-lg bg-canvas px-3 py-2 text-2xs text-ink-secondary">
+      {reason}
+    </p>
+  );
+}
+
+function ActionCard({
+  title,
+  subtitle,
+  badge,
+  badgeTone = 'default',
+  disabled = false,
+  dimmed,
+  lockedLabel = 'Locked',
+  onClick,
+}) {
+  const isDimmed = dimmed ?? disabled;
   return (
     <Card
       elevated
       interactive={!disabled}
       onClick={disabled ? undefined : onClick}
-      className={`!p-4 ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+      className={`!p-4 ${isDimmed ? 'cursor-not-allowed opacity-60' : ''}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="text-sm font-semibold text-ink">{title}</div>
-          <div className={`mt-0.5 text-2xs ${disabled ? 'text-ink-tertiary' : 'text-ink-secondary'}`}>
+          <div className={`mt-0.5 text-2xs ${isDimmed ? 'text-ink-tertiary' : 'text-ink-secondary'}`}>
             {subtitle}
           </div>
         </div>
         {!disabled && <span className="text-lg text-ink-tertiary" aria-hidden>→</span>}
-        {disabled && <span className="text-2xs font-medium text-ink-tertiary" aria-hidden>Locked</span>}
+        {disabled && lockedLabel && (
+          <span className="text-2xs font-medium text-ink-tertiary" aria-hidden>{lockedLabel}</span>
+        )}
       </div>
       {badge && (
         <div className="mt-3">
@@ -1203,6 +1295,7 @@ function DeliverablesDrawer({
   deliverablesDirty,
   canAdd,
   canEditProof,
+  canMarkPosted = false,
   onAddType,
   onRemove,
   engagementId,
@@ -1260,7 +1353,7 @@ function DeliverablesDrawer({
               deliverable={d}
               engagementId={engagementId}
               canEditProof={canEditProof}
-              canMarkPosted={canEditProof}
+              canMarkPosted={canMarkPosted}
               canRemove={canRemoveDeliverable(engagementStatus, d)}
               onUpdate={onUpdate}
               onMarkPosted={onMarkPosted}

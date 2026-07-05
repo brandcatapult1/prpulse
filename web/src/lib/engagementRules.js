@@ -70,23 +70,31 @@ export function deliverablesRules(status) {
     return {
       canAdd: false,
       canEditStatus: false,
-      lockedReason: 'Locked — collaboration complete. Reopen to amend.',
+      canMarkPosted: false,
+      lockedReason: 'Reopen to edit',
     };
   }
   if (isDropped(status)) {
     return {
       canAdd: false,
       canEditStatus: false,
-      lockedReason: 'Engagement was dropped',
+      canMarkPosted: false,
+      lockedReason: 'Engagement dropped',
     };
   }
   if (status === 'awaiting_final_deliverables') {
-    return { canAdd: true, canEditStatus: true, lockedReason: null };
+    return {
+      canAdd: true,
+      canEditStatus: true,
+      canMarkPosted: true,
+      lockedReason: null,
+    };
   }
   if (['in_conversation', 'scheduled', 'no_response'].includes(status)) {
     return {
       canAdd: true,
       canEditStatus: true,
+      canMarkPosted: false,
       lockedReason: null,
       hint: 'Plan deliverables here — move to Awaiting Final Deliverables before content goes live',
     };
@@ -94,7 +102,8 @@ export function deliverablesRules(status) {
   return {
     canAdd: false,
     canEditStatus: false,
-    lockedReason: 'Start outreach before adding deliverables',
+    canMarkPosted: false,
+    lockedReason: 'Start outreach first',
   };
 }
 
@@ -174,7 +183,71 @@ export function feedbackRules(status) {
 export function agreedFeeRules(status) {
   return {
     editable: !isComplete(status),
+    frozen: isComplete(status),
     frozenReason: isComplete(status) ? 'Reopen engagement to amend fee' : null,
+  };
+}
+
+/** Paid/barter toggle — editable once outreach begins; frozen on complete or dropped. */
+export function commercialsRules(status) {
+  if (isComplete(status)) {
+    return { editable: false, lockedReason: 'Reopen engagement to amend fee' };
+  }
+  if (isDropped(status)) {
+    return { editable: false, lockedReason: 'Engagement dropped' };
+  }
+  if (status === 'not_contacted') {
+    return { editable: false, lockedReason: 'Set once outreach begins' };
+  }
+  return { editable: true, lockedReason: null };
+}
+
+/**
+ * Visit card: interactive only while Scheduled; read-only summary after visit when
+ * Awaiting Final Deliverables; otherwise locked with reason.
+ */
+export function visitCardRules(status, { hasVisitDate = false } = {}) {
+  if (status === 'scheduled') {
+    return { mode: 'interactive', lockedReason: null };
+  }
+  if (status === 'awaiting_final_deliverables' && hasVisitDate) {
+    return { mode: 'read_only', lockedReason: null };
+  }
+  const rules = visitRules(status);
+  return { mode: 'locked', lockedReason: rules.lockedReason };
+}
+
+/** Advance outreach status control — log-first-outreach when Not Contacted. */
+export function outreachAdvanceRules(status) {
+  if (isDropped(status)) {
+    return {
+      statusEditable: false,
+      logFirstOutreach: false,
+      lockedReason: 'Engagement dropped',
+      statusHint: 'Engagement dropped — status is read-only',
+    };
+  }
+  if (status === 'not_contacted') {
+    return {
+      statusEditable: false,
+      logFirstOutreach: true,
+      lockedReason: null,
+      statusHint: 'Log first outreach below to begin',
+    };
+  }
+  if (isComplete(status)) {
+    return {
+      statusEditable: false,
+      logFirstOutreach: false,
+      lockedReason: null,
+      statusHint: null,
+    };
+  }
+  return {
+    statusEditable: true,
+    logFirstOutreach: false,
+    lockedReason: null,
+    statusHint: null,
   };
 }
 

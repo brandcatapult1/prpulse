@@ -10,7 +10,7 @@ import { RatingStars, StatusButton } from '../components/ui/DataKit.jsx';
 import { DeliverableRow } from '../components/deliverables/DeliverableProofSection.jsx';
 import { DeliverableTypeButtons, deliverableTypeLabel } from '../components/deliverables/DeliverableTypeButtons.jsx';
 import { FeedbackDrawer } from '../components/feedback/FeedbackDrawer.jsx';
-import { VisitDrawer } from '../components/visit/VisitDrawer.jsx';
+import { VisitCaptureForm } from '../components/visit/VisitCaptureForm.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import {
   Pill,
@@ -79,7 +79,8 @@ import { estimateAgreedFeeFromIndicativeRates } from '../lib/agreedFeeEstimate.j
 import { addDeliverableToList, deliverableListUnitTotals, removeDeliverableFromList } from '../lib/deliverableList.js';
 import {
   buildScheduledTransitionPayload,
-  formatVisitTimeVenue,
+  emptyVisitFields,
+  formatVisitTimeForDisplay,
   resolveEngagementOutletName,
   visitFieldsFromEngagement,
 } from '../lib/visitFields.js';
@@ -203,6 +204,8 @@ export function EngagementRecordPage() {
   const [pendingStatusTransition, setPendingStatusTransition] = useState(null);
   const [statusFollowUpDraft, setStatusFollowUpDraft] = useState('');
   const [agreedFeeDraft, setAgreedFeeDraft] = useState('');
+  const [visitFields, setVisitFields] = useState(emptyVisitFields);
+  const [pendingScheduleVisit, setPendingScheduleVisit] = useState(false);
 
   const persistEngagement = async (patch, { silent = false, successMessage = 'Saved' } = {}) => {
     setSaving(true);
@@ -409,6 +412,20 @@ export function EngagementRecordPage() {
     );
   }, [engagement?.id, engagement?.agreed_fee]);
 
+  useEffect(() => {
+    if (!engagement) return;
+    setVisitFields(visitFieldsFromEngagement(engagement));
+    if (engagement.conversation_status === 'scheduled') {
+      setPendingScheduleVisit(false);
+    }
+  }, [
+    engagement?.id,
+    engagement?.visit_date,
+    engagement?.visit_time,
+    engagement?.visit_notes,
+    engagement?.conversation_status,
+  ]);
+
   if (loading) {
     return (
       <div className="mx-auto max-w-5xl py-12 text-center text-sm text-ink-secondary">
@@ -533,9 +550,11 @@ export function EngagementRecordPage() {
     if (next === engagement.conversation_status) return;
 
     if (next === 'scheduled') {
-      setModal('visit');
+      setPendingScheduleVisit(true);
+      setVisitFields(visitFieldsFromEngagement(engagement));
       return;
     }
+    setPendingScheduleVisit(false);
     if (isComplete(engagement?.conversation_status)) return;
 
     if (next === 'collaboration_complete') {
@@ -678,26 +697,37 @@ export function EngagementRecordPage() {
     setStatusPrompt('follow_up_date');
   }
 
-  const visitCardSubtitle = (() => {
-    if (visitCard.mode === 'interactive' && engagement.visit_date) {
-      return [
-        formatDate(engagement.visit_date),
-        formatVisitTimeVenue(engagement.visit_time, resolveEngagementOutletName(engagement)),
-      ].filter(Boolean).join(' · ');
-    }
-    if (visitCard.mode === 'read_only') {
-      return [
-        formatDate(engagement.visit_date),
-        formatVisitTimeVenue(engagement.visit_time, resolveEngagementOutletName(engagement)),
-      ].filter(Boolean).join(' · ');
-    }
-    if (visitCard.mode === 'interactive') {
-      return 'Plan visit';
-    }
-    return visitCard.lockedReason;
-  })();
+  const visitOutletName = resolveEngagementOutletName(engagement);
+  const visitSectionLocked = visitCard.mode === 'locked' && !pendingScheduleVisit;
+  const visitSectionEditable = visitCard.mode === 'interactive' || pendingScheduleVisit;
+  const visitSectionReadOnly = visitCard.mode === 'read_only';
+  const canMarkVisitDone = status === 'scheduled' && Boolean(engagement.visit_date);
 
-  const visitCardInteractive = visitCard.mode === 'interactive';
+  async function handleSaveVisit() {
+    const payload = buildScheduledTransitionPayload(engagement, visitFields);
+    const result = transitionStage(engagement, STAGE.SCHEDULED, {
+      ...payload,
+      deliverables: savedDeliverables,
+      collabReason: engagement.primary_collaboration_reason,
+    });
+    if (!result.ok) {
+      setToast(result.error ?? 'Could not save visit');
+      return;
+    }
+    const ok = await persistEngagement(result.patch, {
+      successMessage: 'Visit saved — follow-up set to visit date',
+    });
+    if (ok) {
+      setFollowUpSuggestion(null);
+      setPendingScheduleVisit(false);
+    }
+  }
+
+  async function handleMarkVisitDone() {
+    const result = buildVisitDoneTransition(engagement, transitionStage, STAGE);
+    await applyStageTransition(result, visitDoneToastMessage());
+  }
+
   const deliverablesFullyLocked = Boolean(deliverablesRule.lockedReason)
     && !deliverablesRule.canAdd
     && !deliverablesRule.canEditStatus;
@@ -799,7 +829,7 @@ export function EngagementRecordPage() {
         <p className="text-2xs text-ink-tertiary">Saving…</p>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <ActionCard
           title="Feedback"
           subtitle={
@@ -813,16 +843,6 @@ export function EngagementRecordPage() {
           badgeTone="success"
           disabled={!feedback.available}
           onClick={() => feedback.available && setModal('feedback')}
-        />
-        <ActionCard
-          title="Visit"
-          subtitle={visitCardSubtitle}
-          badge={visitCard.mode === 'read_only' ? 'Completed' : undefined}
-          badgeTone="success"
-          disabled={!visitCardInteractive}
-          dimmed={visitCard.mode === 'locked'}
-          lockedLabel={visitCard.mode === 'read_only' ? null : 'Locked'}
-          onClick={() => visitCardInteractive && setModal('visit')}
         />
         <ActionCard
           title="Timeline"
@@ -963,6 +983,72 @@ export function EngagementRecordPage() {
                   </div>
                 )}
               </div>
+            </div>
+          </Card>
+
+          <Card
+            elevated
+            className={`!p-5 ${visitSectionLocked ? 'opacity-60' : ''}`}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-ink">Visit</h2>
+                <p className="mt-0.5 text-2xs text-ink-secondary">
+                  Plan and log the creator visit
+                </p>
+              </div>
+              {visitSectionLocked && (
+                <span className="text-2xs font-medium text-ink-tertiary shrink-0">Locked</span>
+              )}
+              {visitSectionReadOnly && (
+                <Pill tone="success">Completed</Pill>
+              )}
+            </div>
+            {visitSectionLocked && (
+              <LockedReasonBanner reason={visitCard.lockedReason} />
+            )}
+            <div className={`mt-4 ${visitSectionLocked ? 'pointer-events-none' : ''}`}>
+              {visitSectionReadOnly && (
+                <VisitSummary
+                  engagement={engagement}
+                  outletName={visitOutletName}
+                  completed
+                />
+              )}
+              {visitSectionEditable && (
+                <>
+                  {(pendingScheduleVisit || !engagement.visit_date) && (
+                    <p className="mb-3 text-2xs text-ink-secondary">
+                      Required when status is Scheduled. Follow-up will be set to the visit date you pick.
+                    </p>
+                  )}
+                  <VisitCaptureForm
+                    outletName={visitOutletName}
+                    value={visitFields}
+                    onChange={setVisitFields}
+                  />
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={!visitFields.visitDate || saving}
+                      onClick={handleSaveVisit}
+                    >
+                      {saving ? 'Saving…' : 'Save visit'}
+                    </button>
+                    {canMarkVisitDone && (
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        disabled={saving}
+                        onClick={handleMarkVisitDone}
+                      >
+                        Mark visit done
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </Card>
 
@@ -1298,35 +1384,6 @@ export function EngagementRecordPage() {
         }}
       />
 
-      <VisitDrawer
-        open={modal === 'visit'}
-        onClose={() => setModal(null)}
-        contactName={engagement.contact_name}
-        outletName={resolveEngagementOutletName(engagement)}
-        title={`Visit · ${engagement.contact_name}`}
-        intro="Required when status is Scheduled. Follow-up will be set to the visit date you pick."
-        initialValues={visitFieldsFromEngagement(engagement)}
-        onSave={async (fields) => {
-          const payload = buildScheduledTransitionPayload(engagement, fields);
-          const result = transitionStage(engagement, STAGE.SCHEDULED, {
-            ...payload,
-            deliverables: savedDeliverables,
-            collabReason: engagement.primary_collaboration_reason,
-          });
-          if (!result.ok) {
-            setToast(result.error ?? 'Could not save visit');
-            return;
-          }
-          const ok = await persistEngagement(result.patch, {
-            successMessage: 'Visit saved — follow-up set to visit date',
-          });
-          if (ok) {
-            setFollowUpSuggestion(null);
-            setModal(null);
-          }
-        }}
-      />
-
       <TimelineDrawer
         open={modal === 'timeline'}
         onClose={() => setModal(null)}
@@ -1357,6 +1414,30 @@ function LockedReasonBanner({ reason }) {
     <p className="mt-3 rounded-lg bg-canvas px-3 py-2 text-2xs text-ink-secondary">
       {reason}
     </p>
+  );
+}
+
+function VisitSummary({ engagement, outletName, completed = false, className = '' }) {
+  if (!engagement?.visit_date) return null;
+  return (
+    <dl className={`grid gap-3 sm:grid-cols-2 ${className}`}>
+      <DetailItem label="Visit date" value={formatDate(engagement.visit_date)} />
+      {engagement.visit_time && (
+        <DetailItem label="Time" value={formatVisitTimeForDisplay(engagement.visit_time)} />
+      )}
+      {outletName && (
+        <DetailItem label="Outlet" value={outletName} className="sm:col-span-2" />
+      )}
+      {engagement.visit_notes && (
+        <DetailItem label="Notes" value={engagement.visit_notes} className="sm:col-span-2" />
+      )}
+      {completed && engagement.visit_completed_date && (
+        <DetailItem
+          label="Visit completed"
+          value={formatDate(engagement.visit_completed_date)}
+        />
+      )}
+    </dl>
   );
 }
 

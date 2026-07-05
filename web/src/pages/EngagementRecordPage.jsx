@@ -61,11 +61,8 @@ import {
   terminalBanner,
   visitRules,
 } from '../lib/engagementRules.js';
-import { deliverableHasProof, isDeliverableFullyPosted } from '../lib/deliverableLogging.js';
-import {
-  deliverableProofDemotionMessage,
-  deliverableProofRequirementMessage,
-} from '../lib/deliverableProofRules.js';
+import { deliverableHasProof, deliverableProofRejectMessage, isDeliverableFullyPosted } from '../lib/deliverableLogging.js';
+import { deliverableProofDemotionMessage } from '../lib/deliverableProofRules.js';
 import { formatCollaborationReason } from '../lib/collaborationReasons.js';
 import { addDeliverableToList, deliverableListUnitTotals, removeDeliverableFromList } from '../lib/deliverableList.js';
 import {
@@ -135,14 +132,18 @@ export function EngagementRecordPage() {
   const persistDeliverables = async (list) => {
     try {
       const beforeList = await fetchDeliverables(id);
+      const enteringIssues = [];
       for (const item of list) {
         if (item.status !== 'posted') continue;
         const prior = beforeList.find((d) => d.id === item.id);
         const enteringPosted = !prior || prior.status !== 'posted';
         if (enteringPosted && !deliverableHasProof({ ...item, status: 'posted' })) {
-          setToast(deliverableProofRequirementMessage(item.deliverable_type));
-          return null;
+          enteringIssues.push(deliverableProofRejectMessage(item));
         }
+      }
+      if (enteringIssues.length) {
+        setToast(enteringIssues.join(' · '));
+        return null;
       }
 
       const saved = await syncDeliverables(id, beforeList, list);
@@ -164,8 +165,11 @@ export function EngagementRecordPage() {
       setSavedDeliverables(cloneDeliverables(saved));
       updateEngagementDeliverables(id, saved);
       return saved;
-    } catch {
-      setToast('Could not save deliverables');
+    } catch (err) {
+      const message = err.deliverable
+        ? deliverableProofRejectMessage(err.deliverable, err.message)
+        : (err.message || 'Could not save deliverables');
+      setToast(message);
       return null;
     }
   };
@@ -193,7 +197,7 @@ export function EngagementRecordPage() {
       if (item && item.status !== 'posted') {
         const merged = { ...item, ...patch };
         if (!deliverableHasProof({ ...merged, status: 'posted' })) {
-          setToast(deliverableProofRequirementMessage(merged.deliverable_type));
+          setToast(deliverableProofRejectMessage(merged));
           return;
         }
       }

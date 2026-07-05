@@ -73,16 +73,26 @@ export async function syncDeliverables(engagementId, beforeList, afterList) {
 
     if (isNew) {
       const { id: _omit, ...body } = item;
-      const created = await createDeliverable(engagementId, body);
-      results.push(created);
+      try {
+        const created = await createDeliverable(engagementId, body);
+        results.push(created);
+      } catch (err) {
+        err.deliverable = item;
+        throw err;
+      }
       continue;
     }
 
     if (touchedExisting.has(item.id)) continue;
     touchedExisting.add(item.id);
 
-    const updated = await updateDeliverable(engagementId, item.id, item);
-    results.push(updated);
+    try {
+      const updated = await updateDeliverable(engagementId, item.id, item);
+      results.push(updated);
+    } catch (err) {
+      err.deliverable = item;
+      throw err;
+    }
   }
   return results;
 }

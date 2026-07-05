@@ -7,6 +7,7 @@ import {
   deliverablePostedUnits,
   deliverableTotalUnits,
 } from '../../lib/deliverableLogging.js';
+import { deliverableProofRequirementMessage } from '../../lib/deliverableProofRules.js';
 import { todayIso } from '../../lib/dates.js';
 import { uploadProofScreenshot } from '../../lib/proofUpload.js';
 
@@ -171,6 +172,7 @@ export function LogDeliverableDrawer({ deliverable, open, onClose, onConfirm }) 
     screenshots,
     deliverableType: deliverable.deliverable_type,
   });
+  const proofRequirementMessage = deliverableProofRequirementMessage(deliverable.deliverable_type);
 
   function resetAndClose() {
     setContentLink('');
@@ -196,13 +198,18 @@ export function LogDeliverableDrawer({ deliverable, open, onClose, onConfirm }) 
       title={deliverableDrawerTitle(deliverable)}
       onClose={resetAndClose}
       footer={
-        <div className="flex justify-end gap-2">
-          <button type="button" className="btn-secondary" onClick={resetAndClose}>
-            Cancel
-          </button>
-          <button type="button" className="btn-primary" disabled={!canSubmit || uploading} onClick={handleConfirm}>
-            {uploading ? 'Uploading…' : 'Mark posted'}
-          </button>
+        <div className="space-y-2">
+          {!canSubmit && !uploading && (
+            <p className="text-right text-2xs text-health-red">{proofRequirementMessage}</p>
+          )}
+          <div className="flex justify-end gap-2">
+            <button type="button" className="btn-secondary" onClick={resetAndClose}>
+              Cancel
+            </button>
+            <button type="button" className="btn-primary" disabled={!canSubmit || uploading} onClick={handleConfirm}>
+              {uploading ? 'Uploading…' : 'Mark posted'}
+            </button>
+          </div>
         </div>
       }
     >

@@ -8,6 +8,19 @@ import {
 
 export { screenshotHasUrl, deliverableProofRequirementMessage };
 
+/** Short row label for save/error feedback, e.g. "reel ×1". */
+export function deliverableRowLabel(deliverable) {
+  const qty = Number(deliverable?.quantity) || 1;
+  const type = deliverable?.deliverable_type ?? 'Deliverable';
+  return `${type} ×${qty}`;
+}
+
+/** Name the deliverable and attach the proof requirement (client or server message). */
+export function deliverableProofRejectMessage(deliverable, serverMessage) {
+  const reason = serverMessage || deliverableProofRequirementMessage(deliverable?.deliverable_type);
+  return `${deliverableRowLabel(deliverable)}: ${reason}`;
+}
+
 /** How many units on this row have been logged with proof. */
 export function deliverablePostedUnits(deliverable) {
   if (!deliverable) return 0;

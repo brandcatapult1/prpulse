@@ -5,6 +5,7 @@ import { DeliverableTypeButtons, deliverableTypeLabel } from '../deliverables/De
 import { formatDate, formatStatus, Pill } from '../../lib/format.jsx';
 import { COLLABORATION_REASONS } from '../../lib/collaborationReasons.js';
 import { addDeliverableToList, deliverableListUnitTotals, removeDeliverableFromList } from '../../lib/deliverableList.js';
+import { deliverableProofRejectMessage } from '../../lib/deliverableLogging.js';
 import { engagementsApi } from '../../lib/api.js';
 import {
   patchEngagement,
@@ -579,7 +580,10 @@ export function CampaignQuickEditDrawer({
         onClose();
       }
     } catch (err) {
-      setToast(err.message ?? 'Save failed');
+      const message = err.deliverable
+        ? deliverableProofRejectMessage(err.deliverable, err.message)
+        : (err.message ?? 'Save failed');
+      setToast(message);
     }
   }
 

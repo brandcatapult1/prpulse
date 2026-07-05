@@ -97,6 +97,15 @@ function deliverablesSnapshot(list) {
   return JSON.stringify((list ?? []).map(({ is_overdue, ...row }) => row));
 }
 
+/** Snapshot for visit draft vs saved engagement — visit_date, visit_time, visit_notes only. */
+function visitSnapshot(fields) {
+  return JSON.stringify({
+    visitDate: fields?.visitDate ?? '',
+    visitTime: fields?.visitTime ?? '',
+    visitNotes: (fields?.visitNotes ?? '').trim(),
+  });
+}
+
 function mergeSavedDeliverableRow(rows, submittedId, saved) {
   const savedRow = structuredClone(saved);
   const index = (rows ?? []).findIndex((d) => d.id === submittedId);
@@ -462,6 +471,9 @@ export function EngagementRecordPage() {
 
   const deliverablesDirty =
     deliverablesSnapshot(deliverables) !== deliverablesSnapshot(savedDeliverables);
+  const savedVisitFields = visitFieldsFromEngagement(engagement);
+  const visitDirty = !engagement.visit_date
+    || visitSnapshot(visitFields) !== visitSnapshot(savedVisitFields);
 
   const status = engagement.conversation_status;
   const followUp = followUpRules(status);
@@ -1057,14 +1069,16 @@ export function EngagementRecordPage() {
                     onChange={setVisitFields}
                   />
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className="btn-primary"
-                      disabled={!visitFields.visitDate || saving}
-                      onClick={handleSaveVisit}
-                    >
-                      {saving ? 'Saving…' : 'Save visit'}
-                    </button>
+                    {visitDirty && (
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        disabled={!visitFields.visitDate || saving}
+                        onClick={handleSaveVisit}
+                      >
+                        {saving ? 'Saving…' : 'Save visit'}
+                      </button>
+                    )}
                     {canMarkVisitDone && (
                       <ScheduledVisitOutcomes
                         step={visitOutcomeStep}

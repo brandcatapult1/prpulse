@@ -39,6 +39,7 @@ import {
   recordFeedbackActivity,
 } from '../lib/engagementActivity.mjs';
 import { commitScheduleEngagement } from '../lib/scheduleEngagement.mjs';
+import { assertDeliverablesEditable } from '../lib/engagementDeliverableRules.mjs';
 
 export const engagementsRouter = Router();
 
@@ -182,22 +183,6 @@ engagementsRouter.post(
     }
   },
 );
-
-async function assertDeliverablesEditable(client, engagementId) {
-  const { rows } = await client.query(
-    'SELECT conversation_status FROM engagements WHERE id = $1',
-    [engagementId],
-  );
-  if (!rows[0]) {
-    throw Object.assign(new Error('Engagement not found'), { status: 404 });
-  }
-  if (rows[0].conversation_status === 'collaboration_complete') {
-    throw Object.assign(
-      new Error('Deliverables are locked while collaboration is complete. Reopen the engagement to amend.'),
-      { status: 409 },
-    );
-  }
-}
 
 engagementsRouter.post('/:id/schedule', requireAuth, requireEngagementWriteAccess('id'), async (req, res) => {
   try {

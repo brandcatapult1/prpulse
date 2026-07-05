@@ -7,6 +7,7 @@ import {
   isDeliverableFullyPosted,
 } from '../../lib/deliverableLogging.js';
 import { deliverableProofIntroMessage, deliverableProofRequirementMessage } from '../../lib/deliverableProofRules.js';
+import { mergeDeliverableProofForDisplay } from '../../lib/deliverableProofDisplay.js';
 import { uploadProofScreenshot } from '../../lib/proofUpload.js';
 
 /**
@@ -34,13 +35,14 @@ export function DeliverableProofSection({
     ?? deliverable?.engagementId
     ?? null;
 
-  const screenshots = deliverable.screenshots ?? [];
-  const contentLink = deliverable.content_link ?? '';
+  const displayProof = mergeDeliverableProofForDisplay(deliverable);
+  const screenshots = displayProof.screenshots ?? [];
+  const contentLink = displayProof.content_link ?? '';
   const emphasis = deliverableProofEmphasis(deliverable.deliverable_type);
   const introMessage = deliverableProofIntroMessage(deliverable.deliverable_type);
   const canSubmitPosted = canMarkDeliverablePosted({
     contentLink: deliverable.content_link,
-    screenshots,
+    screenshots: deliverable.screenshots ?? [],
     deliverableType: deliverable.deliverable_type,
   });
   const proofRequirementMessage = deliverableProofRequirementMessage(deliverable.deliverable_type);
@@ -109,7 +111,7 @@ export function DeliverableProofSection({
               type="url"
               className="input-field mt-1 w-full"
               placeholder="https://instagram.com/p/…"
-              value={contentLink}
+              value={deliverable.content_link ?? ''}
               onChange={(e) => onUpdate({ content_link: e.target.value || null })}
             />
           )}
@@ -168,6 +170,9 @@ export function DeliverableProofSection({
                   {shot.url ? (
                     <a href={shot.url} target="_blank" rel="noreferrer" className="truncate text-brand hover:underline">
                       {shot.label}
+                      {shot.unitIndex != null && deliverable.quantity > 1 && (
+                        <span className="text-ink-tertiary"> · Unit {shot.unitIndex}</span>
+                      )}
                     </a>
                   ) : (
                     <span className="truncate">📎 {shot.label}</span>
@@ -343,11 +348,12 @@ export function DeliverableRow({
   markPostedError = null,
   markPostedBusy = false,
 }) {
+  const displayProof = mergeDeliverableProofForDisplay(deliverable);
   const showProof =
     canEditProof
     || canMarkPosted
-    || deliverable.content_link
-    || (deliverable.screenshots?.length ?? 0) > 0;
+    || displayProof.content_link
+    || (displayProof.screenshots?.length ?? 0) > 0;
   const showStatusSelect = canEditStatus && deliverable.status !== 'posted';
 
   return (
@@ -362,8 +368,8 @@ export function DeliverableRow({
               Due {formatDateShort(deliverable.due_date)}
             </span>
           )}
-          {!compact && deliverable.content_link && (
-            <p className="mt-1 truncate text-2xs text-brand">{deliverable.content_link}</p>
+          {!compact && displayProof.content_link && (
+            <p className="mt-1 truncate text-2xs text-brand">{displayProof.content_link}</p>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">

@@ -4,25 +4,28 @@ import {
   deliverableProofDemotionMessage,
   deliverableProofRequirementMessage,
 } from './deliverableProofRules.mjs';
+import { mergeDeliverableProofForDisplay } from './deliverableProofDisplay.mjs';
 
 export function mapDeliverableRow(row, screenshots = []) {
   if (!row) return null;
+  const unit_proofs = Array.isArray(row.unit_proofs) ? row.unit_proofs : [];
+  const merged = mergeDeliverableProofForDisplay(row, screenshots);
   return {
     id: row.id,
     engagement_id: row.engagement_id,
     deliverable_type: deliverableTypeFromDb(row.deliverable_type),
     quantity: row.quantity,
     posted_quantity: row.posted_quantity ?? 0,
-    unit_proofs: Array.isArray(row.unit_proofs) ? row.unit_proofs : [],
+    unit_proofs,
     due_date: row.due_date,
     status: row.status,
     published_date: row.published_date,
-    content_link: row.content_link,
+    content_link: merged.content_link,
     brief_compliance: row.brief_compliance,
     brand_tag_verified: row.brand_tag_verified,
     internal_rating: row.internal_rating,
     is_overdue: row.is_overdue ?? false,
-    screenshots,
+    screenshots: merged.screenshots,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };

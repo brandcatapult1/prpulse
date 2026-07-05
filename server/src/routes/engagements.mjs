@@ -17,7 +17,7 @@ import {
   listActivityEventsForEngagement,
 } from '../lib/activityEvents.mjs';
 import {
-  assertDeliverablePostedTransition,
+  resolveDeliverablePostedProof,
   deliverableInsertFields,
   loadDeliverablesForEngagement,
   loadScreenshotsForDeliverables,
@@ -33,6 +33,7 @@ import {
 } from '../lib/outlets.mjs';
 import {
   recordDeliverablePostedActivity,
+  recordDeliverableDemotedActivity,
   recordDidntDeliverActivity,
   recordEngagementPatchActivity,
   recordFeedbackActivity,
@@ -424,7 +425,7 @@ engagementsRouter.post('/:id/deliverables', requireAuth, requireEngagementWriteA
       if (!eng.rows[0]) throw Object.assign(new Error('Engagement not found'), { status: 404 });
 
       const fields = deliverableInsertFields(req.body);
-      await assertDeliverablePostedTransition(client, {
+      const { fields: resolvedFields } = await resolveDeliverablePostedProof(client, {
         before: null,
         fields,
         deliverableId: null,
@@ -439,17 +440,17 @@ engagementsRouter.post('/:id/deliverables', requireAuth, requireEngagementWriteA
          RETURNING *`,
         [
           req.params.id,
-          fields.deliverable_type,
-          fields.quantity,
-          fields.posted_quantity,
-          JSON.stringify(fields.unit_proofs),
-          fields.due_date,
-          fields.status,
-          fields.published_date,
-          fields.content_link,
-          fields.brief_compliance,
-          fields.brand_tag_verified,
-          fields.internal_rating,
+          resolvedFields.deliverable_type,
+          resolvedFields.quantity,
+          resolvedFields.posted_quantity,
+          JSON.stringify(resolvedFields.unit_proofs),
+          resolvedFields.due_date,
+          resolvedFields.status,
+          resolvedFields.published_date,
+          resolvedFields.content_link,
+          resolvedFields.brief_compliance,
+          resolvedFields.brand_tag_verified,
+          resolvedFields.internal_rating,
         ],
       );
       const inserted = rows[0];
@@ -470,7 +471,7 @@ engagementsRouter.patch('/:engagementId/deliverables/:deliverableId', requireAut
     const row = await withUserTransaction(req.user.id, async (client) => {
       await assertDeliverablesEditable(client, req.params.engagementId);
       const cur = await client.query(
-        `SELECT d.*, e.campaign_id FROM deliverables d
+        `SELECT d.*, e.campaign_id, e.contact_id FROM deliverables d
          JOIN engagements e ON e.id = d.engagement_id
          WHERE d.id = $1 AND d.engagement_id = $2`,
         [req.params.deliverableId, req.params.engagementId],
@@ -478,10 +479,10 @@ engagementsRouter.patch('/:engagementId/deliverables/:deliverableId', requireAut
       if (!cur.rows[0]) throw Object.assign(new Error('Deliverable not found'), { status: 404 });
       const before = cur.rows[0];
 
-      const fields = deliverableInsertFields({ ...before, ...req.body });
-      await assertDeliverablePostedTransition(client, {
+      const draftFields = deliverableInsertFields({ ...before, ...req.body });
+      const { fields, demoted, demoteMessage } = await resolveDeliverablePostedProof(client, {
         before,
-        fields,
+        fields: draftFields,
         deliverableId: req.params.deliverableId,
         bodyScreenshots: Object.prototype.hasOwnProperty.call(req.body, 'screenshots')
           ? req.body.screenshots
@@ -529,7 +530,6 @@ engagementsRouter.patch('/:engagementId/deliverables/:deliverableId', requireAut
         );
       }
 
-      const [mapped] = await loadDeliverablesForEngagement(client, req.params.engagementId);
       const updated = (await loadDeliverablesForEngagement(client, req.params.engagementId))
         .find((d) => d.id === req.params.deliverableId);
 
@@ -541,7 +541,22 @@ engagementsRouter.patch('/:engagementId/deliverables/:deliverableId', requireAut
         });
       }
 
-      return updated ?? mapDeliverableRow(rows[0], []);
+      if (demoted) {
+        await recordDeliverableDemotedActivity(client, req.user, {
+          campaignId: before.campaign_id,
+          engagementId: req.params.engagementId,
+          contactId: before.contact_id,
+          deliverable: updated ?? mapDeliverableRow(rows[0], req.body.screenshots ?? []),
+          message: demoteMessage,
+        });
+      }
+
+      const result = updated ?? mapDeliverableRow(rows[0], []);
+      if (demoted) {
+        result.proof_demoted = true;
+        result.proof_demote_message = demoteMessage;
+      }
+      return result;
     });
     res.json(row);
   } catch (err) {

@@ -35,6 +35,7 @@ const ACTION_LABELS = {
   contact_replied: 'Contact logged — replied',
   contact_no_reply: 'Contact logged — no reply',
   deliverable_posted: 'Deliverable posted',
+  deliverable_demoted: 'Deliverable moved off Posted',
   reject: 'Profile rejected',
   reopen: 'Engagement reopened',
   didnt_deliver: "Didn't deliver",

@@ -150,6 +150,52 @@ async function runTests() {
       );
     });
 
+    await test('posted reel with top-level link passes proof despite stale unit_proofs', async () => {
+      const { engagementId } = await seedBase(client);
+      const inserted = await client.query(
+        `INSERT INTO deliverables (
+           engagement_id, deliverable_type, status, content_link, unit_proofs, quantity
+         ) VALUES (
+           $1, 'reel', 'posted', 'https://instagram.com/p/test-reel',
+           '[{"content_link":null,"screenshots":[]}]'::jsonb, 1
+         )
+         RETURNING id`,
+        [engagementId],
+      );
+      const deliverableId = inserted.rows[0].id;
+      const { rows } = await client.query(
+        `SELECT fn_deliverable_has_proof(
+           'reel', 'https://instagram.com/p/test-reel',
+           '[{"content_link":null,"screenshots":[]}]'::jsonb, $1, 1
+         ) AS ok`,
+        [deliverableId],
+      );
+      assert(rows[0].ok === true, 'top-level link should satisfy proof despite stale unit_proofs');
+
+      const { rows: complete } = await client.query(
+        'SELECT fn_engagement_deliverables_complete($1) AS ok',
+        [engagementId],
+      );
+      assert(complete[0].ok === true, 'engagement should be deliverables-complete');
+    });
+
+    await test('posted reel with link and no screenshot passes proof check', async () => {
+      const { engagementId } = await seedBase(client);
+      const inserted = await client.query(
+        `INSERT INTO deliverables (engagement_id, deliverable_type, status, content_link, quantity)
+         VALUES ($1, 'reel', 'posted', 'https://instagram.com/p/no-screenshot', 1)
+         RETURNING id`,
+        [engagementId],
+      );
+      const { rows } = await client.query(
+        `SELECT fn_deliverable_has_proof(
+           'reel', 'https://instagram.com/p/no-screenshot', '[]'::jsonb, $1, 1
+         ) AS ok`,
+        [inserted.rows[0].id],
+      );
+      assert(rows[0].ok === true, 'reel proof should not require screenshot');
+    });
+
     await test('valid completion increments campaign count and stamps completed_at', async () => {
       const { engagementId, campaignId } = await seedBase(client);
       await client.query(

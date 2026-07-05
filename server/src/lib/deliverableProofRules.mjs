@@ -1,10 +1,14 @@
 /**
  * Type-aware deliverable proof rules — canonical server copy.
  * Mirror: web/src/lib/deliverableProofRules.js (keep in sync).
+ * DB mirror: fn_deliverable_has_proof in migration 027 (keep in sync).
  *
  * reel, static_carousel_post => content_link required (screenshot optional)
  * story => >=1 screenshot required (link optional)
  * other => content_link OR screenshot
+ *
+ * qty=1: required evidence in top-level column/assets OR unit_proofs (merged).
+ * qty>1: per-unit proof when unit_proofs.length >= quantity (unchanged semantics).
  */
 
 import { deliverableTypeToDb } from './deliverableTypes.mjs';
@@ -32,7 +36,7 @@ function hasScreenshot(screenshots, unitProofs) {
   return (unitProofs ?? []).some((unit) => (unit?.screenshots ?? []).some(screenshotHasUrl));
 }
 
-/** Single source of truth — pass DB or UI deliverable_type. */
+/** Merged proof check — top-level OR unit_proofs (either store satisfies). */
 export function deliverableProofSatisfied(type, { content_link, screenshots, unit_proofs } = {}) {
   const dbType = normalizeDeliverableDbType(type);
   if (dbType === 'reel' || dbType === 'static_carousel_post') {
@@ -58,7 +62,24 @@ export function deliverableProofRequirementMessage(type) {
   return 'Post requires a content link or screenshot before it can be marked Posted.';
 }
 
-/** True when a row being saved as posted meets its type proof rule. */
+export function deliverableProofDemotionMessage(type) {
+  const dbType = normalizeDeliverableDbType(type);
+  if (dbType === 'reel') {
+    return 'Reel moved off Posted — content link required';
+  }
+  if (dbType === 'static_carousel_post') {
+    return 'Carousel moved off Posted — content link required';
+  }
+  if (dbType === 'story') {
+    return 'Story moved off Posted — screenshot required';
+  }
+  return 'Post moved off Posted — content link or screenshot required';
+}
+
+/**
+ * Canonical posted-row proof evaluator — used by post-time guard, completion, and reports.
+ * qty=1 uses merged top-level + unit_proofs read; qty>1 keeps per-unit when fully logged.
+ */
 export function deliverablePostedProofSatisfied({
   deliverable_type,
   content_link,
@@ -70,11 +91,18 @@ export function deliverablePostedProofSatisfied({
   if (status !== 'posted') return true;
   const qty = Number(quantity) || 1;
   const unitProofs = Array.isArray(unit_proofs) ? unit_proofs : [];
-  const dbType = normalizeDeliverableDbType(deliverable_type);
+
+  if (qty === 1) {
+    return deliverableProofSatisfied(deliverable_type, {
+      content_link,
+      screenshots: screenshots ?? [],
+      unit_proofs: unitProofs,
+    });
+  }
 
   if (unitProofs.length >= qty) {
     return unitProofs.slice(0, qty).every((unit) =>
-      deliverableProofSatisfied(dbType, {
+      deliverableProofSatisfied(deliverable_type, {
         content_link: unit.content_link,
         screenshots: unit.screenshots ?? [],
         unit_proofs: [],
@@ -82,7 +110,7 @@ export function deliverablePostedProofSatisfied({
     );
   }
 
-  return deliverableProofSatisfied(dbType, {
+  return deliverableProofSatisfied(deliverable_type, {
     content_link,
     screenshots: screenshots ?? [],
     unit_proofs: unitProofs,

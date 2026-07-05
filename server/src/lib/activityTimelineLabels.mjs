@@ -148,5 +148,9 @@ export function formatTimelineNotes(row, details, { statusChange } = {}) {
     return 'Applied after collaboration completed';
   }
 
+  if (row.action === 'deliverable_demoted' && details.message) {
+    return details.message;
+  }
+
   return null;
 }

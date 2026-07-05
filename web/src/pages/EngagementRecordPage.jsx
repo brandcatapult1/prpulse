@@ -62,7 +62,10 @@ import {
   visitRules,
 } from '../lib/engagementRules.js';
 import { deliverableHasProof, isDeliverableFullyPosted } from '../lib/deliverableLogging.js';
-import { deliverableProofRequirementMessage } from '../lib/deliverableProofRules.js';
+import {
+  deliverableProofDemotionMessage,
+  deliverableProofRequirementMessage,
+} from '../lib/deliverableProofRules.js';
 import { formatCollaborationReason } from '../lib/collaborationReasons.js';
 import { addDeliverableToList, deliverableListUnitTotals, removeDeliverableFromList } from '../lib/deliverableList.js';
 import {
@@ -132,7 +135,31 @@ export function EngagementRecordPage() {
   const persistDeliverables = async (list) => {
     try {
       const beforeList = await fetchDeliverables(id);
+      for (const item of list) {
+        if (item.status !== 'posted') continue;
+        const prior = beforeList.find((d) => d.id === item.id);
+        const enteringPosted = !prior || prior.status !== 'posted';
+        if (enteringPosted && !deliverableHasProof({ ...item, status: 'posted' })) {
+          setToast(deliverableProofRequirementMessage(item.deliverable_type));
+          return null;
+        }
+      }
+
       const saved = await syncDeliverables(id, beforeList, list);
+      const demoted = saved?.filter((d) => d.proof_demoted) ?? [];
+      if (demoted.length) {
+        const message = demoted
+          .map((d) => d.proof_demote_message || deliverableProofDemotionMessage(d.deliverable_type))
+          .join(' · ');
+        setToast(message);
+        const [eng, tl] = await Promise.all([
+          engagementsApi.get(id),
+          fetchEngagementTimeline(id),
+        ]);
+        setEngagement(eng);
+        setTimeline(Array.isArray(tl) ? tl : []);
+      }
+
       setDeliverables(saved);
       setSavedDeliverables(cloneDeliverables(saved));
       updateEngagementDeliverables(id, saved);
@@ -145,7 +172,7 @@ export function EngagementRecordPage() {
 
   const commitDeliverablesDraft = async () => {
     const saved = await persistDeliverables(deliverables);
-    if (saved) setToast('Deliverables saved');
+    if (saved && !saved.some((d) => d.proof_demoted)) setToast('Deliverables saved');
   };
 
   const discardDeliverablesDraft = () => {

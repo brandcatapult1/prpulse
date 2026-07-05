@@ -1,6 +1,7 @@
 import { deliverableTypeFromDb, deliverableTypeToDb } from './deliverableTypes.mjs';
 import {
   deliverablePostedProofSatisfied,
+  deliverableProofDemotionMessage,
   deliverableProofRequirementMessage,
 } from './deliverableProofRules.mjs';
 
@@ -94,16 +95,16 @@ export function deliverableInsertFields(body) {
 }
 
 /**
- * Reject transitions to status=posted when type proof is not met.
- * Existing posted rows may be amended without re-check (going-forward rule).
+ * Enforce proof on every write that would leave status='posted'.
+ * Entering posted without proof => 422. Already-posted without proof => demote to pending.
  */
-export async function assertDeliverablePostedTransition(
+export async function resolveDeliverablePostedProof(
   client,
   { before, fields, deliverableId, bodyScreenshots },
 ) {
-  const wasPosted = before?.status === 'posted';
-  const willBePosted = fields.status === 'posted';
-  if (!willBePosted || wasPosted) return;
+  if (fields.status !== 'posted') {
+    return { fields, demoted: false };
+  }
 
   let screenshots = bodyScreenshots;
   if (screenshots === undefined && deliverableId) {
@@ -117,13 +118,32 @@ export async function assertDeliverablePostedTransition(
     unit_proofs: fields.unit_proofs,
     screenshots: screenshots ?? [],
     quantity: fields.quantity,
-    status: fields.status,
+    status: 'posted',
   });
 
-  if (!satisfied) {
+  if (satisfied) {
+    return { fields, demoted: false };
+  }
+
+  const wasPosted = before?.status === 'posted';
+  if (!wasPosted) {
     throw Object.assign(
       new Error(deliverableProofRequirementMessage(fields.deliverable_type)),
       { status: 422 },
     );
   }
+
+  const demoteMessage = deliverableProofDemotionMessage(fields.deliverable_type);
+  return {
+    fields: {
+      ...fields,
+      status: 'pending',
+      posted_quantity: 0,
+    },
+    demoted: true,
+    demoteMessage,
+  };
 }
+
+/** @deprecated use resolveDeliverablePostedProof */
+export const assertDeliverablePostedTransition = resolveDeliverablePostedProof;

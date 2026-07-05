@@ -138,6 +138,34 @@ export async function recordDeliverablePostedActivity(client, user, { campaignId
   });
 }
 
+export async function recordDeliverableDemotedActivity(
+  client,
+  user,
+  { campaignId, engagementId, contactId, deliverable, message },
+) {
+  await tryInsertActivityEvent(client, user, {
+    campaignId,
+    engagementId,
+    action: ACTIVITY_ACTION.DELIVERABLE_DEMOTED,
+    details: {
+      deliverableId: deliverable.id,
+      deliverableType: deliverable.deliverable_type,
+      quantity: deliverable.quantity,
+      message,
+      fromStatus: 'posted',
+      toStatus: 'pending',
+    },
+  });
+
+  if (contactId) {
+    await client.query(
+      `INSERT INTO timeline_entries (engagement_id, contact_id, user_id, action, status_change, notes)
+       VALUES ($1, $2, $3, 'deliverable_demoted', 'posted -> pending', $4)`,
+      [engagementId, contactId, user.id, message],
+    );
+  }
+}
+
 export async function recordDidntDeliverActivity(client, user, { campaignId, engagementId, engagementPatch, blacklist, contactId }) {
   await tryInsertActivityEvent(client, user, {
     campaignId,

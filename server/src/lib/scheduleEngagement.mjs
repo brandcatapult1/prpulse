@@ -1,5 +1,5 @@
 import {
-  assertDeliverablePostedTransition,
+  resolveDeliverablePostedProof,
   deliverableInsertFields,
   loadDeliverablesForEngagement,
   syncDeliverableScreenshots,
@@ -9,14 +9,21 @@ import {
   normalizeVisitTime,
   syncVisitOutletText,
 } from './outlets.mjs';
-import { recordEngagementPatchActivity } from './engagementActivity.mjs';
+import { recordEngagementPatchActivity, recordDeliverableDemotedActivity } from './engagementActivity.mjs';
 
 function isTempDeliverableId(id) {
   return id == null || String(id).startsWith('d-');
 }
 
 /** Replace deliverable rows for an engagement inside an open transaction. */
-export async function syncDeliverablesInTransaction(client, engagementId, desiredList, userId) {
+export async function syncDeliverablesInTransaction(client, engagementId, desiredList, user) {
+  const userId = user?.id ?? user;
+  const { rows: engRows } = await client.query(
+    'SELECT campaign_id, contact_id FROM engagements WHERE id = $1',
+    [engagementId],
+  );
+  const { campaign_id: campaignId, contact_id: contactId } = engRows[0] ?? {};
+
   const before = await loadDeliverablesForEngagement(client, engagementId);
   const beforeById = new Map(before.map((d) => [d.id, d]));
   const keepIds = new Set(
@@ -39,7 +46,7 @@ export async function syncDeliverablesInTransaction(client, engagementId, desire
     const isNew = isTempDeliverableId(item.id) || !beforeById.has(item.id);
 
     if (isNew) {
-      await assertDeliverablePostedTransition(client, {
+      const { fields: resolvedFields } = await resolveDeliverablePostedProof(client, {
         before: null,
         fields,
         deliverableId: null,
@@ -54,17 +61,17 @@ export async function syncDeliverablesInTransaction(client, engagementId, desire
          RETURNING *`,
         [
           engagementId,
-          fields.deliverable_type,
-          fields.quantity,
-          fields.posted_quantity,
-          JSON.stringify(fields.unit_proofs),
-          fields.due_date,
-          fields.status,
-          fields.published_date,
-          fields.content_link,
-          fields.brief_compliance,
-          fields.brand_tag_verified,
-          fields.internal_rating,
+          resolvedFields.deliverable_type,
+          resolvedFields.quantity,
+          resolvedFields.posted_quantity,
+          JSON.stringify(resolvedFields.unit_proofs),
+          resolvedFields.due_date,
+          resolvedFields.status,
+          resolvedFields.published_date,
+          resolvedFields.content_link,
+          resolvedFields.brief_compliance,
+          resolvedFields.brand_tag_verified,
+          resolvedFields.internal_rating,
         ],
       );
       if (item.screenshots?.length) {
@@ -74,12 +81,15 @@ export async function syncDeliverablesInTransaction(client, engagementId, desire
     }
 
     const beforeRow = beforeById.get(item.id);
-    await assertDeliverablePostedTransition(client, {
-      before: beforeRow,
-      fields,
-      deliverableId: item.id,
-      bodyScreenshots: item.screenshots,
-    });
+    const { fields: resolvedFields, demoted, demoteMessage } = await resolveDeliverablePostedProof(
+      client,
+      {
+        before: beforeRow,
+        fields,
+        deliverableId: item.id,
+        bodyScreenshots: item.screenshots,
+      },
+    );
 
     const { rows } = await client.query(
       `UPDATE deliverables SET
@@ -100,21 +110,34 @@ export async function syncDeliverablesInTransaction(client, engagementId, desire
       [
         item.id,
         engagementId,
-        fields.deliverable_type,
-        fields.quantity,
-        fields.posted_quantity,
-        JSON.stringify(fields.unit_proofs),
-        fields.due_date,
-        fields.status,
-        fields.published_date,
-        fields.content_link,
-        fields.brief_compliance,
-        fields.brand_tag_verified,
-        fields.internal_rating,
+        resolvedFields.deliverable_type,
+        resolvedFields.quantity,
+        resolvedFields.posted_quantity,
+        JSON.stringify(resolvedFields.unit_proofs),
+        resolvedFields.due_date,
+        resolvedFields.status,
+        resolvedFields.published_date,
+        resolvedFields.content_link,
+        resolvedFields.brief_compliance,
+        resolvedFields.brand_tag_verified,
+        resolvedFields.internal_rating,
       ],
     );
     if (item.screenshots?.length) {
       await syncDeliverableScreenshots(client, rows[0].id, item.screenshots, userId);
+    }
+
+    if (demoted && user?.id) {
+      const demotedRow = (await loadDeliverablesForEngagement(client, engagementId)).find(
+        (d) => d.id === item.id,
+      );
+      await recordDeliverableDemotedActivity(client, user, {
+        campaignId,
+        engagementId,
+        contactId,
+        deliverable: demotedRow ?? rows[0],
+        message: demoteMessage,
+      });
     }
   }
 
@@ -148,7 +171,7 @@ export async function commitScheduleEngagement(client, user, engagementId, body,
     client,
     engagementId,
     body.deliverables,
-    user.id,
+    user,
   );
 
   const patch = {

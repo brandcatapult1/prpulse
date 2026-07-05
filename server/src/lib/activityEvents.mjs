@@ -15,6 +15,7 @@ export const ACTIVITY_ACTION = {
   CONTACT_REPLIED: 'contact_replied',
   CONTACT_NO_REPLY: 'contact_no_reply',
   DELIVERABLE_POSTED: 'deliverable_posted',
+  DELIVERABLE_DEMOTED: 'deliverable_demoted',
   REJECT: 'reject',
   REOPEN: 'reopen',
   DIDNT_DELIVER: 'didnt_deliver',
@@ -65,6 +66,7 @@ const ACTION_LABELS = {
   [ACTIVITY_ACTION.CONTACT_REPLIED]: 'Contact logged — replied',
   [ACTIVITY_ACTION.CONTACT_NO_REPLY]: 'Contact logged — no reply',
   [ACTIVITY_ACTION.DELIVERABLE_POSTED]: 'Deliverable posted',
+  [ACTIVITY_ACTION.DELIVERABLE_DEMOTED]: 'Deliverable moved off Posted',
   [ACTIVITY_ACTION.REJECT]: 'Profile rejected',
   [ACTIVITY_ACTION.REOPEN]: 'Engagement reopened',
   [ACTIVITY_ACTION.DIDNT_DELIVER]: "Didn't deliver",
@@ -92,6 +94,10 @@ function formatStatusChangeForRow(row, details) {
     const label = formatDeliverableType(details.deliverableType);
     const qty = details.quantity > 1 ? ` ×${details.quantity}` : '';
     return label ? `${label}${qty}` : null;
+  }
+  if (row.action === ACTIVITY_ACTION.DELIVERABLE_DEMOTED && details.deliverableType) {
+    const label = formatDeliverableType(details.deliverableType);
+    return label ? `${label} → Pending` : 'Pending';
   }
   if (row.action === 'contact_tags_added' && details.tag_name) {
     return details.tag_name;

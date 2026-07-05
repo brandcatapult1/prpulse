@@ -19,6 +19,28 @@ export function Card({ children, className = '', padding = true, elevated = fals
   );
 }
 
+/**
+ * Frosted glass surface — styles from `.campaign-glass-tile` in index.css
+ * (Campaign View, contact profile, reports, and related surfaces).
+ */
+export function GlassTile({ as: Tag = 'div', children, className = '', ...props }) {
+  return (
+    <Tag className={['campaign-glass-tile', className].filter(Boolean).join(' ')} {...props}>
+      {children}
+    </Tag>
+  );
+}
+
+/** Glass tile with uppercase section heading (contact profile overview cards). */
+export function GlassSectionCard({ title, children, className = '', as = 'section' }) {
+  return (
+    <GlassTile as={as} className={['p-4', className].filter(Boolean).join(' ')}>
+      <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-ink-tertiary">{title}</h3>
+      {children}
+    </GlassTile>
+  );
+}
+
 export function EmptyState({ title, description, action }) {
   return (
     <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-line bg-white px-6 py-14 text-center">

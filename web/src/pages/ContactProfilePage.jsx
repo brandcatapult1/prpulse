@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { DataTable, RatingStars } from '../components/ui/DataKit.jsx';
-import { EmptyState, Toast } from '../components/ui/Primitives.jsx';
+import { EmptyState, Toast, GlassTile } from '../components/ui/Primitives.jsx';
 import { Pill, formatDate, formatFee, formatStatus, statusTone } from '../lib/format.jsx';
 import { MODULES, CONTACT_PROFILE_TABS } from '../lib/modules.js';
 import { contactsApi, lookupApi } from '../lib/api.js';
@@ -195,7 +195,7 @@ export function ContactProfilePage() {
         }
       />
 
-      <div className="campaign-glass-tile p-5">
+      <GlassTile className="p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold tracking-tight text-ink">{contact.full_name}</h2>
@@ -222,7 +222,7 @@ export function ContactProfilePage() {
           {extras.avg_rating != null && ` · ★${extras.avg_rating.toFixed(1)}`}
           {extras.would_work_again_pct != null && ` · Would work again ${extras.would_work_again_pct}%`}
         </p>
-      </div>
+      </GlassTile>
 
       <div className="flex gap-1 overflow-x-auto border-b border-line">
         {CONTACT_PROFILE_TABS.map((tab) => (

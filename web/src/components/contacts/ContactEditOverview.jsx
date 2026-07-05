@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { GlassSectionCard } from '../ui/Primitives.jsx';
 import { Pill, formatFee } from '../../lib/format.jsx';
 import { formatClassification, CLASSIFICATION_OPTIONS, classificationSelectLabel } from '../../lib/classifications.js';
 import { CONTACT_STATUS_OPTIONS } from '../../lib/contactLifecycle.js';
@@ -61,7 +62,7 @@ export function ContactEditOverview({
 
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <ReadCard title="Contact & classification">
+      <GlassSectionCard title="Contact & classification">
         <dl className="grid gap-4 sm:grid-cols-2 text-sm">
           <ProfileField
             label="Full name"
@@ -163,9 +164,9 @@ export function ContactEditOverview({
             }
           />
         </dl>
-      </ReadCard>
+      </GlassSectionCard>
 
-      <ReadCard title="Collaboration terms">
+      <GlassSectionCard title="Collaboration terms">
         <dl className="grid gap-4 sm:grid-cols-2 text-sm">
           <ProfileField
             label="Open to barter"
@@ -228,9 +229,9 @@ export function ContactEditOverview({
             </dl>
           </>
         )}
-      </ReadCard>
+      </GlassSectionCard>
 
-      <ReadCard title="Categories, tags & socials" className="sm:col-span-2">
+      <GlassSectionCard title="Categories, tags & socials" className="sm:col-span-2">
         <dl className="grid gap-4 sm:grid-cols-2 text-sm">
           <div className="sm:col-span-2">
             <dt className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">Primary category</dt>
@@ -353,9 +354,9 @@ export function ContactEditOverview({
             </button>
           </div>
         </div>
-      </ReadCard>
+      </GlassSectionCard>
 
-      <ReadCard title="Lifecycle status" className="sm:col-span-2">
+      <GlassSectionCard title="Lifecycle status" className="sm:col-span-2">
         <div className="flex flex-wrap gap-2">
           {CONTACT_STATUS_OPTIONS.map(({ value, label }) => (
             <button
@@ -372,7 +373,7 @@ export function ContactEditOverview({
             </button>
           ))}
         </div>
-      </ReadCard>
+      </GlassSectionCard>
     </div>
   );
 }
@@ -413,7 +414,7 @@ function ContactReadOverview({ contact, extras, tagLabels }) {
 
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <ReadCard title="Contact & classification">
+      <GlassSectionCard title="Contact & classification">
         <dl className="space-y-2.5">
           <ReadRow label="Mobile" value={contact.mobile_number} />
           <ReadRow label="Email" value={email} />
@@ -421,9 +422,9 @@ function ContactReadOverview({ contact, extras, tagLabels }) {
           <ReadRow label="State" value={state} />
           <ReadRow label="Classification" value={classification} />
         </dl>
-      </ReadCard>
+      </GlassSectionCard>
 
-      <ReadCard title="Collaboration terms">
+      <GlassSectionCard title="Collaboration terms">
         <div className="space-y-2.5">
           <div>
             <span className="text-[10px] font-medium uppercase tracking-wider text-ink-tertiary">Open to</span>
@@ -451,10 +452,10 @@ function ContactReadOverview({ contact, extras, tagLabels }) {
             </div>
           )}
         </div>
-      </ReadCard>
+      </GlassSectionCard>
 
       {(hasCategoriesOrTags || hasSocials) && (
-        <ReadCard title="Categories, tags & socials" className="sm:col-span-2">
+        <GlassSectionCard title="Categories, tags & socials" className="sm:col-span-2">
           <div className="space-y-3">
             {primaryCategory && (
               <div>
@@ -487,18 +488,9 @@ function ContactReadOverview({ contact, extras, tagLabels }) {
               </div>
             )}
           </div>
-        </ReadCard>
+        </GlassSectionCard>
       )}
     </div>
-  );
-}
-
-function ReadCard({ title, children, className = '' }) {
-  return (
-    <section className={`campaign-glass-tile p-4 ${className}`}>
-      <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-ink-tertiary">{title}</h3>
-      {children}
-    </section>
   );
 }
 

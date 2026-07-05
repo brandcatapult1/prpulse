@@ -33,8 +33,10 @@ import {
   logDeliverableProof,
 } from '../lib/persistence.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import { canReopenComplete } from '../lib/campaignPermissions.js';
+import { canMarkDidntDeliver, canReopenComplete } from '../lib/campaignPermissions.js';
+import { getDropReasonOptionsForStatus } from '../lib/campaignDrawerMoves.js';
 import {
+  firstOutreachToastMessage,
   reopenCompleteToastMessage,
   REOPEN_COMPLETE_CONFIRM,
 } from '../lib/outreachLogging.js';
@@ -81,6 +83,8 @@ import {
   visitFieldsFromEngagement,
 } from '../lib/visitFields.js';
 import { STAGE, transitionStage } from '../lib/engagementTransitions.js';
+import { DIDNT_DELIVER_REASON } from '../lib/dropTransitions.js';
+import { buildVisitDoneTransition, visitDoneToastMessage } from '../lib/visitLogging.js';
 
 const interestOptions = [
   { value: 'high', label: 'High' },
@@ -126,6 +130,9 @@ export function EngagementRecordPage() {
   const [saving, setSaving] = useState(false);
   const [notesEditing, setNotesEditing] = useState(false);
   const [notesDraft, setNotesDraft] = useState('');
+  const [statusPrompt, setStatusPrompt] = useState(null);
+  const [pendingStatusTransition, setPendingStatusTransition] = useState(null);
+  const [statusFollowUpDraft, setStatusFollowUpDraft] = useState('');
 
   const persistEngagement = async (patch, { silent = false, successMessage = 'Saved' } = {}) => {
     setSaving(true);
@@ -398,7 +405,48 @@ export function EngagementRecordPage() {
     }
   };
 
-  const handleStatusChange = (next) => {
+  function clearStatusPrompt() {
+    setStatusPrompt(null);
+    setPendingStatusTransition(null);
+    setStatusFollowUpDraft('');
+  }
+
+  async function applyStageTransition(result, successMessage = 'Saved') {
+    if (!result.ok) {
+      if (result.needsPrompt === 'follow_up_date') {
+        setStatusFollowUpDraft('');
+        setStatusPrompt('follow_up_date');
+        return false;
+      }
+      if (result.needsPrompt === 'drop_reason') {
+        setPendingStatusTransition({ target: STAGE.DROPPED });
+        setStatusPrompt('drop_reason');
+        return false;
+      }
+      setToast(result.error ?? 'Could not update status');
+      return false;
+    }
+
+    const ok = await persistEngagement(result.patch, { successMessage });
+    if (ok) {
+      clearStatusPrompt();
+      const nextStatus = result.patch.conversation_status;
+      const rule = followUpSuggestionForStatus(nextStatus);
+      if (rule && followUpRules(nextStatus).editable) {
+        setFollowUpSuggestion({
+          date: addDaysIso(rule.days),
+          label: rule.label,
+        });
+      } else {
+        setFollowUpSuggestion(null);
+      }
+    }
+    return ok;
+  }
+
+  async function handleStatusChange(next) {
+    if (next === engagement.conversation_status) return;
+
     if (next === 'scheduled') {
       setModal('visit');
       return;
@@ -414,22 +462,83 @@ export function EngagementRecordPage() {
         setToast('Complete when all deliverables are Posted with proof');
         return;
       }
+      const patch = { conversation_status: next, ...sideEffectsOnStatusChange(next) };
+      const rule = followUpSuggestionForStatus(next);
+      if (rule && followUpRules(next).editable) {
+        setFollowUpSuggestion({ date: addDaysIso(rule.days), label: rule.label });
+      } else {
+        setFollowUpSuggestion(null);
+      }
+      persistEngagement(patch);
+      return;
     }
 
-    const patch = { conversation_status: next, ...sideEffectsOnStatusChange(next) };
+    if (next === 'not_contacted') {
+      setToast('Not Contacted cannot be set from the record page — use the campaign board.');
+      return;
+    }
 
-    const rule = followUpSuggestionForStatus(next);
-    if (rule && followUpRules(next).editable) {
-      setFollowUpSuggestion({
-        date: addDaysIso(rule.days),
-        label: rule.label,
+    clearStatusPrompt();
+
+    if (next === 'awaiting_final_deliverables') {
+      const result = buildVisitDoneTransition(engagement, transitionStage, STAGE);
+      await applyStageTransition(result, visitDoneToastMessage());
+      return;
+    }
+
+    if (next === 'in_conversation') {
+      setPendingStatusTransition({
+        target: STAGE.IN_CONVERSATION,
+        logFirstOutreach: engagement.conversation_status === 'not_contacted',
       });
-    } else {
-      setFollowUpSuggestion(null);
+      await applyStageTransition(transitionStage(engagement, STAGE.IN_CONVERSATION, {}));
+      return;
     }
 
-    persistEngagement(patch);
-  };
+    if (next === 'no_response') {
+      await applyStageTransition(transitionStage(engagement, STAGE.NO_RESPONSE, {}));
+      return;
+    }
+
+    if (next === 'dropped') {
+      if (!canMarkDidntDeliver(user?.role)) {
+        setToast('Senior Manager or Admin required');
+        return;
+      }
+      const result = transitionStage(engagement, STAGE.DROPPED, {
+        dropReason: DIDNT_DELIVER_REASON,
+      });
+      await applyStageTransition(result, "Moved to Dropped — Didn't Deliver");
+      return;
+    }
+
+    if (next.startsWith('dropped_')) {
+      const result = transitionStage(engagement, STAGE.DROPPED, { dropReason: next });
+      await applyStageTransition(result, `Moved to Dropped — ${formatStatus(next)}`);
+      return;
+    }
+
+    setToast('Could not update status');
+  }
+
+  async function handleStatusFollowUpSave() {
+    if (!pendingStatusTransition || !statusFollowUpDraft) return;
+    const result = transitionStage(engagement, pendingStatusTransition.target, {
+      nextFollowUpDate: statusFollowUpDraft,
+      logFirstOutreach: pendingStatusTransition.logFirstOutreach,
+    });
+    const message = pendingStatusTransition.logFirstOutreach
+      ? firstOutreachToastMessage(statusFollowUpDraft)
+      : `Logged — next follow-up ${formatDate(statusFollowUpDraft)}`;
+    await applyStageTransition(result, message);
+  }
+
+  async function handleStatusDropReason(reason) {
+    const result = transitionStage(engagement, STAGE.DROPPED, { dropReason: reason });
+    const label = getDropReasonOptionsForStatus(status).find((o) => o.value === reason)?.label
+      ?? formatStatus(reason);
+    await applyStageTransition(result, `Moved to Dropped — ${label}`);
+  }
 
   const handleFollowUpChange = (date) => {
     if (!followUp.editable) return;
@@ -466,6 +575,7 @@ export function EngagementRecordPage() {
   const previousBrands = contactEngagements.length
     ? [...new Set(contactEngagements.map((e) => e.brand_name).filter(Boolean))].join(', ')
     : '—';
+  const statusDropReasonOptions = getDropReasonOptionsForStatus(status);
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -573,6 +683,50 @@ export function EngagementRecordPage() {
                         : undefined
                   }
                 />
+                {statusPrompt === 'follow_up_date' && pendingStatusTransition && (
+                  <div className="mt-3 rounded-lg border border-line bg-canvas px-3 py-3">
+                    <p className="text-2xs font-medium text-ink">Next follow-up date</p>
+                    <input
+                      type="date"
+                      className="input-field mt-2 w-full"
+                      value={statusFollowUpDraft}
+                      onChange={(e) => setStatusFollowUpDraft(e.target.value)}
+                    />
+                    <div className="mt-3 flex gap-2">
+                      <button type="button" className="btn-secondary flex-1" onClick={clearStatusPrompt}>
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-primary flex-1"
+                        disabled={!statusFollowUpDraft}
+                        onClick={handleStatusFollowUpSave}
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {statusPrompt === 'drop_reason' && (
+                  <div className="mt-3 rounded-lg border border-line bg-canvas px-3 py-3">
+                    <p className="text-2xs font-medium text-ink">Drop reason</p>
+                    <div className="mt-2 space-y-1">
+                      {statusDropReasonOptions.map((o) => (
+                        <button
+                          key={o.value}
+                          type="button"
+                          className="btn-ghost w-full justify-start text-2xs text-health-red"
+                          onClick={() => handleStatusDropReason(o.value)}
+                        >
+                          {o.label}
+                        </button>
+                      ))}
+                    </div>
+                    <button type="button" className="btn-secondary mt-2 w-full" onClick={clearStatusPrompt}>
+                      Cancel
+                    </button>
+                  </div>
+                )}
                 {isComplete(status) && canReopenComplete(user?.role) && (
                   <div className="mt-3">
                     {reopenConfirm ? (

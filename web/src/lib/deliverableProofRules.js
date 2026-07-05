@@ -65,6 +65,18 @@ export function deliverableProofRequirementMessage(type) {
   return 'Post requires a content link or screenshot before it can be marked Posted.';
 }
 
+/** Short intro for proof capture forms — per-type requirement summary. */
+export function deliverableProofIntroMessage(type) {
+  const dbType = normalizeDeliverableDbType(type);
+  if (dbType === 'reel' || dbType === 'static_carousel_post') {
+    return 'Add a post link (screenshot optional).';
+  }
+  if (dbType === 'story') {
+    return 'Add a screenshot (post link optional).';
+  }
+  return 'Add a post link and/or screenshot — at least one is required.';
+}
+
 export function deliverableProofDemotionMessage(type) {
   const dbType = normalizeDeliverableDbType(type);
   if (dbType === 'reel') {

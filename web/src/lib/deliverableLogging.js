@@ -77,8 +77,8 @@ export function deliverableProofEmphasis(type) {
 export function canMarkDeliverablePosted({ contentLink, screenshots, deliverableType }) {
   return deliverableProofSatisfied(deliverableType, {
     content_link: contentLink,
-    screenshots,
-    unit_proofs: [{ content_link: contentLink, screenshots }],
+    screenshots: screenshots ?? [],
+    unit_proofs: [],
   });
 }
 

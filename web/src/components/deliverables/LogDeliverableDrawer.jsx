@@ -7,7 +7,7 @@ import {
   deliverablePostedUnits,
   deliverableTotalUnits,
 } from '../../lib/deliverableLogging.js';
-import { deliverableProofRequirementMessage } from '../../lib/deliverableProofRules.js';
+import { deliverableProofIntroMessage, deliverableProofRequirementMessage } from '../../lib/deliverableProofRules.js';
 import { todayIso } from '../../lib/dates.js';
 import { uploadProofScreenshot } from '../../lib/proofUpload.js';
 
@@ -35,6 +35,7 @@ export function LogDeliverableForm({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
   const emphasis = deliverableProofEmphasis(deliverable.deliverable_type);
+  const introMessage = deliverableProofIntroMessage(deliverable.deliverable_type);
 
   async function handleFiles(event) {
     const files = Array.from(event.target.files ?? []);
@@ -68,9 +69,7 @@ export function LogDeliverableForm({
 
   return (
     <div className="space-y-4">
-      <p className="text-2xs text-ink-secondary">
-        Add a post link and/or screenshot — at least one is required.
-      </p>
+      <p className="text-2xs text-ink-secondary">{introMessage}</p>
 
       <label className="block text-2xs text-ink-secondary">
         <span className={emphasis.screenshotPrimary ? 'font-normal text-ink-tertiary' : 'font-medium text-ink'}>
@@ -155,6 +154,8 @@ export function LogDeliverableDrawer({ deliverable, open, onClose, onConfirm }) 
   const [screenshots, setScreenshots] = useState([]);
   const [publishedDate, setPublishedDate] = useState(todayIso());
   const [uploading, setUploading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
 
   const engagementId = deliverable?.engagement_id ?? deliverable?.engagementId ?? null;
 
@@ -163,7 +164,12 @@ export function LogDeliverableDrawer({ deliverable, open, onClose, onConfirm }) 
     setContentLink('');
     setScreenshots([]);
     setPublishedDate(todayIso());
+    setSubmitError(null);
   }, [open, deliverable?.id]);
+
+  useEffect(() => {
+    setSubmitError(null);
+  }, [contentLink, screenshots, publishedDate]);
 
   if (!deliverable) return null;
 
@@ -181,15 +187,25 @@ export function LogDeliverableDrawer({ deliverable, open, onClose, onConfirm }) 
     onClose();
   }
 
-  function handleConfirm() {
-    if (!canSubmit) return;
+  async function handleConfirm() {
+    if (!canSubmit || submitting) return;
     const next = buildUnitPostedPatch(deliverable, {
       contentLink,
       screenshots,
       publishedDate,
     });
-    onConfirm(next);
-    resetAndClose();
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      await onConfirm(next);
+      resetAndClose();
+    } catch (err) {
+      setSubmitError(
+        err?.message || deliverableProofRequirementMessage(deliverable.deliverable_type),
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -199,15 +215,22 @@ export function LogDeliverableDrawer({ deliverable, open, onClose, onConfirm }) 
       onClose={resetAndClose}
       footer={
         <div className="space-y-2">
-          {!canSubmit && !uploading && (
-            <p className="text-right text-2xs text-health-red">{proofRequirementMessage}</p>
+          {(submitError || (!canSubmit && !uploading && !submitting)) && (
+            <p className="text-right text-2xs text-health-red">
+              {submitError || proofRequirementMessage}
+            </p>
           )}
           <div className="flex justify-end gap-2">
-            <button type="button" className="btn-secondary" onClick={resetAndClose}>
+            <button type="button" className="btn-secondary" onClick={resetAndClose} disabled={submitting}>
               Cancel
             </button>
-            <button type="button" className="btn-primary" disabled={!canSubmit || uploading} onClick={handleConfirm}>
-              {uploading ? 'Uploading…' : 'Mark posted'}
+            <button
+              type="button"
+              className="btn-primary"
+              disabled={!canSubmit || uploading || submitting}
+              onClick={handleConfirm}
+            >
+              {uploading ? 'Uploading…' : submitting ? 'Saving…' : 'Mark posted'}
             </button>
           </div>
         </div>

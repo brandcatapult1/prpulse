@@ -144,21 +144,17 @@ export function CampaignViewPage() {
   }
 
   async function applyDeliverablesLogging(engagementId, deliverable, message) {
-    try {
-      const prior = (await fetchDeliverables(engagementId)).find((d) => d.id === deliverable.id) ?? null;
-      await logDeliverableProof(engagementId, deliverable);
-      await refreshAfterDeliverableWrite(engagementId);
-      const undo = prior
-        ? async () => {
-            await updateDeliverable(engagementId, prior.id, prior);
-            await refreshAfterDeliverableWrite(engagementId);
-            setToast(null);
-          }
-        : null;
-      showActionToast(message, undo);
-    } catch (err) {
-      setToast({ message: err.message ?? 'Could not log deliverable', onUndo: null });
-    }
+    const prior = (await fetchDeliverables(engagementId)).find((d) => d.id === deliverable.id) ?? null;
+    await logDeliverableProof(engagementId, deliverable);
+    await refreshAfterDeliverableWrite(engagementId);
+    const undo = prior
+      ? async () => {
+          await updateDeliverable(engagementId, prior.id, prior);
+          await refreshAfterDeliverableWrite(engagementId);
+          setToast(null);
+        }
+      : null;
+    showActionToast(message, undo);
   }
 
   async function applyDidntDeliverLogging(engagementId, { engagementPatch, blacklist, message }) {

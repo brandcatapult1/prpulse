@@ -56,7 +56,10 @@ export function AwaitingDeliverablesCardLogging({
   const loggingDeliverable = deliverables.find((d) => d.id === loggingDeliverableId) ?? null;
 
   function handleLogDeliverable(nextDeliverable) {
-    onApplyDeliverables(nextDeliverable, markDeliverablePostedToastMessage(nextDeliverable));
+    return onApplyDeliverables(
+      nextDeliverable,
+      markDeliverablePostedToastMessage(nextDeliverable),
+    );
   }
 
   function handleMarkComplete() {

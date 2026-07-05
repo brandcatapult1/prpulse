@@ -153,13 +153,9 @@ export function ManagerDashboardView({ scopeUserId, displayFirstName }) {
 
   const applyDeliverablesLogging = useCallback(
     async (engagementId, deliverable, message) => {
-      try {
-        await logDeliverableProof(engagementId, deliverable);
-        await reload();
-        showActionToast(message, null);
-      } catch (err) {
-        showActionToast(err.message ?? 'Could not log deliverable', null);
-      }
+      await logDeliverableProof(engagementId, deliverable);
+      await reload();
+      showActionToast(message, null);
     },
     [reload, showActionToast],
   );
@@ -190,15 +186,16 @@ export function ManagerDashboardView({ scopeUserId, displayFirstName }) {
   }, []);
 
   const handleDeliverableConfirm = useCallback(
-    (nextDeliverable) => {
+    async (nextDeliverable) => {
       const engagementId = loggingDeliverable?.engagementId;
-      if (!engagementId) return;
-      applyDeliverablesLogging(
+      if (!engagementId) {
+        throw new Error('Engagement not found');
+      }
+      await applyDeliverablesLogging(
         engagementId,
         nextDeliverable,
         markDeliverablePostedToastMessage(nextDeliverable),
       );
-      setLoggingDeliverable(null);
     },
     [applyDeliverablesLogging, loggingDeliverable?.engagementId],
   );

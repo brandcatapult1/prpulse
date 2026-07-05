@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import { ExpandableSection } from '../ui/DataKit.jsx';
 import { deliverableTypeLabel } from '../../lib/deliverableTypes.js';
 import {
   canMarkDeliverablePosted,
@@ -252,93 +251,14 @@ export function DeliverableProofSection({
         </div>
       )}
 
-      {(editable || deliverable.brief_compliance != null || deliverable.brand_tag_verified != null || deliverable.internal_rating) && (
-        <ExpandableSection title="Compliance & internal rating">
-          <div className="space-y-3">
-            <ToggleField
-              label="Brief compliance"
-              value={deliverable.brief_compliance}
-              editable={editable}
-              onChange={(v) => onUpdate({ brief_compliance: v })}
-            />
-            <ToggleField
-              label="Brand tag verified"
-              value={deliverable.brand_tag_verified}
-              editable={editable}
-              onChange={(v) => onUpdate({ brand_tag_verified: v })}
-            />
-            <StarRatingField
-              label="Internal rating"
-              value={deliverable.internal_rating ?? 0}
-              editable={editable}
-              onChange={(v) => onUpdate({ internal_rating: v || null })}
-            />
-          </div>
-        </ExpandableSection>
-      )}
-    </div>
-  );
-}
-
-function ToggleField({ label, value, editable, onChange }) {
-  if (!editable && value == null) return null;
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-2xs text-ink-secondary">{label}</span>
-      {editable ? (
-        <div className="flex gap-1">
-          {[true, false].map((opt) => (
-            <button
-              key={String(opt)}
-              type="button"
-              onClick={() => onChange(opt)}
-              className={`rounded-md border px-2.5 py-1 text-2xs font-medium ${
-                value === opt
-                  ? 'border-brand bg-brand-soft text-brand'
-                  : 'border-line bg-white text-ink-secondary'
-              }`}
-            >
-              {opt ? 'Yes' : 'No'}
-            </button>
-          ))}
-        </div>
-      ) : (
-        <span className="text-2xs font-medium text-ink">{value ? 'Yes' : 'No'}</span>
-      )}
-    </div>
-  );
-}
-
-function StarRatingField({ label, value, editable, onChange }) {
-  if (!editable && !value) return null;
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-2xs text-ink-secondary">{label}</span>
-      <div className="flex gap-0.5">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <button
-            key={star}
-            type="button"
-            disabled={!editable}
-            onClick={() => onChange(star)}
-            className={`text-sm ${star <= value ? 'text-health-amber' : 'text-line'} ${editable ? 'hover:text-health-amber' : ''}`}
-            aria-label={`${star} star`}
-          >
-            ★
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
 
 export function DeliverableRow({
   deliverable,
-  canEditStatus,
   canEditProof,
   canRemove = false,
-  deliverableStatusOptions,
-  onStatusChange,
   onUpdate,
   onRemove,
   engagementId = null,
@@ -354,7 +274,6 @@ export function DeliverableRow({
     || canMarkPosted
     || displayProof.content_link
     || (displayProof.screenshots?.length ?? 0) > 0;
-  const showStatusSelect = canEditStatus && deliverable.status !== 'posted';
 
   return (
     <div className="rounded-lg border border-line bg-canvas px-3 py-3">
@@ -378,21 +297,9 @@ export function DeliverableRow({
               Overdue
             </span>
           )}
-          {showStatusSelect ? (
-            <select
-              className="input-field h-8 max-w-[140px] capitalize"
-              value={deliverable.status}
-              onChange={(e) => onStatusChange?.(deliverable.id, e.target.value)}
-            >
-              {deliverableStatusOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          ) : (
-            <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-2xs font-medium capitalize text-ink-secondary">
-              {deliverable.status}
-            </span>
-          )}
+          <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-2xs font-medium capitalize text-ink-secondary">
+            {deliverable.status}
+          </span>
           {canRemove && (
             <button
               type="button"

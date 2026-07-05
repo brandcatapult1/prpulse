@@ -48,16 +48,12 @@ import { getContactProfileExtras } from '../lib/contactProfile.js';
 import { formatTimelineEntry } from '../lib/activityTimelineLabels.js';
 import {
   agreedFeeRules,
-  canSetDeliverableStatus,
-  deliverableStatusBlockReason,
-  deliverableDraftStatusOptionsForEngagement,
-  deliverablesRules,
   canRemoveDeliverable,
+  deliverablesRules,
   feedbackRules,
   followUpRules,
   followUpSuggestionForStatus,
   getStatusOptions,
-  interestRules,
   isComplete,
   notesRules,
   sideEffectsOnStatusChange,
@@ -85,12 +81,6 @@ import {
 import { STAGE, transitionStage } from '../lib/engagementTransitions.js';
 import { DIDNT_DELIVER_REASON } from '../lib/dropTransitions.js';
 import { buildVisitDoneTransition, visitDoneToastMessage } from '../lib/visitLogging.js';
-
-const interestOptions = [
-  { value: 'high', label: 'High' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'low', label: 'Low' },
-];
 
 function deliverablesSnapshot(list) {
   return JSON.stringify((list ?? []).map(({ is_overdue, ...row }) => row));
@@ -276,16 +266,11 @@ export function EngagementRecordPage() {
 
   const updateDeliverable = (delId, patch) => {
     if (!engagement) return;
-    const engagementStatus = engagement.conversation_status;
     if (patch.status === 'posted') {
       setToast('Use Save & mark posted to mark this deliverable Posted');
       return;
     }
-    if (patch.status && !canSetDeliverableStatus(engagementStatus, patch.status)) {
-      setToast(
-        deliverableStatusBlockReason(engagementStatus, patch.status)
-          ?? 'This status is not available at the current stage',
-      );
+    if (patch.status) {
       return;
     }
     setMarkPostedErrors((prev) => ({ ...prev, [delId]: null }));
@@ -354,10 +339,8 @@ export function EngagementRecordPage() {
   const followUp = followUpRules(status);
   const visit = visitRules(status);
   const deliverablesRule = deliverablesRules(status);
-  const deliverableStatusOptions = deliverableDraftStatusOptionsForEngagement(status);
   const feedback = feedbackRules(status);
   const feeRule = agreedFeeRules(status);
-  const interestRule = interestRules(status);
   const notesRule = notesRules(status);
   const closedBanner = terminalBanner(status);
 
@@ -576,6 +559,21 @@ export function EngagementRecordPage() {
     ? [...new Set(contactEngagements.map((e) => e.brand_name).filter(Boolean))].join(', ')
     : '—';
   const statusDropReasonOptions = getDropReasonOptionsForStatus(status);
+  const collabType = engagement.collaboration_type === 'paid' ? 'paid' : 'barter';
+  const commercialsFrozen = feeRule.frozen;
+
+  async function makePaid() {
+    if (commercialsFrozen) return;
+    await persistEngagement({ collaboration_type: 'paid' }, { successMessage: 'Switched to paid' });
+  }
+
+  async function makeBarter() {
+    if (commercialsFrozen) return;
+    await persistEngagement(
+      { collaboration_type: 'barter', agreed_fee: null },
+      { successMessage: 'Switched to barter' },
+    );
+  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -660,8 +658,8 @@ export function EngagementRecordPage() {
         <div className="space-y-4">
           <Card elevated className="!p-5">
             <h2 className="text-sm font-semibold text-ink">Advance outreach</h2>
-            <p className="mt-0.5 text-2xs text-ink-secondary">Update status and interest</p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <p className="mt-0.5 text-2xs text-ink-secondary">Update conversation status</p>
+            <div className="mt-4">
               <div>
                 <label className="mb-2 block text-2xs font-medium uppercase tracking-wide text-ink-tertiary">
                   Status
@@ -764,17 +762,6 @@ export function EngagementRecordPage() {
                   </div>
                 )}
               </div>
-              <div>
-                <label className="mb-2 block text-2xs font-medium uppercase tracking-wide text-ink-tertiary">
-                  Interest
-                </label>
-                <ChipGroup
-                  options={interestOptions}
-                  value={engagement.interest_level}
-                  disabled={!interestRule.editable}
-                  onChange={(v) => interestRule.editable && persistEngagement({ interest_level: v })}
-                />
-              </div>
             </div>
           </Card>
 
@@ -835,6 +822,33 @@ export function EngagementRecordPage() {
               <p className="mt-3 text-2xs text-ink-tertiary">{deliverablesRule.hint}</p>
             )}
 
+            <div className="mt-4 border-t border-line/60 pt-4">
+              <p className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">The deal</p>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-2xs text-ink-secondary">
+                  <span>Type</span>
+                  <Pill tone={collabType === 'paid' ? 'info' : 'success'}>
+                    {collabType === 'paid' ? 'Paid' : 'Barter'}
+                  </Pill>
+                </div>
+                {commercialsFrozen ? (
+                  <span className="text-2xs text-ink-tertiary">{feeRule.frozenReason}</span>
+                ) : collabType === 'barter' ? (
+                  <button type="button" className="text-2xs text-brand hover:underline" onClick={makePaid}>
+                    Make paid →
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="text-2xs text-ink-tertiary hover:text-ink hover:underline"
+                    onClick={makeBarter}
+                  >
+                    Switch to barter
+                  </button>
+                )}
+              </div>
+            </div>
+
             {deliverablesRule.canAdd && (
               <div className="mt-4">
                 <p className="mb-2 text-2xs font-medium text-ink-tertiary">Add content type</p>
@@ -871,12 +885,9 @@ export function EngagementRecordPage() {
                     key={d.id}
                     deliverable={d}
                     engagementId={id}
-                    canEditStatus={deliverablesRule.canEditStatus}
                     canEditProof={deliverablesRule.canEditStatus}
                     canMarkPosted={deliverablesRule.canEditStatus}
                     canRemove={canRemoveDeliverable(status, d)}
-                    deliverableStatusOptions={deliverableStatusOptions}
-                    onStatusChange={(delId, nextStatus) => updateDeliverable(delId, { status: nextStatus })}
                     onUpdate={updateDeliverable}
                     onMarkPosted={saveAndMarkDeliverablePosted}
                     markPostedError={markPostedErrors[d.id] ?? null}
@@ -1004,13 +1015,11 @@ export function EngagementRecordPage() {
         deliverables={deliverables}
         deliverablesDirty={deliverablesDirty}
         canAdd={deliverablesRule.canAdd}
-        canEditStatus={deliverablesRule.canEditStatus}
-        deliverableStatusOptions={deliverableStatusOptions}
+        canEditProof={deliverablesRule.canEditStatus}
         onAddType={addDeliverable}
         onRemove={removeDeliverable}
         engagementId={id}
         engagementStatus={status}
-        onStatusChange={(delId, nextStatus) => updateDeliverable(delId, { status: nextStatus })}
         onUpdate={updateDeliverable}
         onMarkPosted={saveAndMarkDeliverablePosted}
         markingDeliverableId={markingDeliverableId}
@@ -1115,28 +1124,6 @@ function ActionCard({ title, subtitle, badge, badgeTone = 'default', disabled = 
   );
 }
 
-function ChipGroup({ options, value, onChange, disabled = false }) {
-  return (
-    <div className={`flex flex-wrap gap-2 ${disabled ? 'opacity-60' : ''}`}>
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          disabled={disabled}
-          onClick={() => onChange(opt.value)}
-          className={`rounded-lg border px-3 py-2 text-2xs font-medium transition-colors ${
-            value === opt.value
-              ? 'border-brand bg-brand-soft text-brand'
-              : 'border-line bg-white text-ink-secondary hover:border-zinc-300'
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function DetailItem({ label, value, highlight, locked, hint, className = '' }) {
   return (
     <div className={className}>
@@ -1215,13 +1202,11 @@ function DeliverablesDrawer({
   deliverables,
   deliverablesDirty,
   canAdd,
-  canEditStatus,
-  deliverableStatusOptions,
+  canEditProof,
   onAddType,
   onRemove,
   engagementId,
   engagementStatus,
-  onStatusChange,
   onUpdate,
   onMarkPosted,
   markingDeliverableId = null,
@@ -1274,12 +1259,9 @@ function DeliverablesDrawer({
               key={d.id}
               deliverable={d}
               engagementId={engagementId}
-              canEditStatus={canEditStatus}
-              canEditProof={canEditStatus}
-              canMarkPosted={canEditStatus}
+              canEditProof={canEditProof}
+              canMarkPosted={canEditProof}
               canRemove={canRemoveDeliverable(engagementStatus, d)}
-              deliverableStatusOptions={deliverableStatusOptions}
-              onStatusChange={onStatusChange}
               onUpdate={onUpdate}
               onMarkPosted={onMarkPosted}
               markPostedError={markPostedErrors[d.id] ?? null}

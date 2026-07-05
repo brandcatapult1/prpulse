@@ -22,7 +22,7 @@ import {
 } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
 import { addDaysIso, toDateInputValue } from '../lib/dates.js';
-import { engagementsApi } from '../lib/api.js';
+import { apiErrorMessage, engagementsApi } from '../lib/api.js';
 import {
   patchEngagement,
   reopenEngagement,
@@ -142,8 +142,8 @@ export function EngagementRecordPage() {
       }));
       if (!silent) setToast(successMessage);
       return true;
-    } catch {
-      setToast('Could not save — please try again');
+    } catch (err) {
+      setToast(apiErrorMessage(err));
       return false;
     } finally {
       setSaving(false);
@@ -213,7 +213,7 @@ export function EngagementRecordPage() {
     } catch (err) {
       const message = err.deliverable
         ? deliverableProofRejectMessage(err.deliverable, err.message)
-        : (err.message || 'Could not save deliverables');
+        : apiErrorMessage(err);
       setToast(message);
       return null;
     }
@@ -390,7 +390,7 @@ export function EngagementRecordPage() {
       setReopenConfirm(false);
       setToast(reopenCompleteToastMessage());
     } catch (err) {
-      setToast(err.message ?? 'Could not reopen');
+      setToast(apiErrorMessage(err, 'Could not reach the server — try reopen again'));
     } finally {
       setReopening(false);
     }

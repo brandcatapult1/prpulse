@@ -15,6 +15,25 @@ export async function api(path, options = {}) {
   return res.json();
 }
 
+/**
+ * User-facing text from a failed api() call.
+ * HTTP rejections (err.status set, body.error → err.message) are returned verbatim.
+ * Network / unreachable server → networkFallback (distinct from validation rejections).
+ */
+export function apiErrorMessage(
+  err,
+  networkFallback = 'Could not reach the server — check your connection and try again',
+) {
+  const msg = String(err?.message ?? '').trim();
+  if (err?.status != null && msg) {
+    return msg;
+  }
+  if (msg && msg !== 'Failed to fetch') {
+    return msg;
+  }
+  return networkFallback;
+}
+
 async function download(path) {
   const res = await fetch(`/api${path}`, {
     credentials: 'include',

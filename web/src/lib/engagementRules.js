@@ -136,6 +136,13 @@ export function deliverableStatusOptionsForEngagement(engagementStatus) {
   }));
 }
 
+/** Full-record draft UI — Posted is set only via Save & mark posted, not the dropdown. */
+export function deliverableDraftStatusOptionsForEngagement(engagementStatus) {
+  return deliverableStatusOptionsForEngagement(engagementStatus).filter(
+    (opt) => opt.value !== 'posted',
+  );
+}
+
 export function canSetDeliverableStatus(engagementStatus, nextStatus) {
   return allowedDeliverableStatuses(engagementStatus).includes(nextStatus);
 }

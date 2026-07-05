@@ -1,4 +1,5 @@
 import { formatDate } from './format.jsx';
+import { todayIstIso } from './dates.js';
 import {
   deliverablePostedProofSatisfied,
   deliverableProofRequirementMessage,
@@ -104,6 +105,15 @@ export function canMarkDeliverablePosted({ contentLink, screenshots, deliverable
     screenshots: screenshots ?? [],
     unit_proofs: [],
   });
+}
+
+export function buildMarkPostedDeliverableForSave(deliverable) {
+  const prepared = buildUnitPostedPatch(deliverable, {
+    contentLink: deliverable.content_link,
+    screenshots: deliverable.screenshots ?? [],
+    publishedDate: deliverable.published_date ?? todayIstIso(),
+  });
+  return reconcileDeliverableProofStores(prepared);
 }
 
 /** Log one unit; marks the row posted when all units are logged. */

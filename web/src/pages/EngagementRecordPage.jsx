@@ -30,6 +30,7 @@ import {
   fetchDeliverables,
   fetchFeedback,
   fetchEngagementTimeline,
+  logDeliverableProof,
 } from '../lib/persistence.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { canReopenComplete } from '../lib/campaignPermissions.js';
@@ -47,7 +48,7 @@ import {
   agreedFeeRules,
   canSetDeliverableStatus,
   deliverableStatusBlockReason,
-  deliverableStatusOptionsForEngagement,
+  deliverableDraftStatusOptionsForEngagement,
   deliverablesRules,
   canRemoveDeliverable,
   feedbackRules,
@@ -61,8 +62,16 @@ import {
   terminalBanner,
   visitRules,
 } from '../lib/engagementRules.js';
-import { deliverableHasProof, deliverableProofRejectMessage, isDeliverableFullyPosted, reconcileDeliverableProofStores } from '../lib/deliverableLogging.js';
-import { deliverableProofDemotionMessage } from '../lib/deliverableProofRules.js';
+import {
+  buildMarkPostedDeliverableForSave,
+  canMarkDeliverablePosted,
+  deliverableHasProof,
+  deliverableProofRejectMessage,
+  isDeliverableFullyPosted,
+  markDeliverablePostedToastMessage,
+  reconcileDeliverableProofStores,
+} from '../lib/deliverableLogging.js';
+import { deliverableProofDemotionMessage, deliverableProofRequirementMessage } from '../lib/deliverableProofRules.js';
 import { formatCollaborationReason } from '../lib/collaborationReasons.js';
 import { addDeliverableToList, deliverableListUnitTotals, removeDeliverableFromList } from '../lib/deliverableList.js';
 import {
@@ -100,6 +109,8 @@ export function EngagementRecordPage() {
   const [savedDeliverables, setSavedDeliverables] = useState([]);
   const [timeline, setTimeline] = useState([]);
   const [feedbackRecord, setFeedbackRecord] = useState(null);
+  const [markingDeliverableId, setMarkingDeliverableId] = useState(null);
+  const [markPostedErrors, setMarkPostedErrors] = useState({});
   const [contactEngagements, setContactEngagements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -177,7 +188,62 @@ export function EngagementRecordPage() {
 
   const commitDeliverablesDraft = async () => {
     const saved = await persistDeliverables(deliverables);
-    if (saved && !saved.some((d) => d.proof_demoted)) setToast('Deliverables saved');
+    if (saved && !saved.some((d) => d.proof_demoted)) {
+      setToast('Deliverables saved — proof and status updated (not marked Posted unless already posted)');
+    }
+  };
+
+  const saveAndMarkDeliverablePosted = async (delId) => {
+    const item = deliverables.find((d) => d.id === delId);
+    if (!item) return;
+
+    if (!canMarkDeliverablePosted({
+      contentLink: item.content_link,
+      screenshots: item.screenshots,
+      deliverableType: item.deliverable_type,
+    })) {
+      setMarkPostedErrors((prev) => ({
+        ...prev,
+        [delId]: deliverableProofRequirementMessage(item.deliverable_type),
+      }));
+      return;
+    }
+
+    setMarkingDeliverableId(delId);
+    setMarkPostedErrors((prev) => ({ ...prev, [delId]: null }));
+
+    try {
+      const toSave = buildMarkPostedDeliverableForSave(item);
+      const saved = await logDeliverableProof(id, toSave);
+
+      setDeliverables((rows) => {
+        const next = rows.map((d) => (d.id === delId ? saved : d));
+        updateEngagementDeliverables(id, next);
+        return next;
+      });
+      setSavedDeliverables((rows) => rows.map((d) => (d.id === delId ? structuredClone(saved) : d)));
+
+      if (saved.proof_demoted) {
+        const message = saved.proof_demote_message
+          || deliverableProofDemotionMessage(saved.deliverable_type);
+        setToast(message);
+        const [eng, tl] = await Promise.all([
+          engagementsApi.get(id),
+          fetchEngagementTimeline(id),
+        ]);
+        setEngagement(eng);
+        setTimeline(Array.isArray(tl) ? tl : []);
+      } else {
+        setToast(markDeliverablePostedToastMessage(saved));
+      }
+    } catch (err) {
+      setMarkPostedErrors((prev) => ({
+        ...prev,
+        [delId]: err.message || deliverableProofRequirementMessage(item.deliverable_type),
+      }));
+    } finally {
+      setMarkingDeliverableId(null);
+    }
   };
 
   const discardDeliverablesDraft = () => {
@@ -186,6 +252,10 @@ export function EngagementRecordPage() {
 
   const updateDeliverable = (delId, patch) => {
     const engagementStatus = engagement.conversation_status;
+    if (patch.status === 'posted') {
+      setToast('Use Save & mark posted to mark this deliverable Posted');
+      return;
+    }
     if (patch.status && !canSetDeliverableStatus(engagementStatus, patch.status)) {
       setToast(
         deliverableStatusBlockReason(engagementStatus, patch.status)
@@ -193,16 +263,7 @@ export function EngagementRecordPage() {
       );
       return;
     }
-    if (patch.status === 'posted') {
-      const item = deliverables.find((d) => d.id === delId);
-      if (item && item.status !== 'posted') {
-        const merged = { ...item, ...patch };
-        if (!deliverableHasProof({ ...merged, status: 'posted' })) {
-          setToast(deliverableProofRejectMessage(merged));
-          return;
-        }
-      }
-    }
+    setMarkPostedErrors((prev) => ({ ...prev, [delId]: null }));
     setDeliverables((rows) => rows.map((d) => (d.id === delId ? { ...d, ...patch } : d)));
   };
 
@@ -266,7 +327,7 @@ export function EngagementRecordPage() {
   const followUp = followUpRules(status);
   const visit = visitRules(status);
   const deliverablesRule = deliverablesRules(status);
-  const deliverableStatusOptions = deliverableStatusOptionsForEngagement(status);
+  const deliverableStatusOptions = deliverableDraftStatusOptionsForEngagement(status);
   const feedback = feedbackRules(status);
   const feeRule = agreedFeeRules(status);
   const interestRule = interestRules(status);
@@ -618,10 +679,14 @@ export function EngagementRecordPage() {
                     engagementId={id}
                     canEditStatus={deliverablesRule.canEditStatus}
                     canEditProof={deliverablesRule.canEditStatus}
+                    canMarkPosted={deliverablesRule.canEditStatus}
                     canRemove={canRemoveDeliverable(status, d)}
                     deliverableStatusOptions={deliverableStatusOptions}
                     onStatusChange={(delId, nextStatus) => updateDeliverable(delId, { status: nextStatus })}
                     onUpdate={updateDeliverable}
+                    onMarkPosted={saveAndMarkDeliverablePosted}
+                    markPostedError={markPostedErrors[d.id] ?? null}
+                    markPostedBusy={markingDeliverableId === d.id}
                     onRemove={removeDeliverable}
                     compact
                   />
@@ -630,13 +695,18 @@ export function EngagementRecordPage() {
             )}
 
             {deliverablesDirty && deliverablesRule.canEditStatus && (
-              <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-line/80 pt-3">
-                <button type="button" className="btn-secondary text-2xs" onClick={discardDeliverablesDraft}>
-                  Discard
-                </button>
-                <button type="button" className="btn-primary text-2xs" onClick={commitDeliverablesDraft}>
-                  Save deliverables
-                </button>
+              <div className="mt-4 space-y-2 border-t border-line/80 pt-3">
+                <p className="text-2xs text-ink-tertiary">
+                  Save deliverables stores proof and non-posted status changes. Use Save &amp; mark posted on each row to mark Posted.
+                </p>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <button type="button" className="btn-secondary text-2xs" onClick={discardDeliverablesDraft}>
+                    Discard
+                  </button>
+                  <button type="button" className="btn-primary text-2xs" onClick={commitDeliverablesDraft}>
+                    Save deliverables
+                  </button>
+                </div>
               </div>
             )}
           </Card>
@@ -748,6 +818,9 @@ export function EngagementRecordPage() {
         engagementStatus={status}
         onStatusChange={(delId, nextStatus) => updateDeliverable(delId, { status: nextStatus })}
         onUpdate={updateDeliverable}
+        onMarkPosted={saveAndMarkDeliverablePosted}
+        markingDeliverableId={markingDeliverableId}
+        markPostedErrors={markPostedErrors}
         onSave={async () => {
           await commitDeliverablesDraft();
           setModal(null);
@@ -956,6 +1029,10 @@ function DeliverablesDrawer({
   engagementStatus,
   onStatusChange,
   onUpdate,
+  onRemove,
+  onMarkPosted,
+  markingDeliverableId = null,
+  markPostedErrors = {},
   onSave,
   onDiscard,
 }) {
@@ -1006,10 +1083,14 @@ function DeliverablesDrawer({
               engagementId={engagementId}
               canEditStatus={canEditStatus}
               canEditProof={canEditStatus}
+              canMarkPosted={canEditStatus}
               canRemove={canRemoveDeliverable(engagementStatus, d)}
               deliverableStatusOptions={deliverableStatusOptions}
               onStatusChange={onStatusChange}
               onUpdate={onUpdate}
+              onMarkPosted={onMarkPosted}
+              markPostedError={markPostedErrors[d.id] ?? null}
+              markPostedBusy={markingDeliverableId === d.id}
               onRemove={onRemove}
             />
           ))}

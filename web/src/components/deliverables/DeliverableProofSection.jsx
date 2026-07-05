@@ -1,8 +1,12 @@
 import { useRef, useState } from 'react';
 import { ExpandableSection } from '../ui/DataKit.jsx';
 import { deliverableTypeLabel } from '../../lib/deliverableTypes.js';
-import { deliverableProofEmphasis } from '../../lib/deliverableLogging.js';
-import { deliverableProofIntroMessage } from '../../lib/deliverableProofRules.js';
+import {
+  canMarkDeliverablePosted,
+  deliverableProofEmphasis,
+  isDeliverableFullyPosted,
+} from '../../lib/deliverableLogging.js';
+import { deliverableProofIntroMessage, deliverableProofRequirementMessage } from '../../lib/deliverableProofRules.js';
 import { uploadProofScreenshot } from '../../lib/proofUpload.js';
 
 /**
@@ -14,6 +18,10 @@ export function DeliverableProofSection({
   editable,
   onUpdate,
   engagementId: engagementIdProp = null,
+  canMarkPosted = false,
+  onMarkPosted,
+  markPostedError = null,
+  markPostedBusy = false,
 }) {
   const fileRef = useRef(null);
   const [urlDraft, setUrlDraft] = useState('');
@@ -30,6 +38,18 @@ export function DeliverableProofSection({
   const contentLink = deliverable.content_link ?? '';
   const emphasis = deliverableProofEmphasis(deliverable.deliverable_type);
   const introMessage = deliverableProofIntroMessage(deliverable.deliverable_type);
+  const canSubmitPosted = canMarkDeliverablePosted({
+    contentLink: deliverable.content_link,
+    screenshots,
+    deliverableType: deliverable.deliverable_type,
+  });
+  const proofRequirementMessage = deliverableProofRequirementMessage(deliverable.deliverable_type);
+
+  async function handleMarkPosted() {
+    if (!canMarkPosted || markPostedBusy) return;
+    if (!canSubmitPosted) return;
+    await onMarkPosted?.();
+  }
 
   async function handleFiles(event) {
     const files = Array.from(event.target.files ?? []);
@@ -207,6 +227,24 @@ export function DeliverableProofSection({
         )}
       </div>
 
+      {canMarkPosted && (
+        <div className="space-y-2 border-t border-line pt-3">
+          {(markPostedError || !canSubmitPosted) && !markPostedBusy && (
+            <p className="text-2xs text-health-red">
+              {markPostedError || proofRequirementMessage}
+            </p>
+          )}
+          <button
+            type="button"
+            className="btn-primary w-full justify-center text-2xs"
+            disabled={!canSubmitPosted || markPostedBusy}
+            onClick={handleMarkPosted}
+          >
+            {markPostedBusy ? 'Saving…' : 'Save & mark posted'}
+          </button>
+        </div>
+      )}
+
       {(editable || deliverable.brief_compliance != null || deliverable.brand_tag_verified != null || deliverable.internal_rating) && (
         <ExpandableSection title="Compliance & internal rating">
           <div className="space-y-3">
@@ -298,8 +336,17 @@ export function DeliverableRow({
   onRemove,
   engagementId = null,
   compact = false,
+  canMarkPosted = false,
+  onMarkPosted,
+  markPostedError = null,
+  markPostedBusy = false,
 }) {
-  const showProof = canEditProof || deliverable.content_link || (deliverable.screenshots?.length ?? 0) > 0;
+  const showProof =
+    canEditProof
+    || canMarkPosted
+    || deliverable.content_link
+    || (deliverable.screenshots?.length ?? 0) > 0;
+  const showStatusSelect = canEditStatus && deliverable.status !== 'posted';
 
   return (
     <div className="rounded-lg border border-line bg-canvas px-3 py-3">
@@ -323,7 +370,7 @@ export function DeliverableRow({
               Overdue
             </span>
           )}
-          {canEditStatus ? (
+          {showStatusSelect ? (
             <select
               className="input-field h-8 max-w-[140px] capitalize"
               value={deliverable.status}
@@ -357,6 +404,10 @@ export function DeliverableRow({
           editable={canEditProof}
           engagementId={engagementId}
           onUpdate={(patch) => onUpdate?.(deliverable.id, patch)}
+          canMarkPosted={canMarkPosted && !isDeliverableFullyPosted(deliverable)}
+          onMarkPosted={() => onMarkPosted?.(deliverable.id)}
+          markPostedError={markPostedError}
+          markPostedBusy={markPostedBusy}
         />
       )}
     </div>

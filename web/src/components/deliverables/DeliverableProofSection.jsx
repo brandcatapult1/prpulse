@@ -1,20 +1,21 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { ExpandableSection } from '../ui/DataKit.jsx';
 import { deliverableTypeLabel } from '../../lib/deliverableTypes.js';
+import { deliverableProofEmphasis } from '../../lib/deliverableLogging.js';
+import { deliverableProofIntroMessage } from '../../lib/deliverableProofRules.js';
 import { uploadProofScreenshot } from '../../lib/proofUpload.js';
 
 /**
  * Inline proof capture for a deliverable — content link + screenshots (PRD Module 6).
+ * Proof fields are draft-only until the parent commits all deliverables in one save.
  */
 export function DeliverableProofSection({
   deliverable,
   editable,
   onUpdate,
-  onSaved,
   engagementId: engagementIdProp = null,
 }) {
   const fileRef = useRef(null);
-  const [linkDraft, setLinkDraft] = useState(deliverable.content_link ?? '');
   const [urlDraft, setUrlDraft] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
@@ -27,20 +28,10 @@ export function DeliverableProofSection({
 
   const screenshots = deliverable.screenshots ?? [];
   const contentLink = deliverable.content_link ?? '';
+  const emphasis = deliverableProofEmphasis(deliverable.deliverable_type);
+  const introMessage = deliverableProofIntroMessage(deliverable.deliverable_type);
 
-  useEffect(() => {
-    setLinkDraft(contentLink);
-  }, [deliverable.id, contentLink]);
-
-  const notify = () => onSaved?.();
-
-  const saveLink = () => {
-    const next = linkDraft.trim() || null;
-    onUpdate({ content_link: next });
-    notify();
-  };
-
-  const handleFiles = async (event) => {
+  async function handleFiles(event) {
     const files = Array.from(event.target.files ?? []);
     event.target.value = '';
     if (!files.length || !engagementId) return;
@@ -61,15 +52,14 @@ export function DeliverableProofSection({
 
     if (added.length) {
       onUpdate({ screenshots: [...screenshots, ...added] });
-      notify();
     }
     if (failures.length) {
       setUploadError(failures.join(' · '));
     }
     setUploading(false);
-  };
+  }
 
-  const addImageUrl = () => {
+  function addImageUrl() {
     const url = urlDraft.trim();
     if (!url) return;
     onUpdate({
@@ -79,23 +69,19 @@ export function DeliverableProofSection({
       ],
     });
     setUrlDraft('');
-    notify();
-  };
+  }
 
-  const removeScreenshot = (screenshotId) => {
+  function removeScreenshot(screenshotId) {
     onUpdate({ screenshots: screenshots.filter((s) => s.id !== screenshotId) });
-    notify();
-  };
+  }
 
   return (
     <div className="space-y-3 border-t border-line pt-3">
-      <p className="text-2xs text-ink-tertiary">
-        Attach proof so the team can mark this deliverable Posted and close the loop.
-      </p>
+      <p className="text-2xs text-ink-tertiary">{introMessage}</p>
 
       <div>
         <label className="mb-1.5 block text-2xs font-medium text-ink-secondary">
-          Content link
+          {emphasis.linkLabel}
         </label>
         {contentLink && !editable && (
           <a
@@ -108,18 +94,13 @@ export function DeliverableProofSection({
           </a>
         )}
         {editable && (
-          <div className="flex flex-wrap gap-2">
-            <input
-              type="url"
-              className="input-field min-w-0 flex-1"
-              placeholder="https://instagram.com/p/…"
-              value={linkDraft}
-              onChange={(e) => setLinkDraft(e.target.value)}
-            />
-            <button type="button" className="btn-primary shrink-0" onClick={saveLink}>
-              Save link
-            </button>
-          </div>
+          <input
+            type="url"
+            className="input-field w-full"
+            placeholder="https://instagram.com/p/…"
+            value={contentLink}
+            onChange={(e) => onUpdate({ content_link: e.target.value || null })}
+          />
         )}
         {!contentLink && !editable && (
           <p className="text-2xs text-ink-tertiary">No link attached</p>
@@ -128,8 +109,12 @@ export function DeliverableProofSection({
 
       <div>
         <div className="mb-1.5 flex items-center justify-between gap-2">
-          <span className="text-2xs font-medium text-ink-secondary">
-            Screenshots
+          <span
+            className={`text-2xs ${
+              emphasis.screenshotPrimary ? 'font-medium text-ink-secondary' : 'font-medium text-ink-secondary'
+            }`}
+          >
+            {emphasis.screenshotLabel}
             {deliverable.quantity > 1 && deliverable.deliverable_type === 'story' && (
               <span className="font-normal text-ink-tertiary">
                 {' '}· {screenshots.length} of {deliverable.quantity} for this story set
@@ -197,7 +182,7 @@ export function DeliverableProofSection({
               disabled={uploading || !engagementId}
               onClick={() => fileRef.current?.click()}
             >
-              {uploading ? 'Uploading…' : 'Upload screenshots'}
+              {uploading ? 'Uploading…' : 'Upload screenshot'}
             </button>
             {uploadError && (
               <p className="text-2xs text-health-red">{uploadError}</p>
@@ -311,7 +296,6 @@ export function DeliverableRow({
   onStatusChange,
   onUpdate,
   onRemove,
-  onSaved,
   engagementId = null,
   compact = false,
 }) {
@@ -373,7 +357,6 @@ export function DeliverableRow({
           editable={canEditProof}
           engagementId={engagementId}
           onUpdate={(patch) => onUpdate?.(deliverable.id, patch)}
-          onSaved={onSaved}
         />
       )}
     </div>

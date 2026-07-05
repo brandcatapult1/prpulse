@@ -21,6 +21,30 @@ export function deliverableProofRejectMessage(deliverable, serverMessage) {
   return `${deliverableRowLabel(deliverable)}: ${reason}`;
 }
 
+/**
+ * Keep content_link and unit_proofs aligned for qty=1 before persisting.
+ * qty>1: unchanged — per-unit unit_proofs semantics preserved.
+ */
+export function reconcileDeliverableProofStores(deliverable) {
+  const qty = Number(deliverable?.quantity) || 1;
+  if (qty > 1) return deliverable;
+
+  const content_link = String(deliverable?.content_link ?? '').trim() || null;
+  const screenshots = Array.isArray(deliverable?.screenshots) ? deliverable.screenshots : [];
+  const existingUnits = Array.isArray(deliverable?.unit_proofs) ? deliverable.unit_proofs : [];
+  const published_date =
+    deliverable?.published_date
+    ?? existingUnits[0]?.published_date
+    ?? null;
+
+  return {
+    ...deliverable,
+    content_link,
+    screenshots,
+    unit_proofs: [{ content_link, screenshots, published_date }],
+  };
+}
+
 /** How many units on this row have been logged with proof. */
 export function deliverablePostedUnits(deliverable) {
   if (!deliverable) return 0;

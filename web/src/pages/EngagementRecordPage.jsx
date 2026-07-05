@@ -61,7 +61,7 @@ import {
   terminalBanner,
   visitRules,
 } from '../lib/engagementRules.js';
-import { deliverableHasProof, deliverableProofRejectMessage, isDeliverableFullyPosted } from '../lib/deliverableLogging.js';
+import { deliverableHasProof, deliverableProofRejectMessage, isDeliverableFullyPosted, reconcileDeliverableProofStores } from '../lib/deliverableLogging.js';
 import { deliverableProofDemotionMessage } from '../lib/deliverableProofRules.js';
 import { formatCollaborationReason } from '../lib/collaborationReasons.js';
 import { addDeliverableToList, deliverableListUnitTotals, removeDeliverableFromList } from '../lib/deliverableList.js';
@@ -131,9 +131,10 @@ export function EngagementRecordPage() {
 
   const persistDeliverables = async (list) => {
     try {
+      const prepared = list.map(reconcileDeliverableProofStores);
       const beforeList = await fetchDeliverables(id);
       const enteringIssues = [];
-      for (const item of list) {
+      for (const item of prepared) {
         if (item.status !== 'posted') continue;
         const prior = beforeList.find((d) => d.id === item.id);
         const enteringPosted = !prior || prior.status !== 'posted';
@@ -146,7 +147,7 @@ export function EngagementRecordPage() {
         return null;
       }
 
-      const saved = await syncDeliverables(id, beforeList, list);
+      const saved = await syncDeliverables(id, beforeList, prepared);
       const demoted = saved?.filter((d) => d.proof_demoted) ?? [];
       if (demoted.length) {
         const message = demoted

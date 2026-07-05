@@ -49,6 +49,7 @@ import { formatTimelineEntry, formatDropReason } from '../lib/activityTimelineLa
 import {
   agreedFeeRules,
   canRemoveDeliverable,
+  collaborationReasonRules,
   commercialsRules,
   deliverablesRules,
   feedbackRules,
@@ -73,7 +74,8 @@ import {
   reconcileDeliverableProofStores,
 } from '../lib/deliverableLogging.js';
 import { deliverableProofDemotionMessage, deliverableProofRequirementMessage } from '../lib/deliverableProofRules.js';
-import { formatCollaborationReason } from '../lib/collaborationReasons.js';
+import { formatCollaborationReason, COLLABORATION_REASONS } from '../lib/collaborationReasons.js';
+import { estimateAgreedFeeFromIndicativeRates } from '../lib/agreedFeeEstimate.js';
 import { addDeliverableToList, deliverableListUnitTotals, removeDeliverableFromList } from '../lib/deliverableList.js';
 import {
   buildScheduledTransitionPayload,
@@ -126,6 +128,7 @@ export function EngagementRecordPage() {
   const [statusPrompt, setStatusPrompt] = useState(null);
   const [pendingStatusTransition, setPendingStatusTransition] = useState(null);
   const [statusFollowUpDraft, setStatusFollowUpDraft] = useState('');
+  const [agreedFeeDraft, setAgreedFeeDraft] = useState('');
 
   const persistEngagement = async (patch, { silent = false, successMessage = 'Saved' } = {}) => {
     setSaving(true);
@@ -313,6 +316,15 @@ export function EngagementRecordPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  useEffect(() => {
+    if (!engagement) return;
+    setAgreedFeeDraft(
+      engagement.agreed_fee != null && engagement.agreed_fee !== ''
+        ? String(engagement.agreed_fee)
+        : '',
+    );
+  }, [engagement?.id, engagement?.agreed_fee]);
+
   if (loading) {
     return (
       <div className="mx-auto max-w-5xl py-12 text-center text-sm text-ink-secondary">
@@ -344,6 +356,7 @@ export function EngagementRecordPage() {
   const deliverablesRule = deliverablesRules(status);
   const feedback = feedbackRules(status);
   const feeRule = agreedFeeRules(status);
+  const collabReasonRule = collaborationReasonRules(status);
   const commercialsRule = commercialsRules(status);
   const outreachRule = outreachAdvanceRules(status);
   const notesRule = notesRules(status);
@@ -443,7 +456,7 @@ export function EngagementRecordPage() {
 
     if (next === 'collaboration_complete') {
       if (!engagement.primary_collaboration_reason) {
-        setToast('Add a collaboration reason before completing — set it on the campaign board.');
+        setToast('Add a collaboration reason before completing — set it in Details below.');
         return;
       }
       if (!deliverablesReady) {
@@ -602,11 +615,41 @@ export function EngagementRecordPage() {
 
   async function makePaid() {
     if (commercialsFrozen) return;
-    await persistEngagement({ collaboration_type: 'paid' }, { successMessage: 'Switched to paid' });
+    const patch = { collaboration_type: 'paid' };
+    const estimated = estimateAgreedFeeFromIndicativeRates(savedDeliverables, contactExtras);
+    if (savedDeliverables.length > 0 && estimated != null) {
+      patch.agreed_fee = estimated;
+      setAgreedFeeDraft(String(estimated));
+    }
+    await persistEngagement(patch, { successMessage: 'Switched to paid' });
+  }
+
+  async function saveAgreedFee() {
+    if (feeRule.frozen || collabType !== 'paid') return;
+    const raw = agreedFeeDraft.trim();
+    const next = raw === '' ? null : Number(raw);
+    if (raw !== '' && Number.isNaN(next)) {
+      setToast('Enter a valid agreed fee');
+      return;
+    }
+    const current = engagement.agreed_fee == null ? null : Number(engagement.agreed_fee);
+    if (next === current) return;
+    await persistEngagement({ agreed_fee: next }, { successMessage: 'Agreed fee saved' });
+  }
+
+  async function handleCollabReasonChange(value) {
+    if (!collabReasonRule.editable) return;
+    const next = value || null;
+    if (next === (engagement.primary_collaboration_reason ?? null)) return;
+    await persistEngagement(
+      { primary_collaboration_reason: next },
+      { successMessage: 'Collaboration reason saved' },
+    );
   }
 
   async function makeBarter() {
     if (commercialsFrozen) return;
+    setAgreedFeeDraft('');
     await persistEngagement(
       { collaboration_type: 'barter', agreed_fee: null },
       { successMessage: 'Switched to barter' },
@@ -737,7 +780,7 @@ export function EngagementRecordPage() {
                           ? 'Use Reopen to amend deliverables or fee'
                           : 'Collaboration complete — Senior Manager or Admin can reopen'
                         : !hasCollaborationReason && deliverablesReady
-                          ? 'Add a collaboration reason on the campaign board before completing'
+                          ? 'Add a collaboration reason in Details before completing'
                         : !canComplete
                           ? 'Complete unlocks when all deliverables are Posted with proof'
                           : undefined)
@@ -841,15 +884,11 @@ export function EngagementRecordPage() {
                 onAccept={acceptFollowUpSuggestion}
                 onDismiss={() => setFollowUpSuggestion(null)}
               />
-              <DetailItem
-                label="Agreed fee"
-                value={formatFee(engagement.agreed_fee)}
-                locked={feeRule.frozen}
-                hint={feeRule.frozenReason}
-              />
-              <DetailItem
-                label="Reason"
-                value={formatCollaborationReason(engagement.primary_collaboration_reason)}
+              <CollaborationReasonField
+                value={engagement.primary_collaboration_reason}
+                editable={collabReasonRule.editable}
+                lockedReason={collabReasonRule.lockedReason}
+                onChange={handleCollabReasonChange}
                 className="sm:col-span-2"
               />
             </dl>
@@ -915,6 +954,44 @@ export function EngagementRecordPage() {
                   </button>
                 )}
               </div>
+              {collabType === 'paid' && (
+                <div className="mt-3 space-y-3">
+                  <div className="rounded-lg bg-canvas px-3 py-2">
+                    <p className="text-2xs font-medium text-ink-tertiary">
+                      Indicative rates (reference only — not saved to this engagement)
+                    </p>
+                    <p className="mt-1 text-2xs text-ink-secondary">
+                      Reel {formatFee(contactExtras.reel_rate)}
+                      {' · '}
+                      Story {formatFee(contactExtras.story_rate)}
+                      {' · '}
+                      Post {formatFee(contactExtras.post_rate)}
+                      {' · '}
+                      Other {formatFee(contactExtras.other_rate)}
+                    </p>
+                  </div>
+                  <label className="block">
+                    <span className="text-2xs font-medium text-ink-tertiary">Agreed fee (this engagement)</span>
+                    {feeRule.frozen ? (
+                      <p className="mt-1 text-sm font-medium text-ink">{formatFee(engagement.agreed_fee)}</p>
+                    ) : (
+                      <input
+                        type="number"
+                        min={0}
+                        className="input-field mt-1 max-w-[200px]"
+                        value={agreedFeeDraft}
+                        onChange={(e) => setAgreedFeeDraft(e.target.value)}
+                        onBlur={saveAgreedFee}
+                        placeholder="Amount"
+                        disabled={commercialsFrozen}
+                      />
+                    )}
+                    {feeRule.frozenReason && (
+                      <p className="mt-1 text-2xs text-ink-tertiary">{feeRule.frozenReason}</p>
+                    )}
+                  </label>
+                </div>
+              )}
             </div>
 
             {!deliverablesRule.canAdd && deliverables.length > 0 && (
@@ -1129,7 +1206,11 @@ export function EngagementRecordPage() {
         initialValues={visitFieldsFromEngagement(engagement)}
         onSave={async (fields) => {
           const payload = buildScheduledTransitionPayload(engagement, fields);
-          const result = transitionStage(engagement, STAGE.SCHEDULED, payload);
+          const result = transitionStage(engagement, STAGE.SCHEDULED, {
+            ...payload,
+            deliverables: savedDeliverables,
+            collabReason: engagement.primary_collaboration_reason,
+          });
           if (!result.ok) {
             setToast(result.error ?? 'Could not save visit');
             return;
@@ -1213,6 +1294,50 @@ function ActionCard({
         </div>
       )}
     </Card>
+  );
+}
+
+function CollaborationReasonField({
+  value,
+  editable,
+  lockedReason,
+  onChange,
+  className = '',
+}) {
+  return (
+    <div className={className}>
+      <dt className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">
+        Collaboration reason
+        {!editable && <span className="ml-1 normal-case text-ink-tertiary">(locked)</span>}
+      </dt>
+      <dd className="mt-1.5">
+        {editable ? (
+          <>
+            <select
+              className="input-field max-w-[240px]"
+              value={value ?? ''}
+              onChange={(e) => onChange(e.target.value || null)}
+              aria-label="Primary collaboration reason"
+            >
+              <option value="">Select reason…</option>
+              {COLLABORATION_REASONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            {!value && (
+              <p className="mt-1.5 text-2xs text-health-amber">Required before scheduling</p>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-medium text-ink">{formatCollaborationReason(value)}</p>
+            {lockedReason && (
+              <p className="mt-1 text-2xs text-ink-tertiary">{lockedReason}</p>
+            )}
+          </>
+        )}
+      </dd>
+    </div>
   );
 }
 

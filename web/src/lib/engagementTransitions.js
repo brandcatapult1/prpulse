@@ -43,7 +43,7 @@ export const DIDNT_DELIVER_DROP_REASON = {
 export const SCHEDULED_PREREQUISITE = {
   visitDate: 'visit date',
   deliverables: 'at least one deliverable',
-  collabReason: 'collab reason',
+  collabReason: 'a collaboration reason',
 };
 
 /** @deprecated use formatScheduledBlockMessage */
@@ -67,11 +67,12 @@ export function getScheduledPrerequisitesMissing(engagement, visitDate, override
 /** Names whichever Scheduled prerequisites are absent. */
 export function formatScheduledBlockMessage(missing) {
   if (!missing?.length) return null;
-  if (missing.length === 1) return `Add ${missing[0]} before scheduling`;
+  const suffix = ' before scheduling a visit';
+  if (missing.length === 1) return `Add ${missing[0]}${suffix}`;
   if (missing.length === 2) {
-    return `Add ${missing[0]} and ${missing[1]} before scheduling`;
+    return `Add ${missing[0]} and ${missing[1]}${suffix}`;
   }
-  return `Add ${missing[0]}, ${missing[1]}, and ${missing[2]} before scheduling`;
+  return `Add ${missing[0]}, ${missing[1]}, and ${missing[2]}${suffix}`;
 }
 
 export { isValidDropReason, resolveDroppedFrom, droppedFromToStatus } from './dropTransitions.js';
@@ -166,7 +167,10 @@ export function transitionStage(engagement, target, payload = {}) {
     if (!payload.visitDate) {
       return { ok: false, needsPrompt: 'visit_date' };
     }
-    const missing = getScheduledPrerequisitesMissing(engagement, payload.visitDate);
+    const missing = getScheduledPrerequisitesMissing(engagement, payload.visitDate, {
+      deliverables: payload.deliverables,
+      collabReason: payload.collabReason,
+    });
     const missingAfterVisit = missing.filter((m) => m !== SCHEDULED_PREREQUISITE.visitDate);
     if (missingAfterVisit.length > 0) {
       return {

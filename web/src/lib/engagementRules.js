@@ -188,6 +188,23 @@ export function agreedFeeRules(status) {
   };
 }
 
+/** Primary collaboration reason — editable until complete or dropped. */
+export function collaborationReasonRules(status) {
+  if (isComplete(status)) {
+    return {
+      editable: false,
+      lockedReason: 'Locked — collaboration complete',
+    };
+  }
+  if (isDropped(status)) {
+    return {
+      editable: false,
+      lockedReason: 'Engagement dropped',
+    };
+  }
+  return { editable: true, lockedReason: null };
+}
+
 /** Paid/barter toggle — editable once outreach begins; frozen on complete or dropped. */
 export function commercialsRules(status) {
   if (isComplete(status)) {

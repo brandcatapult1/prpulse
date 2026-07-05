@@ -1029,7 +1029,6 @@ function DeliverablesDrawer({
   engagementStatus,
   onStatusChange,
   onUpdate,
-  onRemove,
   onMarkPosted,
   markingDeliverableId = null,
   markPostedErrors = {},

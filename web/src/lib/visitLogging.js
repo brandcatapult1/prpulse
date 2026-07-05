@@ -1,6 +1,14 @@
 import { formatDate } from './format.jsx';
 import { whatsAppUrl } from './contactSocialLinks.js';
 
+export const AWAITING_REQUIRES_VISIT_MESSAGE =
+  'Schedule and log the visit before moving to Awaiting Final Deliverables';
+
+/** Scheduled + visit_date — prerequisites for the sanctioned visit-done path. */
+export function canAdvanceToAwaitingViaVisit(engagement) {
+  return engagement?.conversation_status === 'scheduled' && Boolean(engagement?.visit_date);
+}
+
 /** Visit completed — defaults completion date to the booked visit date. */
 export function buildVisitDoneTransition(engagement, transitionStage, STAGE) {
   const visitCompletedDate = engagement.visit_date ?? engagement.next_follow_up_date;

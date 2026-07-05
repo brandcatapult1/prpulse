@@ -84,9 +84,14 @@ import {
   resolveEngagementOutletName,
   visitFieldsFromEngagement,
 } from '../lib/visitFields.js';
-import { STAGE, transitionStage } from '../lib/engagementTransitions.js';
+import { DROP_REASON_OPTIONS, STAGE, transitionStage } from '../lib/engagementTransitions.js';
 import { DIDNT_DELIVER_REASON } from '../lib/dropTransitions.js';
-import { buildVisitDoneTransition, visitDoneToastMessage } from '../lib/visitLogging.js';
+import {
+  AWAITING_REQUIRES_VISIT_MESSAGE,
+  buildVisitDoneTransition,
+  canAdvanceToAwaitingViaVisit,
+  visitDoneToastMessage,
+} from '../lib/visitLogging.js';
 
 function deliverablesSnapshot(list) {
   return JSON.stringify((list ?? []).map(({ is_overdue, ...row }) => row));
@@ -206,6 +211,7 @@ export function EngagementRecordPage() {
   const [agreedFeeDraft, setAgreedFeeDraft] = useState('');
   const [visitFields, setVisitFields] = useState(emptyVisitFields);
   const [pendingScheduleVisit, setPendingScheduleVisit] = useState(false);
+  const [visitOutcomeStep, setVisitOutcomeStep] = useState('idle');
 
   const persistEngagement = async (patch, { silent = false, successMessage = 'Saved' } = {}) => {
     setSaving(true);
@@ -426,6 +432,12 @@ export function EngagementRecordPage() {
     engagement?.conversation_status,
   ]);
 
+  useEffect(() => {
+    if (engagement?.conversation_status !== 'scheduled') {
+      setVisitOutcomeStep('idle');
+    }
+  }, [engagement?.conversation_status]);
+
   if (loading) {
     return (
       <div className="mx-auto max-w-5xl py-12 text-center text-sm text-ink-secondary">
@@ -585,6 +597,10 @@ export function EngagementRecordPage() {
     clearStatusPrompt();
 
     if (next === 'awaiting_final_deliverables') {
+      if (!canAdvanceToAwaitingViaVisit(engagement)) {
+        setToast(AWAITING_REQUIRES_VISIT_MESSAGE);
+        return;
+      }
       const result = buildVisitDoneTransition(engagement, transitionStage, STAGE);
       await applyStageTransition(result, visitDoneToastMessage());
       return;
@@ -726,6 +742,19 @@ export function EngagementRecordPage() {
   async function handleMarkVisitDone() {
     const result = buildVisitDoneTransition(engagement, transitionStage, STAGE);
     await applyStageTransition(result, visitDoneToastMessage());
+    setVisitOutcomeStep('idle');
+  }
+
+  function handleVisitReschedule() {
+    setVisitFields((prev) => ({ ...prev, visitDate: '' }));
+    setVisitOutcomeStep('idle');
+  }
+
+  async function handleVisitCancelled(reason) {
+    const result = transitionStage(engagement, STAGE.DROPPED, { dropReason: reason });
+    const label = DROP_REASON_OPTIONS.find((o) => o.value === reason)?.label ?? 'Dropped';
+    await applyStageTransition(result, `Visit cancelled — ${label}`);
+    setVisitOutcomeStep('idle');
   }
 
   const deliverablesFullyLocked = Boolean(deliverablesRule.lockedReason)
@@ -1037,14 +1066,14 @@ export function EngagementRecordPage() {
                       {saving ? 'Saving…' : 'Save visit'}
                     </button>
                     {canMarkVisitDone && (
-                      <button
-                        type="button"
-                        className="btn-secondary"
-                        disabled={saving}
-                        onClick={handleMarkVisitDone}
-                      >
-                        Mark visit done
-                      </button>
+                      <ScheduledVisitOutcomes
+                        step={visitOutcomeStep}
+                        onStepChange={setVisitOutcomeStep}
+                        onVisitDone={handleMarkVisitDone}
+                        onReschedule={handleVisitReschedule}
+                        onCancelled={handleVisitCancelled}
+                        saving={saving}
+                      />
                     )}
                   </div>
                 </>
@@ -1417,6 +1446,103 @@ function LockedReasonBanner({ reason }) {
   );
 }
 
+/** Matches board ScheduledCardLogging — Visit done / Didn't happen → reschedule or cancel. */
+function ScheduledVisitOutcomes({
+  step,
+  onStepChange,
+  onVisitDone,
+  onReschedule,
+  onCancelled,
+  saving,
+}) {
+  if (step === 'didnt_happen') {
+    return (
+      <div className="mt-4 w-full rounded-lg border border-line bg-canvas px-3 py-3">
+        <p className="text-2xs font-medium text-ink-secondary">What happened?</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={saving}
+            onClick={onReschedule}
+          >
+            Reschedule
+          </button>
+          <button
+            type="button"
+            className="btn-secondary text-health-red"
+            disabled={saving}
+            onClick={() => onStepChange('cancelled_reason')}
+          >
+            Cancelled
+          </button>
+          <button
+            type="button"
+            className="btn-ghost text-2xs"
+            disabled={saving}
+            onClick={() => onStepChange('idle')}
+          >
+            Back
+          </button>
+        </div>
+        <p className="mt-2 text-2xs text-ink-tertiary">
+          Reschedule keeps the engagement Scheduled — pick a new visit date above and save.
+        </p>
+      </div>
+    );
+  }
+
+  if (step === 'cancelled_reason') {
+    return (
+      <div className="mt-4 w-full rounded-lg border border-line bg-canvas px-3 py-3">
+        <p className="text-2xs font-medium text-ink-secondary">Drop reason</p>
+        <div className="mt-2 space-y-1">
+          {DROP_REASON_OPTIONS.map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              className="btn-ghost w-full justify-start text-2xs text-health-red"
+              disabled={saving}
+              onClick={() => onCancelled(o.value)}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="btn-secondary mt-2 w-full"
+          disabled={saving}
+          onClick={() => onStepChange('didnt_happen')}
+        >
+          Back
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 flex w-full flex-wrap gap-2 border-t border-line pt-4">
+      <button
+        type="button"
+        className="btn-primary"
+        disabled={saving}
+        onClick={onVisitDone}
+      >
+        Visit done
+      </button>
+      <button
+        type="button"
+        className="btn-secondary"
+        disabled={saving}
+        onClick={() => onStepChange('didnt_happen')}
+      >
+        Didn&apos;t happen
+      </button>
+    </div>
+  );
+}
+
 function VisitSummary({ engagement, outletName, completed = false, className = '' }) {
   if (!engagement?.visit_date) return null;
   return (
@@ -1546,7 +1672,9 @@ function FollowUpField({ value, suggestion, editable, lockedHint, onChange, onAc
         <dt className="text-2xs font-medium uppercase tracking-wide text-ink-tertiary">
           Next follow-up
         </dt>
-        <dd className="mt-1 text-sm font-medium text-ink">—</dd>
+        <dd className="mt-1 text-sm font-medium text-ink">
+          {value ? formatDate(value) : '—'}
+        </dd>
         {lockedHint && <p className="mt-1.5 text-2xs text-ink-tertiary">{lockedHint}</p>}
       </div>
     );

@@ -43,6 +43,13 @@ export function followUpRules(status) {
       hint: 'No follow-up — engagement was dropped',
     };
   }
+  if (status === 'scheduled') {
+    return {
+      editable: false,
+      display: null,
+      hint: 'Follow-up matches the visit date while a visit is scheduled',
+    };
+  }
   return { editable: true, display: null, hint: null };
 }
 
@@ -317,6 +324,10 @@ export function getStatusOptions({ current, canComplete, formatStatus }) {
   let options = all;
   if (!canComplete) {
     options = options.filter((o) => o.value !== 'collaboration_complete');
+  }
+  // Forward move to Awaiting only via Visit done — not the status dropdown.
+  if (current !== 'awaiting_final_deliverables') {
+    options = options.filter((o) => o.value !== 'awaiting_final_deliverables');
   }
 
   return options;

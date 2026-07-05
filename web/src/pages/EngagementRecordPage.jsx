@@ -91,18 +91,92 @@ function deliverablesSnapshot(list) {
   return JSON.stringify((list ?? []).map(({ is_overdue, ...row }) => row));
 }
 
+function mergeSavedDeliverableRow(rows, submittedId, saved) {
+  const savedRow = structuredClone(saved);
+  const index = (rows ?? []).findIndex((d) => d.id === submittedId);
+  if (index === -1) {
+    const withoutDup = (rows ?? []).filter((d) => d.id !== savedRow.id);
+    return [...withoutDup, savedRow];
+  }
+  return (rows ?? []).map((d) => (d.id === submittedId ? savedRow : d));
+}
+
+function isTempDeliverableId(deliverableId) {
+  return String(deliverableId ?? '').startsWith('d-');
+}
+
 function cloneDeliverables(list) {
   return structuredClone(list ?? []);
 }
 
-function deliverableDraftSavedToast(saved, beforeList) {
-  if (saved.some((d) => d.proof_demoted)) return null;
-  const newlyPosted = saved.some((row) => {
-    const prior = beforeList.find((d) => d.id === row.id);
-    return row.status === 'posted' && prior?.status !== 'posted';
+function proofStateSignature(row) {
+  if (!row) return '';
+  const screenshots = [...(row.screenshots ?? [])]
+    .map((s) => String(s.url ?? s.file_path ?? '').trim())
+    .filter(Boolean)
+    .sort();
+  return JSON.stringify({
+    content_link: row.content_link ?? null,
+    status: row.status ?? 'pending',
+    posted_quantity: row.posted_quantity ?? 0,
+    screenshots,
+    unit_proofs: row.unit_proofs ?? [],
   });
+}
+
+function planningStateSignature(row) {
+  if (!row) return '';
+  return JSON.stringify({
+    deliverable_type: row.deliverable_type,
+    quantity: row.quantity ?? 1,
+    line_fee: row.line_fee ?? null,
+  });
+}
+
+function deliverablesSaveHint({ canEditProof, showLineFee }) {
+  if (canEditProof) {
+    return 'Save deliverables stores proof (links and screenshots). Use Save & mark posted on each row to mark Posted.';
+  }
+  if (showLineFee) {
+    return 'Save deliverables stores planned types, counts, and optional line fees.';
+  }
+  return 'Save deliverables stores planned types and counts.';
+}
+
+/** Toast after Save deliverables — keyed off what the draft actually changed. */
+function deliverableDraftSavedToast(beforeList, afterDraft, saved) {
+  if (saved?.some((d) => d.proof_demoted)) return null;
+
+  const beforeById = new Map((beforeList ?? []).map((d) => [d.id, d]));
+  const afterIds = new Set((afterDraft ?? []).map((d) => d.id));
+
+  let newlyPosted = false;
+  let proofChanged = false;
+  let planningChanged = false;
+
+  for (const row of afterDraft ?? []) {
+    const isNew = String(row.id ?? '').startsWith('d-') || !beforeById.has(row.id);
+    if (isNew) {
+      planningChanged = true;
+      if (row.status === 'posted') newlyPosted = true;
+      continue;
+    }
+    const prior = beforeById.get(row.id);
+    if (prior.status !== row.status && row.status === 'posted') newlyPosted = true;
+    if (proofStateSignature(prior) !== proofStateSignature(row)) proofChanged = true;
+    if (planningStateSignature(prior) !== planningStateSignature(row)) planningChanged = true;
+  }
+
+  for (const prior of beforeList ?? []) {
+    if (!afterIds.has(prior.id)) planningChanged = true;
+  }
+
   if (newlyPosted) return 'Deliverables saved';
-  return 'Deliverables saved — proof updated (use Save & mark posted to mark Posted)';
+  if (proofChanged) {
+    return 'Deliverables saved — proof updated (use Save & mark posted to mark Posted)';
+  }
+  if (planningChanged) return 'Deliverables saved';
+  return 'Deliverables saved';
 }
 
 export function EngagementRecordPage() {
@@ -162,13 +236,20 @@ export function EngagementRecordPage() {
     setTimeline(Array.isArray(tl) ? tl : []);
   };
 
-  const applySavedDeliverableRow = async (delId, saved, { refreshTimelineOnDemotion = false } = {}) => {
+  const applySavedDeliverableRow = async (submittedId, saved, { refreshTimelineOnDemotion = false } = {}) => {
     setDeliverables((rows) => {
-      const next = rows.map((d) => (d.id === delId ? saved : d));
+      const next = mergeSavedDeliverableRow(rows, submittedId, saved);
       updateEngagementDeliverables(id, next);
       return next;
     });
-    setSavedDeliverables((rows) => rows.map((d) => (d.id === delId ? structuredClone(saved) : d)));
+    setSavedDeliverables((rows) => mergeSavedDeliverableRow(rows, submittedId, saved));
+    if (isTempDeliverableId(submittedId) && saved.id && saved.id !== submittedId) {
+      setMarkPostedErrors((prev) => {
+        const next = { ...prev };
+        delete next[submittedId];
+        return next;
+      });
+    }
     if (saved.proof_demoted) {
       const message = saved.proof_demote_message
         || deliverableProofDemotionMessage(saved.deliverable_type);
@@ -199,8 +280,8 @@ export function EngagementRecordPage() {
         return null;
       }
 
-      const saved = await syncDeliverables(id, beforeList, prepared);
-      const demoted = saved?.filter((d) => d.proof_demoted) ?? [];
+      const synced = await syncDeliverables(id, beforeList, prepared);
+      const demoted = synced?.filter((d) => d.proof_demoted) ?? [];
       if (demoted.length) {
         const message = demoted
           .map((d) => d.proof_demote_message || deliverableProofDemotionMessage(d.deliverable_type))
@@ -209,10 +290,12 @@ export function EngagementRecordPage() {
         await refreshAfterDeliverableDemotion();
       }
 
-      setDeliverables(saved);
-      setSavedDeliverables(cloneDeliverables(saved));
-      updateEngagementDeliverables(id, saved);
-      return { saved, beforeList };
+      const fresh = await fetchDeliverables(id);
+      const confirmed = cloneDeliverables(fresh ?? []);
+      setDeliverables(confirmed);
+      setSavedDeliverables(cloneDeliverables(confirmed));
+      updateEngagementDeliverables(id, confirmed);
+      return { saved: confirmed, beforeList };
     } catch (err) {
       const message = err.deliverable
         ? deliverableProofRejectMessage(err.deliverable, err.message)
@@ -223,9 +306,10 @@ export function EngagementRecordPage() {
   };
 
   const commitDeliverablesDraft = async () => {
-    const result = await persistDeliverables(deliverables);
+    const draft = deliverables;
+    const result = await persistDeliverables(draft);
     if (!result?.saved) return;
-    const toastMessage = deliverableDraftSavedToast(result.saved, result.beforeList);
+    const toastMessage = deliverableDraftSavedToast(result.beforeList, draft, result.saved);
     if (toastMessage) setToast(toastMessage);
   };
 
@@ -470,7 +554,7 @@ export function EngagementRecordPage() {
       } else {
         setFollowUpSuggestion(null);
       }
-      persistEngagement(patch);
+      persistEngagement(patch, { successMessage: 'Collaboration complete' });
       return;
     }
 
@@ -544,7 +628,10 @@ export function EngagementRecordPage() {
   const handleFollowUpChange = (date) => {
     if (!followUp.editable) return;
     if (date === followUpSuggestion?.date) setFollowUpSuggestion(null);
-    persistEngagement({ next_follow_up_date: date || null });
+    persistEngagement(
+      { next_follow_up_date: date || null },
+      { successMessage: date ? `Follow-up set to ${formatDate(date)}` : 'Follow-up cleared' },
+    );
   };
 
   const acceptFollowUpSuggestion = async () => {
@@ -1060,7 +1147,7 @@ export function EngagementRecordPage() {
             {deliverablesDirty && deliverablesRule.canEditStatus && (
               <div className="mt-4 space-y-2 border-t border-line/80 pt-3">
                 <p className="text-2xs text-ink-tertiary">
-                  Save deliverables stores proof and non-posted status changes. Use Save &amp; mark posted on each row to mark Posted.
+                  {deliverablesSaveHint({ canEditProof: deliverablesRule.canEditProof, showLineFee })}
                 </p>
                 <div className="flex flex-wrap justify-end gap-2">
                   <button type="button" className="btn-secondary text-2xs" onClick={discardDeliverablesDraft}>

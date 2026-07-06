@@ -2,6 +2,9 @@ import { Navigate, NavLink, useParams } from 'react-router-dom';
 import { Card } from '../components/ui/Primitives.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { TagsSettingsSection } from '../components/settings/TagsSettingsSection.jsx';
+import { UsersSettingsSection } from '../components/settings/UsersSettingsSection.jsx';
+import { AuditSettingsSection } from '../components/settings/AuditSettingsSection.jsx';
+import { OrgBrandingSettingsSection } from '../components/settings/OrgBrandingSettingsSection.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { roleLabel } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
@@ -15,6 +18,9 @@ import {
 /** Map registry keys to section components — keep registry free of React imports. */
 const SECTION_COMPONENTS = {
   tags: TagsSettingsSection,
+  users: UsersSettingsSection,
+  audit: AuditSettingsSection,
+  branding: OrgBrandingSettingsSection,
 };
 
 export function SettingsPage() {

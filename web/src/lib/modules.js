@@ -68,13 +68,6 @@ export const MODULES = {
     prd: 9,
     pageTitle: 'Feedback',
   },
-  admin: {
-    prd: 11,
-    navLabel: 'Admin',
-    pageTitle: 'Admin',
-    subtitle: 'Users, roles, and audit log',
-    path: '/admin',
-  },
   settings: {
     navLabel: 'Settings',
     pageTitle: 'Settings',
@@ -91,7 +84,6 @@ export const NAV_ITEMS = [
   MODULES.registration,
   MODULES.reporting,
   MODULES.settings,
-  MODULES.admin,
 ].map((m) => ({ to: m.path, label: m.navLabel, end: m.path === '/' }));
 
 export const CONTACT_PROFILE_TABS = [

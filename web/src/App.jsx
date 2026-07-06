@@ -14,7 +14,7 @@ import { ReportsPage } from './pages/ReportsPage.jsx';
 import { RegistrationsPage } from './pages/RegistrationsPage.jsx';
 import { BrandsPage } from './pages/BrandsPage.jsx';
 import { BulkImportPage } from './pages/BulkImportPage.jsx';
-import { AdminPage } from './pages/AdminPage.jsx';
+import { AdminFixturesPage } from './pages/AdminFixturesPage.jsx';
 import { SettingsPage } from './pages/SettingsPage.jsx';
 import { PublicRegistrationPage } from './pages/PublicRegistrationPage.jsx';
 import { AddContactDrawer } from './components/contacts/AddContactDrawer.jsx';
@@ -41,7 +41,7 @@ export default function App() {
             <Route path="import" element={<BulkImportPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="settings/:sectionKey" element={<SettingsPage />} />
-            <Route path="admin" element={<AdminPage />} />
+            <Route path="admin/fixtures" element={<AdminFixturesPage />} />
           </Route>
         </Route>
       </Routes>

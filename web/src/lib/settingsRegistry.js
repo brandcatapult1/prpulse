@@ -14,6 +14,24 @@ export const SETTINGS_SECTIONS = [
     path: 'tags',
     allowedRoles: ['admin', 'senior_manager'],
   },
+  {
+    key: 'users',
+    label: 'Users & roles',
+    path: 'users',
+    allowedRoles: ['admin'],
+  },
+  {
+    key: 'audit',
+    label: 'Audit log',
+    path: 'audit',
+    allowedRoles: ['admin'],
+  },
+  {
+    key: 'branding',
+    label: 'Org branding',
+    path: 'branding',
+    allowedRoles: ['admin'],
+  },
 ];
 
 export function getSettingsSection(key) {

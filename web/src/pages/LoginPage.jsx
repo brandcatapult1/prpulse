@@ -17,15 +17,11 @@ function loginErrorMessage(errorKey) {
 }
 
 export function LoginPage() {
-  const { devMode, loading } = useAuth();
+  const { loading } = useAuth();
   const [searchParams] = useSearchParams();
   const errorKey = searchParams.get('error');
   const errorMessage = useMemo(() => loginErrorMessage(errorKey), [errorKey]);
   const [logoUrl, setLogoUrl] = useState(DEFAULT_DEMO_ORG_LOGO);
-
-  useEffect(() => {
-    if (devMode) window.location.replace('/');
-  }, [devMode]);
 
   useEffect(() => {
     loadPublicOrgLogoUrl().then((url) => {
@@ -33,7 +29,7 @@ export function LoginPage() {
     });
   }, []);
 
-  if (loading || devMode) return null;
+  if (loading) return null;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-canvas px-4 py-10">

@@ -8,6 +8,7 @@ import {
   isGoogleConfigured,
   sessionUser,
 } from '../lib/authConfig.mjs';
+import { normalizeUserEmail } from '../lib/userAdmin.mjs';
 
 export const authRouter = Router();
 
@@ -40,24 +41,32 @@ authRouter.get('/google/callback', async (req, res) => {
     const payload = ticket.getPayload();
     if (!payload?.email) throw new Error('Google account missing email');
 
-    const { rows: countRows } = await pool.query('SELECT count(*)::int AS n FROM users');
-    const isFirstUser = countRows[0].n === 0;
+    const verifiedEmail = normalizeUserEmail(payload.email);
+    const googleName = String(payload.name ?? '').trim() || verifiedEmail;
 
-    const { rows } = await pool.query(
-      `INSERT INTO users (google_sub, email, full_name, role)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (email) DO UPDATE
-         SET google_sub = EXCLUDED.google_sub,
-             full_name = EXCLUDED.full_name,
-             updated_at = now()
-       RETURNING id, email, full_name, role, is_active`,
-      [payload.sub, payload.email, payload.name ?? payload.email, isFirstUser ? 'admin' : 'campaign_manager'],
+    const { rows: existingRows } = await pool.query(
+      `SELECT id, email, full_name, role, is_active
+       FROM users
+       WHERE email = $1
+       LIMIT 1`,
+      [verifiedEmail],
     );
 
-    const user = rows[0];
-    if (!user.is_active) return res.redirect('/login?error=account_inactive');
+    const existing = existingRows[0];
+    if (!existing) return res.redirect('/login?error=not_allowlisted');
+    if (!existing.is_active) return res.redirect('/login?error=account_inactive');
 
-    req.session.user = sessionUser(user);
+    const { rows } = await pool.query(
+      `UPDATE users
+       SET google_sub = $2,
+           full_name = CASE WHEN trim(full_name) = '' THEN $3 ELSE full_name END,
+           updated_at = now()
+       WHERE id = $1
+       RETURNING id, email, full_name, role, is_active`,
+      [existing.id, payload.sub, googleName],
+    );
+
+    req.session.user = sessionUser(rows[0]);
     res.redirect('/');
   } catch (err) {
     console.error('Google auth failed:', err.message ?? err);

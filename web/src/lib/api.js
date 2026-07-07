@@ -128,6 +128,8 @@ export const campaignsApi = {
 
 export const engagementsApi = {
   byCampaign: (campaignId) => api(`/engagements/campaign/${campaignId}`),
+  deliverablesByCampaign: (campaignId) => api(`/engagements/campaign/${campaignId}/deliverables`),
+  feedbackByCampaign: (campaignId) => api(`/engagements/campaign/${campaignId}/feedback`),
   assignedToMe: () => api('/engagements/assigned/me'),
   get: (id) => api(`/engagements/${id}`),
   update: (id, body) => api(`/engagements/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),

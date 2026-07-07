@@ -19,7 +19,8 @@ import {
   logDeliverableProof,
   updateDeliverable,
   saveFeedback,
-  fetchFeedback,
+  fetchFeedbackForCampaign,
+  fetchDeliverablesForCampaign,
   blacklistContact,
   clearBlacklist,
   fetchDeliverables,
@@ -32,25 +33,25 @@ import { mergeContactsCache } from '../lib/contactsCache.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
 async function loadCampaignData(campaignId) {
-  const [camp, engs] = await Promise.all([
+  const [camp, engs, deliverablesMap, feedbackByEngagement] = await Promise.all([
     campaignsApi.get(campaignId),
     engagementsApi.byCampaign(campaignId),
+    fetchDeliverablesForCampaign(campaignId),
+    fetchFeedbackForCampaign(campaignId),
   ]);
 
-  const deliverablesMap = {};
-  const engsWithFeedback = await Promise.all(
-    (engs ?? []).map(async (eng) => {
-      deliverablesMap[eng.id] = await fetchDeliverables(eng.id);
-      if (eng.conversation_status === 'collaboration_complete') {
-        const feedback = await fetchFeedback(eng.id).catch(() => null);
-        return { ...eng, feedback };
-      }
-      return eng;
-    }),
-  );
+  const normalizedDeliverables = deliverablesMap ?? {};
+  setDeliverablesCache(normalizedDeliverables);
 
-  setDeliverablesCache(deliverablesMap);
-  return { camp, engs: engsWithFeedback, deliverablesMap };
+  const engsWithFeedback = (engs ?? []).map((eng) => {
+    if (eng.conversation_status === 'collaboration_complete') {
+      const feedback = feedbackByEngagement?.[eng.id] ?? null;
+      return { ...eng, feedback };
+    }
+    return eng;
+  });
+
+  return { camp, engs: engsWithFeedback, deliverablesMap: normalizedDeliverables };
 }
 
 export function CampaignViewPage() {

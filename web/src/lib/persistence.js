@@ -28,6 +28,10 @@ export async function fetchDeliverables(engagementId) {
   return engagementsApi.deliverables(engagementId);
 }
 
+export async function fetchDeliverablesForCampaign(campaignId) {
+  return engagementsApi.deliverablesByCampaign(campaignId);
+}
+
 export async function createDeliverable(engagementId, body) {
   return engagementsApi.createDeliverable(engagementId, body);
 }
@@ -103,6 +107,10 @@ export async function saveFeedback(engagementId, record) {
 
 export async function fetchFeedback(engagementId) {
   return engagementsApi.feedback(engagementId);
+}
+
+export async function fetchFeedbackForCampaign(campaignId) {
+  return engagementsApi.feedbackByCampaign(campaignId);
 }
 
 export async function patchContact(id, patch) {

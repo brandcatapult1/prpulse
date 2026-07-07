@@ -20,6 +20,7 @@ import {
   resolveDeliverablePostedProof,
   deliverableInsertFields,
   loadDeliverablesForEngagement,
+  loadDeliverablesByEngagementIds,
   loadScreenshotsForDeliverables,
   mapDeliverableRow,
   syncDeliverableScreenshots,
@@ -98,6 +99,36 @@ engagementsRouter.get('/campaign/:campaignId', requireAuth, async (req, res) => 
     [req.params.campaignId],
   );
   res.json(rows);
+});
+
+engagementsRouter.get('/campaign/:campaignId/deliverables', requireAuth, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { rows: engagementRows } = await pool.query(
+      'SELECT id FROM engagements WHERE campaign_id = $1',
+      [req.params.campaignId],
+    );
+    const engagementIds = engagementRows.map((row) => row.id);
+    const byEngagement = await loadDeliverablesByEngagementIds(client, engagementIds);
+    res.json(byEngagement);
+  } finally {
+    client.release();
+  }
+});
+
+engagementsRouter.get('/campaign/:campaignId/feedback', requireAuth, async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT f.*
+     FROM feedback f
+     JOIN engagements e ON e.id = f.engagement_id
+     WHERE e.campaign_id = $1`,
+    [req.params.campaignId],
+  );
+  const byEngagement = {};
+  for (const row of rows) {
+    byEngagement[row.engagement_id] = row;
+  }
+  res.json(byEngagement);
 });
 
 /** Engagements assigned to the current user (dashboard workspace). */

@@ -42,7 +42,7 @@ export function LoginPage() {
         />
         <h1 className="mt-5 text-xl font-semibold tracking-tight text-ink">PR Pulse</h1>
         <p className="mt-2 text-sm leading-relaxed text-ink-secondary">
-          Relationship operations for Brand Catapult
+          The Lifeline of the PR Team
         </p>
 
         {errorMessage && (

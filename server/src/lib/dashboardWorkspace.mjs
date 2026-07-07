@@ -1,5 +1,5 @@
 import { isBroadRole } from './permissions.mjs';
-import { loadDeliverablesForEngagement } from './deliverableRows.mjs';
+import { loadDeliverablesByEngagementIds } from './deliverableRows.mjs';
 import {
   ENGAGEMENT_OUTLET_JOINS,
   ENGAGEMENT_OUTLET_SELECT,
@@ -65,13 +65,12 @@ export async function loadDashboardWorkspace(pool, scopeUserId, requesterId, req
   ]);
 
   const engagements = engagementsRes.rows;
-  const deliverablesByEngagement = {};
+  const engagementIds = engagements.map((eng) => eng.id);
 
   const client = await pool.connect();
+  let deliverablesByEngagement;
   try {
-    for (const eng of engagements) {
-      deliverablesByEngagement[eng.id] = await loadDeliverablesForEngagement(client, eng.id);
-    }
+    deliverablesByEngagement = await loadDeliverablesByEngagementIds(client, engagementIds);
   } finally {
     client.release();
   }

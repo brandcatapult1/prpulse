@@ -65,6 +65,34 @@ export async function loadDeliverablesForEngagement(client, engagementId) {
   return rows.map((row) => mapDeliverableRow(row, screenshotsById.get(row.id) ?? []));
 }
 
+/**
+ * Batch load deliverables for many engagements — same per-engagement arrays as
+ * loadDeliverablesForEngagement, in 2 queries total (deliverables + assets).
+ */
+export async function loadDeliverablesByEngagementIds(client, engagementIds) {
+  const uniqueIds = [...new Set(engagementIds)];
+  const byEngagement = Object.fromEntries(uniqueIds.map((id) => [id, []]));
+  if (!uniqueIds.length) return byEngagement;
+
+  const { rows } = await client.query(
+    `SELECT * FROM v_deliverables
+     WHERE engagement_id = ANY($1::uuid[])
+     ORDER BY created_at`,
+    [uniqueIds],
+  );
+  const deliverableIds = rows.map((r) => r.id);
+  const screenshotsById = await loadScreenshotsForDeliverables(client, deliverableIds);
+
+  for (const row of rows) {
+    const list = byEngagement[row.engagement_id];
+    if (list) {
+      list.push(mapDeliverableRow(row, screenshotsById.get(row.id) ?? []));
+    }
+  }
+
+  return byEngagement;
+}
+
 export async function syncDeliverableScreenshots(client, deliverableId, screenshots, userId) {
   await client.query('DELETE FROM assets WHERE deliverable_id = $1 AND asset_type = $2', [
     deliverableId,

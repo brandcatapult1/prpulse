@@ -718,7 +718,76 @@ BEGIN
   SELECT target_collaborations INTO v_target FROM campaigns WHERE id = p_campaign_id;
 
   IF EXISTS (SELECT 1 FROM campaign_cycles WHERE campaign_id = p_campaign_id) THEN
-    PERFORM recompute_campaign_cycle_metrics(p_campaign_id);
+    WITH counted_engagements AS (
+      SELECT
+        e.id,
+        (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date AS completed_ist
+      FROM engagements e
+      WHERE e.campaign_id = p_campaign_id
+        AND e.conversation_status = 'collaboration_complete'
+        AND fn_engagement_deliverables_complete(e.id)
+    ),
+    bounds AS (
+      SELECT
+        min(cycle_start) AS first_start,
+        max(cycle_end) AS last_end,
+        min(cycle_number) AS first_num,
+        max(cycle_number) AS last_num
+      FROM campaign_cycles
+      WHERE campaign_id = p_campaign_id
+    ),
+    cycle_counts AS (
+      SELECT
+        cc.id AS cycle_id,
+        count(ce.id)::integer AS completed
+      FROM campaign_cycles cc
+      CROSS JOIN bounds b
+      LEFT JOIN counted_engagements ce
+        ON ce.completed_ist IS NOT NULL
+       AND (
+         (
+           ce.completed_ist >= cc.cycle_start
+           AND ce.completed_ist < cc.cycle_end
+         )
+         OR (
+           cc.cycle_number = b.first_num
+           AND ce.completed_ist < b.first_start
+         )
+         OR (
+           cc.cycle_number = b.last_num
+           AND ce.completed_ist >= b.last_end
+         )
+       )
+      WHERE cc.campaign_id = p_campaign_id
+      GROUP BY cc.id
+    ),
+    cycle_values AS (
+      SELECT
+        cc.id,
+        coalesce(cnt.completed, 0)::integer AS completed,
+        CASE
+          WHEN cc.target IS NULL OR cc.target = 0 THEN NULL
+          ELSE greatest(0, cc.target - coalesce(cnt.completed, 0)::integer)
+        END AS remaining,
+        CASE
+          WHEN cc.target IS NULL OR cc.target = 0 THEN NULL
+          ELSE round(100.0 * coalesce(cnt.completed, 0)::integer / cc.target, 2)
+        END AS pct,
+        CASE
+          WHEN cc.target IS NULL OR cc.target = 0 THEN 'not_set'::campaign_health
+          ELSE fn_campaign_health_for_target(cc.target, coalesce(cnt.completed, 0)::integer)
+        END AS health
+      FROM campaign_cycles cc
+      LEFT JOIN cycle_counts cnt ON cnt.cycle_id = cc.id
+      WHERE cc.campaign_id = p_campaign_id
+    )
+    UPDATE campaign_cycles cc
+       SET completed_collaborations = cv.completed,
+           remaining_collaborations = cv.remaining,
+           achievement_pct = cv.pct,
+           cycle_health = cv.health
+      FROM cycle_values cv
+     WHERE cc.id = cv.id;
 
     v_cycle_id := fn_current_campaign_cycle_id(p_campaign_id);
 
@@ -742,7 +811,8 @@ BEGIN
   SELECT count(*)::integer INTO v_completed
   FROM engagements e
   WHERE e.campaign_id = p_campaign_id
-    AND fn_engagement_counted(e.id);
+    AND e.conversation_status = 'collaboration_complete'
+    AND fn_engagement_deliverables_complete(e.id);
 
   IF v_target IS NULL OR v_target = 0 THEN
     v_pct := NULL; v_remaining := NULL; v_health := 'not_set';
@@ -1086,6 +1156,7 @@ CREATE INDEX idx_contacts_type          ON contacts (contact_type);
 -- Engagements: scoping, follow-up dashboard, uniqueness already covered
 CREATE INDEX idx_engagements_campaign        ON engagements (campaign_id);
 CREATE INDEX idx_engagements_contact         ON engagements (contact_id);
+CREATE INDEX idx_engagements_campaign_completed_at ON engagements (campaign_id, completed_at);
 CREATE INDEX idx_engagements_owner_followup  ON engagements (assigned_manager, next_follow_up_date);
 CREATE INDEX idx_engagements_status          ON engagements (conversation_status);
 CREATE INDEX idx_engagements_laststatus      ON engagements (last_status_change_at);

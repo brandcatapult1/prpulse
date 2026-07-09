@@ -14,6 +14,7 @@ dotenv.config();
 
 export const DEMO_MARKER = 'prpulse_demo_fixture';
 export const DEMO_USER_EMAIL_SUFFIX = '@brandcatapult.fixture';
+const ALLOWED_DEMO_SEED_HOST_SUFFIXES = ['.neon.tech'];
 
 export const DEMO_OUTLETS = {
   glowco: 'GlowCo Bandra',
@@ -34,7 +35,7 @@ export const DEMO_CAMPAIGNS = [
     brandKey: 'glowco',
     status: 'active',
     target: 8,
-    type: 'influencer',
+    type: 'project',
     managerKeys: ['aisha', 'rohan'],
   },
   {
@@ -43,7 +44,7 @@ export const DEMO_CAMPAIGNS = [
     brandKey: 'brewhaus',
     status: 'active',
     target: 5,
-    type: 'influencer',
+    type: 'project',
     managerKeys: ['rohan', 'neha'],
   },
   {
@@ -52,7 +53,7 @@ export const DEMO_CAMPAIGNS = [
     brandKey: 'spiceroute',
     status: 'draft',
     target: 3,
-    type: 'influencer',
+    type: 'project',
     managerKeys: ['aisha'],
   },
 ];
@@ -205,6 +206,51 @@ function pgClientConfig(url) {
     ssl: url.includes('localhost') ? false : { rejectUnauthorized: false },
     connectionTimeoutMillis: 15_000,
   };
+}
+
+function parseHostFromDatabaseUrl(databaseUrl) {
+  try {
+    return new URL(databaseUrl).hostname.toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+function isAllowedDemoSeedHost(hostname) {
+  if (!hostname) return false;
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') return true;
+  return ALLOWED_DEMO_SEED_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix));
+}
+
+export function assertDemoSeedAllowed({
+  databaseUrl = process.env.DATABASE_URL,
+  allowDemoSeed = process.env.ALLOW_DEMO_SEED,
+  nodeEnv = process.env.NODE_ENV,
+  appEnv = process.env.APP_ENV,
+} = {}) {
+  const allowedFlag = String(allowDemoSeed ?? '').trim().toLowerCase() === 'true';
+  if (!allowedFlag) {
+    throw new Error(
+      'Demo seed refused: not a permitted dev environment (set ALLOW_DEMO_SEED=true only in dev).',
+    );
+  }
+
+  const envSignals = [nodeEnv, appEnv].map((v) => String(v ?? '').trim().toLowerCase()).filter(Boolean);
+  if (envSignals.includes('production')) {
+    throw new Error('Demo seed refused: production environment detected.');
+  }
+
+  const trimmedUrl = String(databaseUrl ?? '').trim();
+  if (!trimmedUrl) {
+    throw new Error('Demo seed refused: DATABASE_URL is missing.');
+  }
+
+  const host = parseHostFromDatabaseUrl(trimmedUrl);
+  if (!isAllowedDemoSeedHost(host)) {
+    throw new Error('Demo seed refused: database host is not an approved dev host.');
+  }
+
+  return { ok: true, host };
 }
 
 function buildEngagementPlan(dates) {
@@ -885,6 +931,7 @@ async function seedBrandsAndCampaigns(client, userIds, actor) {
 }
 
 export async function repairDemoHygiene(client, { actorUserId } = {}) {
+  assertDemoSeedAllowed();
   const actor = actorUserId ? { id: actorUserId } : await resolveSeedActor(client);
   const userIds = await ensureDemoUsers(client);
   await client.query(`SELECT set_config('app.current_user_id', $1, true)`, [actor.id]);
@@ -927,6 +974,7 @@ export async function repairDemoHygiene(client, { actorUserId } = {}) {
 }
 
 export async function seedDemoFixtures(client, { actorUserId, reset = false } = {}) {
+  assertDemoSeedAllowed();
   if (reset) {
     await clearDemoFixtures(client);
   } else if (await hasDemoFixtures(client)) {
@@ -983,6 +1031,7 @@ export async function runDemoSeed({
   databaseUrl = process.env.DATABASE_URL,
   actorUserId = null,
 } = {}) {
+  assertDemoSeedAllowed({ databaseUrl });
   if (!databaseUrl?.trim()) {
     throw new Error('DATABASE_URL is not set');
   }
@@ -1011,6 +1060,7 @@ if (isCli) {
   const repairOnly = process.argv.includes('--repair');
   try {
     if (repairOnly && !reset) {
+      assertDemoSeedAllowed();
       const client = new pg.Client(pgClientConfig(process.env.DATABASE_URL?.trim()));
       await client.connect();
       try {

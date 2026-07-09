@@ -6,7 +6,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import { migrateUp } from '../../scripts/migrate.mjs';
-import { hasDemoFixtures, repairDemoHygiene, seedDemoFixtures } from '../../scripts/seed-demo.mjs';
+import {
+  assertDemoSeedAllowed,
+  hasDemoFixtures,
+  repairDemoHygiene,
+  seedDemoFixtures,
+} from '../../scripts/seed-demo.mjs';
 import { pool } from './db.mjs';
 import { ensureCriticalSchema } from './lib/ensureSchema.mjs';
 import { healthRouter } from './routes/health.mjs';
@@ -96,6 +101,12 @@ app.listen(port, () => {
     .then(() => ensureCriticalSchema(pool))
     .then(async () => {
       if (!databaseConfigured || !pool) return;
+      try {
+        assertDemoSeedAllowed();
+      } catch (seedGuardErr) {
+        console.warn('Demo fixture setup skipped:', seedGuardErr.message ?? seedGuardErr);
+        return;
+      }
       const client = await pool.connect();
       try {
         await client.query('BEGIN');

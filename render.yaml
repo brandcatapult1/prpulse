@@ -28,3 +28,5 @@ services:
         sync: false
       - key: CLOUDINARY_FOLDER
         value: prod
+      - key: ALLOW_DEMO_SEED
+        value: false

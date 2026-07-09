@@ -3,6 +3,7 @@ import { pool, withUserTransaction } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
 import { requireSeniorOrAdmin } from '../middleware/permissions.mjs';
 import { findContactByMobile, normalizeMobileToE164 } from '../lib/mobileNumber.mjs';
+import { assertValidCategoryId } from '../lib/categories.mjs';
 
 export const importRouter = Router();
 
@@ -20,7 +21,7 @@ importRouter.post('/contacts', requireAuth, requireImportRole, async (req, res) 
     const created = await withUserTransaction(req.user.id, async (client) => {
       const results = [];
       for (const row of rows) {
-        const { full_name, mobile_number, city, instagram_url } = row;
+        const { full_name, mobile_number, city, instagram_url, email, primary_category_id } = row;
         if (!full_name?.trim() || !mobile_number?.trim()) continue;
 
         const e164 = normalizeMobileToE164(mobile_number);
@@ -29,11 +30,28 @@ importRouter.post('/contacts', requireAuth, requireImportRole, async (req, res) 
         const { contact: dup } = await findContactByMobile(client, mobile_number);
         if (dup) continue;
 
+        const emailValue = email?.trim() || null;
+        let primaryCategoryId = null;
+        if (primary_category_id) {
+          const category = await assertValidCategoryId(client, primary_category_id);
+          primaryCategoryId = category?.id ?? null;
+        }
+
         const { rows: inserted } = await client.query(
-          `INSERT INTO contacts (full_name, mobile_number, city, instagram_url, source, created_by)
-           VALUES ($1, $2, $3, $4, 'bulk_upload', $5)
-           RETURNING id, full_name, mobile_number, city, status`,
-          [full_name.trim(), e164, city ?? null, instagram_url ?? null, req.user.id],
+          `INSERT INTO contacts (
+             full_name, mobile_number, city, instagram_url, email, primary_category_id, source, created_by
+           )
+           VALUES ($1, $2, $3, $4, $5, $6, 'bulk_upload', $7)
+           RETURNING id, full_name, mobile_number, city, email, primary_category_id, status`,
+          [
+            full_name.trim(),
+            e164,
+            city ?? null,
+            instagram_url ?? null,
+            emailValue,
+            primaryCategoryId,
+            req.user.id,
+          ],
         );
         if (inserted[0]) results.push(inserted[0]);
       }

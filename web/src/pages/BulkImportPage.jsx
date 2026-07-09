@@ -15,7 +15,7 @@ import {
   validateCampaignRows,
   validateContactRows,
 } from '../lib/csvImport.js';
-import { brandsApi, contactsApi, importApi } from '../lib/api.js';
+import { brandsApi, contactsApi, importApi, lookupApi } from '../lib/api.js';
 
 const TABS = [
   { id: 'contacts', label: 'Contacts' },
@@ -33,6 +33,7 @@ export function BulkImportPage() {
   const [toast, setToast] = useState(null);
   const [existingContacts, setExistingContacts] = useState([]);
   const [existingBrands, setExistingBrands] = useState([]);
+  const [existingCategories, setExistingCategories] = useState([]);
   const [referenceLoading, setReferenceLoading] = useState(true);
 
   const summary = useMemo(() => importSummary(validated), [validated]);
@@ -41,12 +42,18 @@ export function BulkImportPage() {
   const loadReferenceData = useCallback(async () => {
     setReferenceLoading(true);
     try {
-      const [contacts, brands] = await Promise.all([contactsApi.list(), brandsApi.list()]);
+      const [contacts, brands, categories] = await Promise.all([
+        contactsApi.list(),
+        brandsApi.list(),
+        lookupApi.categories().catch(() => []),
+      ]);
       setExistingContacts(Array.isArray(contacts) ? contacts : []);
       setExistingBrands(Array.isArray(brands) ? brands : []);
+      setExistingCategories(Array.isArray(categories) ? categories : []);
     } catch {
       setExistingContacts([]);
       setExistingBrands([]);
+      setExistingCategories([]);
     } finally {
       setReferenceLoading(false);
     }
@@ -64,7 +71,7 @@ export function BulkImportPage() {
 
     if (tab === 'contacts') {
       setValidated(
-        validateContactRows(rows, existingContacts, { skipDuplicates }),
+        validateContactRows(rows, existingContacts, { skipDuplicates, categories: existingCategories }),
       );
     } else {
       setValidated(validateCampaignRows(rows, existingBrands));
@@ -84,7 +91,12 @@ export function BulkImportPage() {
       ({ status, message, existing_contact_id, existing_contact_name, brand_id, campaign_status, ...rest }) => rest,
     );
     if (tab === 'contacts') {
-      setValidated(validateContactRows(rawRows, existingContacts, { skipDuplicates: nextSkip }));
+      setValidated(
+        validateContactRows(rawRows, existingContacts, {
+          skipDuplicates: nextSkip,
+          categories: existingCategories,
+        }),
+      );
     } else {
       setValidated(validateCampaignRows(rawRows, existingBrands));
     }
@@ -114,6 +126,8 @@ export function BulkImportPage() {
           mobile_number: r.mobile_number,
           city: r.city,
           instagram_url: r.instagram_url,
+          email: r.email,
+          primary_category_id: r.primary_category_id ?? null,
         }));
         await importApi.contacts(payload);
       } else {
@@ -142,6 +156,12 @@ export function BulkImportPage() {
           { key: 'full_name', label: 'Name', render: (r) => r.full_name || '—' },
           { key: 'mobile_number', label: 'Mobile', render: (r) => r.mobile_number || '—' },
           { key: 'city', label: 'City', render: (r) => r.city || '—' },
+          { key: 'email', label: 'Email', render: (r) => r.email || '—' },
+          {
+            key: 'primary_category',
+            label: 'Category',
+            render: (r) => r.primary_category || '—',
+          },
           { key: 'status', label: 'Status', render: (r) => <Pill tone={statusTone(r.status)}>{r.status}</Pill> },
           { key: 'message', label: 'Message', render: (r) => r.message || '—' },
         ]
@@ -200,9 +220,35 @@ export function BulkImportPage() {
       <Card className="!p-4">
         <p className="mb-3 text-2xs text-ink-secondary">
           {tab === 'contacts'
-            ? 'Required columns: full_name, mobile_number. Optional: city, instagram_url.'
+            ? 'Required columns: full_name, mobile_number. Optional: city, instagram_url, email, primary_category (must match an admin category name).'
             : 'Required columns: campaign_name, brand_name. Optional: target_collaborations, status (draft/active/planning).'}
         </p>
+        {tab === 'contacts' && !referenceLoading && (
+          <div className="mb-3 rounded-md border border-line bg-canvas/60 px-3 py-2">
+            <p className="text-2xs font-medium text-ink">Primary category names</p>
+            {existingCategories.length > 0 ? (
+              <>
+                <p className="mt-1 text-2xs text-ink-secondary">
+                  Use these exact names in the <span className="font-mono text-ink">primary_category</span> column:
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {existingCategories.map((cat) => (
+                    <span
+                      key={cat.id}
+                      className="rounded-md border border-line bg-white px-2 py-0.5 text-2xs text-ink-secondary"
+                    >
+                      {cat.name}
+                    </span>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="mt-1 text-2xs text-ink-secondary">
+                No categories configured — ask an Admin to add categories in Settings.
+              </p>
+            )}
+          </div>
+        )}
         <input
           ref={fileRef}
           type="file"

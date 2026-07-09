@@ -46,43 +46,70 @@ export function parseCsv(text) {
   return { headers, rows };
 }
 
-export const CONTACT_IMPORT_TEMPLATE = `full_name,mobile_number,city,instagram_url
-Tanvi R.,+919887766554,Delhi,https://instagram.com/tanvi.creates
-Dev P.,+919900112233,Bangalore,https://instagram.com/dev.photography`;
+export const CONTACT_IMPORT_TEMPLATE = `full_name,mobile_number,city,instagram_url,email,primary_category
+Tanvi R.,+919887766554,Delhi,https://instagram.com/tanvi.creates,tanvi@example.com,Food & Beverage
+Dev P.,+919900112233,Bangalore,https://instagram.com/dev.photography,,Lifestyle`;
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function parseContactImportFields(row) {
+  const full_name = row.full_name?.trim();
+  const mobile_number = row.mobile_number?.trim();
+  const city = row.city?.trim() || null;
+  const instagram_url = row.instagram_url?.trim() || row.instagram_link?.trim() || null;
+  const email = row.email?.trim() || null;
+  const primary_category = row.primary_category?.trim() || row.category?.trim() || null;
+  return { full_name, mobile_number, city, instagram_url, email, primary_category };
+}
+
+function validateContactEmail(email) {
+  if (!email) return null;
+  if (!EMAIL_PATTERN.test(email)) return 'Enter a valid email address';
+  return null;
+}
 
 export const CAMPAIGN_IMPORT_TEMPLATE = `campaign_name,brand_name,target_collaborations,status
 Festive Menu Push,BrandX,15,active
 Winter Glow,GlowCo,10,planning`;
 
-export function validateContactRows(rows, existingContacts, { skipDuplicates = true } = {}) {
+export function validateContactRows(rows, existingContacts, { skipDuplicates = true, categories = [] } = {}) {
   const seenMobiles = new Map();
+  const categoryByName = new Map(categories.map((c) => [c.name.toLowerCase(), c]));
 
   return rows.map((row) => {
-    const full_name = row.full_name?.trim();
-    const mobile_number = row.mobile_number?.trim();
-    const city = row.city?.trim() || null;
-    const instagram_url = row.instagram_url?.trim() || row.instagram_link?.trim() || null;
+    const fields = parseContactImportFields(row);
+    const base = { ...row, ...fields };
 
-    if (!full_name || !mobile_number) {
+    if (!fields.full_name || !fields.mobile_number) {
       return {
-        ...row,
-        full_name,
-        mobile_number,
-        city,
-        instagram_url,
+        ...base,
         status: 'error',
         message: 'Full name and mobile number are required',
       };
     }
 
-    const mobileKey = normalizeMobileToE164(mobile_number);
+    const emailError = validateContactEmail(fields.email);
+    if (emailError) {
+      return { ...base, status: 'error', message: emailError };
+    }
+
+    let primary_category_id = null;
+    if (fields.primary_category) {
+      const category = categoryByName.get(fields.primary_category.toLowerCase());
+      if (!category) {
+        return {
+          ...base,
+          status: 'error',
+          message: `Unknown category "${fields.primary_category}" — use an admin-configured category name`,
+        };
+      }
+      primary_category_id = category.id;
+    }
+
+    const mobileKey = normalizeMobileToE164(fields.mobile_number);
     if (!mobileKey) {
       return {
-        ...row,
-        full_name,
-        mobile_number,
-        city,
-        instagram_url,
+        ...base,
         status: 'error',
         message: 'Enter a valid mobile number',
       };
@@ -90,25 +117,19 @@ export function validateContactRows(rows, existingContacts, { skipDuplicates = t
 
     if (seenMobiles.has(mobileKey)) {
       return {
-        ...row,
-        full_name,
-        mobile_number,
-        city,
-        instagram_url,
+        ...base,
         status: 'error',
         message: `Duplicate mobile in file (row ${seenMobiles.get(mobileKey)})`,
       };
     }
     seenMobiles.set(mobileKey, row._line);
 
-    const match = findContactByMobile(mobile_number, existingContacts);
+    const match = findContactByMobile(fields.mobile_number, existingContacts);
     if (match) {
       return {
-        ...row,
-        full_name,
+        ...base,
         mobile_number: mobileKey,
-        city,
-        instagram_url,
+        primary_category_id,
         status: skipDuplicates ? 'duplicate' : 'warning',
         message: `Matches existing contact: ${match.full_name}`,
         existing_contact_id: match.id,
@@ -117,11 +138,9 @@ export function validateContactRows(rows, existingContacts, { skipDuplicates = t
     }
 
     return {
-      ...row,
-      full_name,
+      ...base,
       mobile_number: mobileKey,
-      city,
-      instagram_url,
+      primary_category_id,
       status: 'ok',
       message: 'Ready to import',
     };

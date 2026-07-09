@@ -4,7 +4,16 @@ const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.trim();
 const apiKey = process.env.CLOUDINARY_API_KEY?.trim();
 const apiSecret = process.env.CLOUDINARY_API_SECRET?.trim();
 
+/** Top-level Cloudinary namespace — dev/prod must not share a folder on one account. */
+const cloudinaryFolder = process.env.CLOUDINARY_FOLDER?.trim() || 'dev';
+
 let configured = false;
+
+/** Build upload folder: `{CLOUDINARY_FOLDER}/{subfolder}` (e.g. dev/pr-pulse/proof-screenshots). */
+export function getCloudinaryUploadFolder(subfolder = '') {
+  const segment = String(subfolder).replace(/^\/+|\/+$/g, '');
+  return segment ? `${cloudinaryFolder}/${segment}` : cloudinaryFolder;
+}
 
 export function isCloudinaryConfigured() {
   return Boolean(cloudName && apiKey && apiSecret);
@@ -35,7 +44,7 @@ export async function uploadProofScreenshot(buffer, { filename, mimeType } = {})
   const result = await new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
-        folder: 'pr-pulse/proof-screenshots',
+        folder: getCloudinaryUploadFolder('pr-pulse/proof-screenshots'),
         resource_type: 'image',
         public_id: `${publicIdBase}-${Date.now()}`,
         overwrite: false,

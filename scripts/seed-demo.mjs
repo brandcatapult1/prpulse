@@ -14,7 +14,7 @@ dotenv.config();
 
 export const DEMO_MARKER = 'prpulse_demo_fixture';
 export const DEMO_USER_EMAIL_SUFFIX = '@brandcatapult.fixture';
-const ALLOWED_DEMO_SEED_HOST_SUFFIXES = ['.neon.tech'];
+const LOCAL_DEMO_SEED_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 
 export const DEMO_OUTLETS = {
   glowco: 'GlowCo Bandra',
@@ -216,10 +216,18 @@ function parseHostFromDatabaseUrl(databaseUrl) {
   }
 }
 
-function isAllowedDemoSeedHost(hostname) {
+function parseDevDbHosts(value) {
+  return String(value ?? '')
+    .split(',')
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function isAllowedDemoSeedHost(hostname, allowedHosts) {
   if (!hostname) return false;
-  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') return true;
-  return ALLOWED_DEMO_SEED_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix));
+  const host = hostname.toLowerCase();
+  if (LOCAL_DEMO_SEED_HOSTS.has(host)) return true;
+  return allowedHosts.includes(host);
 }
 
 export function assertDemoSeedAllowed({
@@ -227,6 +235,7 @@ export function assertDemoSeedAllowed({
   allowDemoSeed = process.env.ALLOW_DEMO_SEED,
   nodeEnv = process.env.NODE_ENV,
   appEnv = process.env.APP_ENV,
+  devDbHosts = process.env.DEV_DB_HOSTS,
 } = {}) {
   const allowedFlag = String(allowDemoSeed ?? '').trim().toLowerCase() === 'true';
   if (!allowedFlag) {
@@ -246,7 +255,8 @@ export function assertDemoSeedAllowed({
   }
 
   const host = parseHostFromDatabaseUrl(trimmedUrl);
-  if (!isAllowedDemoSeedHost(host)) {
+  const allowedHosts = parseDevDbHosts(devDbHosts);
+  if (!isAllowedDemoSeedHost(host, allowedHosts)) {
     throw new Error('Demo seed refused: database host is not an approved dev host.');
   }
 

@@ -31,3 +31,5 @@ jobs:
           fi
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ALLOW_DEMO_SEED: 'true'
+          DEV_DB_HOSTS: ${{ secrets.DEV_DB_HOSTS }}

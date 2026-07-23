@@ -1,39 +1,23 @@
 import { Router } from 'express';
 import { pool, withUserTransaction } from '../db.mjs';
-import { requireAuth, scopeArchived, scopeBlacklisted } from '../middleware/auth.mjs';
+import { requireAuth, scopeBlacklisted } from '../middleware/auth.mjs';
 import { requireSeniorOrAdmin, requireAdmin } from '../middleware/permissions.mjs';
 import { findContactByMobile } from '../lib/mobileNumber.mjs';
 import { applyContactPatch, loadContactDetail, CLASSIFICATION_VALUES } from '../lib/contactDetail.mjs';
 import { createContactDeduped } from '../lib/contactCreate.mjs';
 import { batchAddTagToContacts, batchSetContactStatus, batchSetPrimaryCategory } from '../lib/contactBatch.mjs';
 import { syncContactTags } from '../lib/contactTags.mjs';
+import { listContactsPaginated } from '../lib/contactList.mjs';
 
 export const contactsRouter = Router();
 
 contactsRouter.get('/', requireAuth, async (req, res) => {
-  const includeArchived = req.query.include_archived === 'true';
-  const { rows } = await pool.query(
-    `SELECT c.id, c.full_name, c.city, c.classification, c.status,
-            c.is_blacklisted, c.mobile_number, c.contact_type,
-            c.open_to_paid, c.open_to_barter,
-            c.primary_category_id,
-            pc.name AS primary_category_name,
-            COALESCE(
-              (
-                SELECT array_agg(t.name ORDER BY t.name)
-                FROM contact_tags ct
-                JOIN tags t ON t.id = ct.tag_id
-                WHERE ct.contact_id = c.id
-              ),
-              ARRAY[]::text[]
-            ) AS tags
-     FROM contacts c
-     LEFT JOIN categories pc ON pc.id = c.primary_category_id
-     WHERE 1=1 ${scopeArchived(includeArchived)}
-     ORDER BY c.full_name
-     LIMIT 200`,
-  );
-  res.json(rows);
+  try {
+    const result = await listContactsPaginated(pool, req.query);
+    res.json(result);
+  } catch (err) {
+    res.status(err.status ?? 500).json({ error: err.message ?? 'Could not load contacts' });
+  }
 });
 
 contactsRouter.get('/:id/engagements', requireAuth, async (req, res) => {

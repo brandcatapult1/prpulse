@@ -5,7 +5,7 @@ import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { TagSelectChips } from '../components/tags/TagSelectChips.jsx';
 import { Pill, formatDate } from '../lib/format.jsx';
 import { MODULES } from '../lib/modules.js';
-import { contactsApi, lookupApi, registrationsApi } from '../lib/api.js';
+import { fetchAllContacts, lookupApi, registrationsApi } from '../lib/api.js';
 import { findContactByMobile } from '../lib/phone.js';
 import { formatPrimaryCategory } from '../lib/creatorCategories.js';
 import { todayIso } from '../lib/dates.js';
@@ -33,7 +33,7 @@ export function RegistrationsPage() {
   const load = useCallback(() => {
     Promise.all([
       registrationsApi.list(),
-      contactsApi.list().catch(() => []),
+      fetchAllContacts().catch(() => []),
     ])
       .then(([regs, contactRows]) => {
         setRows(Array.isArray(regs) ? regs : []);

@@ -338,3 +338,38 @@ export function ExpandableSection({ title, children, defaultOpen = false }) {
     </details>
   );
 }
+
+export function ListPagination({ page, pageSize, total, onPageChange, loading = false }) {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, total);
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 px-1 py-2 text-2xs text-ink-secondary">
+      <span>
+        {total === 0 ? 'No results' : `Showing ${from.toLocaleString()}–${to.toLocaleString()} of ${total.toLocaleString()}`}
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="btn-secondary !py-1 !px-2.5 disabled:opacity-40"
+          disabled={page <= 1 || loading}
+          onClick={() => onPageChange(page - 1)}
+        >
+          Previous
+        </button>
+        <span className="whitespace-nowrap tabular-nums">
+          Page {page} of {totalPages}
+        </span>
+        <button
+          type="button"
+          className="btn-secondary !py-1 !px-2.5 disabled:opacity-40"
+          disabled={page >= totalPages || loading}
+          onClick={() => onPageChange(page + 1)}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}

@@ -15,7 +15,7 @@ import {
   validateCampaignRows,
   validateContactRows,
 } from '../lib/csvImport.js';
-import { brandsApi, contactsApi, importApi, lookupApi } from '../lib/api.js';
+import { brandsApi, fetchAllContacts, importApi, lookupApi } from '../lib/api.js';
 
 const TABS = [
   { id: 'contacts', label: 'Contacts' },
@@ -43,7 +43,7 @@ export function BulkImportPage() {
     setReferenceLoading(true);
     try {
       const [contacts, brands, categories] = await Promise.all([
-        contactsApi.list(),
+        fetchAllContacts(),
         brandsApi.list(),
         lookupApi.categories().catch(() => []),
       ]);

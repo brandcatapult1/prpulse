@@ -1,3 +1,5 @@
+import { buildContactListSearchParams } from './contactListParams.js';
+
 export async function api(path, options = {}) {
   const res = await fetch(`/api${path}`, {
     credentials: 'include',
@@ -83,8 +85,22 @@ export const dashboardApi = {
 };
 
 export const contactsApi = {
-  list: ({ includeArchived = false } = {}) =>
-    api(`/contacts${includeArchived ? '?include_archived=true' : ''}`),
+  list: ({
+    page = 1,
+    pageSize = 50,
+    query = '',
+    filters = {},
+    includeArchived = false,
+  } = {}) => {
+    const params = buildContactListSearchParams({
+      page,
+      pageSize,
+      query,
+      filters,
+      includeArchived,
+    });
+    return api(`/contacts?${params.toString()}`);
+  },
   get: (id) => api(`/contacts/${id}`),
   engagements: (id) => api(`/contacts/${id}/engagements`),
   update: (id, body) => api(`/contacts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
@@ -115,6 +131,24 @@ export const contactsApi = {
     api(`/contacts/${id}/blacklist`, { method: 'POST', body: JSON.stringify({ reason }) }),
   clearBlacklist: (id) => api(`/contacts/${id}/blacklist`, { method: 'DELETE' }),
 };
+
+/** Fetch all contacts by paging through the list API (for dedup / reference lookups). */
+export async function fetchAllContacts(options = {}) {
+  const pageSize = 200;
+  let page = 1;
+  const all = [];
+
+  while (true) {
+    const data = await contactsApi.list({ ...options, page, pageSize });
+    const rows = data?.rows ?? [];
+    const total = data?.total ?? rows.length;
+    all.push(...rows);
+    if (all.length >= total || rows.length === 0) break;
+    page += 1;
+  }
+
+  return all;
+}
 
 export const campaignsApi = {
   list: () => api('/campaigns'),

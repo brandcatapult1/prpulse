@@ -18,6 +18,14 @@ export function normalizeMobileToE164(raw, defaultCountry = DEFAULT_MOBILE_COUNT
   return parsed.format('E.164');
 }
 
+/** ISO country from E.164 — mirrors server bulk-import city registration. */
+export function countryFromE164(e164, defaultCountry = DEFAULT_MOBILE_COUNTRY) {
+  const parsed = parsePhoneNumberFromString(String(e164 ?? '').trim());
+  const code = parsed?.country;
+  if (code === 'IN' || code === 'AE' || code === 'US' || code === 'GB') return code;
+  return defaultCountry;
+}
+
 export function isMobileValid(raw, defaultCountry = DEFAULT_MOBILE_COUNTRY) {
   return Boolean(normalizeMobileToE164(raw, defaultCountry));
 }

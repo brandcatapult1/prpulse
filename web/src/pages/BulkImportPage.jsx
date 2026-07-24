@@ -34,6 +34,7 @@ export function BulkImportPage() {
   const [existingContacts, setExistingContacts] = useState([]);
   const [existingBrands, setExistingBrands] = useState([]);
   const [existingCategories, setExistingCategories] = useState([]);
+  const [existingCities, setExistingCities] = useState([]);
   const [referenceLoading, setReferenceLoading] = useState(true);
 
   const summary = useMemo(() => importSummary(validated), [validated]);
@@ -42,18 +43,21 @@ export function BulkImportPage() {
   const loadReferenceData = useCallback(async () => {
     setReferenceLoading(true);
     try {
-      const [contacts, brands, categories] = await Promise.all([
+      const [contacts, brands, categories, cities] = await Promise.all([
         fetchAllContacts(),
         brandsApi.list(),
         lookupApi.categories().catch(() => []),
+        lookupApi.cities().catch(() => []),
       ]);
       setExistingContacts(Array.isArray(contacts) ? contacts : []);
       setExistingBrands(Array.isArray(brands) ? brands : []);
       setExistingCategories(Array.isArray(categories) ? categories : []);
+      setExistingCities(Array.isArray(cities) ? cities : []);
     } catch {
       setExistingContacts([]);
       setExistingBrands([]);
       setExistingCategories([]);
+      setExistingCities([]);
     } finally {
       setReferenceLoading(false);
     }
@@ -71,7 +75,11 @@ export function BulkImportPage() {
 
     if (tab === 'contacts') {
       setValidated(
-        validateContactRows(rows, existingContacts, { skipDuplicates, categories: existingCategories }),
+        validateContactRows(rows, existingContacts, {
+          skipDuplicates,
+          categories: existingCategories,
+          cities: existingCities,
+        }),
       );
     } else {
       setValidated(validateCampaignRows(rows, existingBrands));
@@ -95,6 +103,7 @@ export function BulkImportPage() {
         validateContactRows(rawRows, existingContacts, {
           skipDuplicates: nextSkip,
           categories: existingCategories,
+          cities: existingCities,
         }),
       );
     } else {

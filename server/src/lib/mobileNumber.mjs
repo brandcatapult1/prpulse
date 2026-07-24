@@ -15,6 +15,14 @@ export function normalizeMobileToE164(raw, defaultCountry = DEFAULT_MOBILE_COUNT
   return parsed.format('E.164');
 }
 
+/** ISO country from a stored E.164 mobile — used when bulk import omits country. */
+export function countryFromE164(e164, defaultCountry = DEFAULT_MOBILE_COUNTRY) {
+  const parsed = parsePhoneNumberFromString(String(e164 ?? '').trim());
+  const code = parsed?.country;
+  if (code === 'IN' || code === 'AE' || code === 'US' || code === 'GB') return code;
+  return defaultCountry;
+}
+
 /** Last 10 digits — legacy fallback for rows stored before E.164 normalization. */
 export function mobileNationalSuffix(value) {
   const digits = String(value ?? '').replace(/\D/g, '');

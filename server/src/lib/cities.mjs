@@ -64,6 +64,32 @@ export function assertSupportedCountry(code) {
   return code;
 }
 
+/**
+ * Ensure a city exists on the admin-managed list (case-insensitive via citext).
+ * Used by bulk import to keep contact.city aligned with the city filter dropdown.
+ */
+export async function ensureCityRegistered(client, cityName, countryCode) {
+  const name = String(cityName ?? '').trim();
+  if (!name) return null;
+
+  const country = assertSupportedCountry(countryCode);
+  await ensureCities(client);
+
+  const { rows: existing } = await client.query(
+    `SELECT id, name, country FROM cities WHERE country = $1 AND name = $2`,
+    [country, name],
+  );
+  if (existing[0]) return existing[0];
+
+  const { rows } = await client.query(
+    `INSERT INTO cities (name, country) VALUES ($1, $2)
+     ON CONFLICT (country, name) DO UPDATE SET name = EXCLUDED.name
+     RETURNING id, name, country`,
+    [name, country],
+  );
+  return rows[0];
+}
+
 /** Validate city is on the admin-managed list for the given country. */
 export async function assertValidCity(client, cityName, countryCode) {
   const name = String(cityName ?? '').trim();

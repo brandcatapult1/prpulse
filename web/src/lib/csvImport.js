@@ -1,4 +1,5 @@
-import { findContactByMobile, normalizeMobileToE164 } from './phone.js';
+import { findContactByMobile, normalizeMobileToE164, countryFromE164 } from './phone.js';
+import { matchCityName } from './locations.js';
 
 /** Parse a single CSV line respecting quoted fields. */
 function parseCsvLine(line) {
@@ -72,7 +73,7 @@ export const CAMPAIGN_IMPORT_TEMPLATE = `campaign_name,brand_name,target_collabo
 Festive Menu Push,BrandX,15,active
 Winter Glow,GlowCo,10,planning`;
 
-export function validateContactRows(rows, existingContacts, { skipDuplicates = true, categories = [] } = {}) {
+export function validateContactRows(rows, existingContacts, { skipDuplicates = true, categories = [], cities = [] } = {}) {
   const seenMobiles = new Map();
   const categoryByName = new Map(categories.map((c) => [c.name.toLowerCase(), c]));
 
@@ -115,6 +116,13 @@ export function validateContactRows(rows, existingContacts, { skipDuplicates = t
       };
     }
 
+    let city = fields.city;
+    if (city) {
+      const countryCode = countryFromE164(mobileKey);
+      const canonical = matchCityName(cities, city, countryCode);
+      city = canonical || city;
+    }
+
     if (seenMobiles.has(mobileKey)) {
       return {
         ...base,
@@ -129,6 +137,7 @@ export function validateContactRows(rows, existingContacts, { skipDuplicates = t
       return {
         ...base,
         mobile_number: mobileKey,
+        city,
         primary_category_id,
         status: skipDuplicates ? 'duplicate' : 'warning',
         message: `Matches existing contact: ${match.full_name}`,
@@ -140,6 +149,7 @@ export function validateContactRows(rows, existingContacts, { skipDuplicates = t
     return {
       ...base,
       mobile_number: mobileKey,
+      city,
       primary_category_id,
       status: 'ok',
       message: 'Ready to import',

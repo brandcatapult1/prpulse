@@ -2,8 +2,9 @@ import { Router } from 'express';
 import { pool, withUserTransaction } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
 import { requireSeniorOrAdmin } from '../middleware/permissions.mjs';
-import { findContactByMobile, normalizeMobileToE164 } from '../lib/mobileNumber.mjs';
+import { findContactByMobile, normalizeMobileToE164, countryFromE164 } from '../lib/mobileNumber.mjs';
 import { assertValidCategoryId } from '../lib/categories.mjs';
+import { ensureCityRegistered } from '../lib/cities.mjs';
 
 export const importRouter = Router();
 
@@ -37,16 +38,25 @@ importRouter.post('/contacts', requireAuth, requireImportRole, async (req, res) 
           primaryCategoryId = category?.id ?? null;
         }
 
+        let cityValue = city?.trim() || null;
+        let countryValue = countryFromE164(e164);
+        if (cityValue) {
+          const cityRow = await ensureCityRegistered(client, cityValue, countryValue);
+          cityValue = cityRow.name;
+          countryValue = cityRow.country;
+        }
+
         const { rows: inserted } = await client.query(
           `INSERT INTO contacts (
-             full_name, mobile_number, city, instagram_url, email, primary_category_id, source, created_by
+             full_name, mobile_number, city, country, instagram_url, email, primary_category_id, source, created_by
            )
-           VALUES ($1, $2, $3, $4, $5, $6, 'bulk_upload', $7)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'bulk_upload', $8)
            RETURNING id, full_name, mobile_number, city, email, primary_category_id, status`,
           [
             full_name.trim(),
             e164,
-            city ?? null,
+            cityValue,
+            countryValue,
             instagram_url ?? null,
             emailValue,
             primaryCategoryId,

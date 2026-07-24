@@ -1,0 +1,1 @@
+-- Data backfill; registered cities are not removed on rollback.

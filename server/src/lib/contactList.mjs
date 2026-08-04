@@ -33,27 +33,8 @@ function parseUuidList(value) {
   return value.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
-/**
- * Build WHERE clause + params for contacts list (AND-combined filters).
- */
-export function buildContactListFilters(query) {
-  const conditions = ['1=1'];
-  const params = [];
-  let idx = 1;
-
-  const status = query.status ?? '';
-  const includeArchived = query.include_archived === 'true';
-
-  if (status === 'active' || status === 'inactive' || status === 'archived') {
-    conditions.push(`c.status = $${idx}`);
-    params.push(status);
-    idx += 1;
-  } else if (status === 'all') {
-    // No status restriction — include archived when requested.
-  } else if (!includeArchived) {
-    conditions.push("c.status <> 'archived'");
-  }
-
+/** Shared search + facet filters for contacts list and campaign population. */
+function appendContactFacetFilters(conditions, params, query, idx) {
   const q = query.q?.trim();
   if (q) {
     const pattern = `%${q}%`;
@@ -111,10 +92,97 @@ export function buildContactListFilters(query) {
     idx += 1;
   }
 
+  return idx;
+}
+
+/**
+ * Build WHERE clause + params for contacts list (AND-combined filters).
+ */
+export function buildContactListFilters(query) {
+  const conditions = ['1=1'];
+  const params = [];
+  let idx = 1;
+
+  const status = query.status ?? '';
+  const includeArchived = query.include_archived === 'true';
+
+  if (status === 'active' || status === 'inactive' || status === 'archived') {
+    conditions.push(`c.status = $${idx}`);
+    params.push(status);
+    idx += 1;
+  } else if (status === 'all') {
+    // No status restriction — include archived when requested.
+  } else if (!includeArchived) {
+    conditions.push("c.status <> 'archived'");
+  }
+
+  appendContactFacetFilters(conditions, params, query, idx);
+
   return {
     whereSql: conditions.join(' AND '),
     params,
   };
+}
+
+const POPULATION_LIST_SELECT = `
+  SELECT c.id, c.full_name, c.city, c.classification, c.status,
+         c.is_blacklisted, c.mobile_number, c.open_to_paid, c.open_to_barter,
+         c.primary_category_id, c.instagram_url,
+         pc.name AS primary_category_name,
+         COALESCE(
+           (
+             SELECT array_agg(t.name ORDER BY t.name)
+             FROM contact_tags ct
+             JOIN tags t ON t.id = ct.tag_id
+             WHERE ct.contact_id = c.id
+           ),
+           ARRAY[]::text[]
+         ) AS tags
+  FROM contacts c
+  LEFT JOIN categories pc ON pc.id = c.primary_category_id
+`;
+
+/** Active, non-blacklisted creators not yet on the campaign — with search/facet filters. */
+export function buildPopulationContactFilters(query, campaignId) {
+  const conditions = [
+    "c.status = 'active'",
+    'c.is_blacklisted = false',
+    `NOT EXISTS (
+      SELECT 1 FROM engagements e
+      WHERE e.contact_id = c.id AND e.campaign_id = $1
+    )`,
+  ];
+  const params = [campaignId];
+  appendContactFacetFilters(conditions, params, query, 2);
+  return {
+    whereSql: conditions.join(' AND '),
+    params,
+  };
+}
+
+export async function listPopulationContactsPaginated(pool, campaignId, query) {
+  const page = parsePage(query.page);
+  const pageSize = parsePageSize(query.page_size);
+  const offset = (page - 1) * pageSize;
+
+  const { whereSql, params } = buildPopulationContactFilters(query, campaignId);
+  const fromSql = `${POPULATION_LIST_SELECT} WHERE ${whereSql}`;
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total FROM (${fromSql}) counted`,
+    params,
+  );
+  const total = countResult.rows[0]?.total ?? 0;
+
+  const listParams = [...params, pageSize, offset];
+  const { rows } = await pool.query(
+    `${fromSql}
+     ORDER BY c.full_name
+     LIMIT $${listParams.length - 1} OFFSET $${listParams.length}`,
+    listParams,
+  );
+
+  return { rows, total, page, pageSize };
 }
 
 export async function listContactsPaginated(pool, query) {

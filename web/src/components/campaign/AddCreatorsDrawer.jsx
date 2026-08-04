@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
-import { DataTable } from '../ui/DataKit.jsx';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { DataTable, ListPagination } from '../ui/DataKit.jsx';
 import { Drawer, Toast } from '../ui/Primitives.jsx';
 import { AddContactDrawer } from '../contacts/AddContactDrawer.jsx';
 import { ContactFilters } from '../contacts/ContactFilters.jsx';
 import { campaignsApi, lookupApi } from '../../lib/api.js';
 import { fetchPopulationContacts } from '../../lib/persistence.js';
-import {
-  CONTACT_DRAWER_FILTER_DEFAULTS,
-  filterContacts,
-} from '../../lib/contactFilters.js';
+import { CONTACT_DRAWER_FILTER_DEFAULTS } from '../../lib/contactFilters.js';
 import { instagramProfileFromUrl } from '../../lib/contactSocialLinks.js';
 import { mergeContactsCache } from '../../lib/contactsCache.js';
+
+const PAGE_SIZE = 50;
+const SEARCH_DEBOUNCE_MS = 300;
 
 function InstagramHandle({ contact }) {
   const profile = instagramProfileFromUrl(contact?.instagram_url);
@@ -44,8 +44,11 @@ export function AddCreatorsDrawer({
   onAdded,
 }) {
   const [selected, setSelected] = useState([]);
-  const [contacts, setContacts] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [filters, setFilters] = useState(CONTACT_DRAWER_FILTER_DEFAULTS);
   const [tagOptions, setTagOptions] = useState([]);
   const [cityOptions, setCityOptions] = useState([]);
@@ -60,25 +63,46 @@ export function AddCreatorsDrawer({
     [engagementContactIds],
   );
 
-  function loadPool() {
-    if (!campaignId) return;
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  const fetchPage = useCallback((targetPage) => {
+    if (!campaignId) return Promise.resolve();
     setLoading(true);
-    fetchPopulationContacts(campaignId)
-      .then((rows) => {
-        setContacts(rows ?? []);
-        mergeContactsCache(rows);
+    return fetchPopulationContacts(campaignId, {
+      page: targetPage,
+      pageSize: PAGE_SIZE,
+      query: debouncedQuery,
+      filters,
+    })
+      .then((data) => {
+        const list = data?.rows ?? [];
+        setRows(list);
+        setTotal(data?.total ?? list.length);
+        mergeContactsCache(list);
       })
-      .catch(() => setContacts([]))
+      .catch(() => {
+        setRows([]);
+        setTotal(0);
+      })
       .finally(() => setLoading(false));
-  }
+  }, [campaignId, debouncedQuery, filters]);
 
   useEffect(() => {
     if (!open || !campaignId) return;
     setSelected([]);
     setQuery('');
+    setDebouncedQuery('');
     setFilters(CONTACT_DRAWER_FILTER_DEFAULTS);
-    loadPool();
+    setPage(1);
   }, [open, campaignId]);
+
+  useEffect(() => {
+    if (!open || !campaignId) return;
+    fetchPage(page);
+  }, [open, campaignId, page, fetchPage]);
 
   useEffect(() => {
     if (!open) return;
@@ -94,27 +118,19 @@ export function AddCreatorsDrawer({
   }, [open]);
 
   function updateFilters(patch) {
+    setPage(1);
     setFilters((prev) => ({ ...prev, ...patch }));
   }
 
   function clearFilters() {
+    setPage(1);
     setQuery('');
     setFilters(CONTACT_DRAWER_FILTER_DEFAULTS);
   }
 
-  const filteredRows = useMemo(
-    () => filterContacts(contacts, {
-      query,
-      filters,
-      tagOptions,
-      includeStatusFilter: false,
-    }),
-    [contacts, query, filters, tagOptions],
-  );
-
   const selectableIds = useMemo(
-    () => filteredRows.filter((r) => !inCampaignIds.has(String(r.id))).map((r) => r.id),
-    [filteredRows, inCampaignIds],
+    () => rows.filter((r) => !inCampaignIds.has(String(r.id))).map((r) => r.id),
+    [rows, inCampaignIds],
   );
 
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.includes(id));
@@ -163,6 +179,8 @@ export function AddCreatorsDrawer({
     }
   }
 
+  const showEmpty = !loading && rows.length === 0;
+
   return (
     <>
       <Drawer
@@ -194,7 +212,10 @@ export function AddCreatorsDrawer({
           layout="drawer"
           hideStatus
           query={query}
-          onQueryChange={setQuery}
+          onQueryChange={(value) => {
+            setPage(1);
+            setQuery(value);
+          }}
           filters={filters}
           onChange={updateFilters}
           cityOptions={cityOptions}
@@ -203,57 +224,75 @@ export function AddCreatorsDrawer({
           onClear={clearFilters}
         />
 
-        <div className="mt-4">
-          {loading ? (
+        <div className="mt-4 space-y-3">
+          <ListPagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={total}
+            loading={loading}
+            onPageChange={setPage}
+          />
+
+          {loading && rows.length === 0 ? (
             <p className="campaign-glass-tile p-4 text-center text-2xs text-ink-tertiary">Loading creators…</p>
-          ) : filteredRows.length === 0 ? (
+          ) : showEmpty ? (
             <p className="campaign-glass-tile p-4 text-center text-2xs text-ink-tertiary">
-              {contacts.length === 0
-                ? 'No eligible creators — add a new contact first.'
-                : 'No creators match these filters.'}
+              No eligible creators match these filters — add a new contact or adjust filters.
             </p>
           ) : (
-            <DataTable
-              selectable
-              selected={selected}
-              onSelect={toggleSelect}
-              onSelectAll={toggleSelectAll}
-              allSelected={allSelected}
-              someSelected={someSelected}
-              isRowDisabled={(row) => inCampaignIds.has(String(row.id))}
-              columns={[
-                {
-                  key: 'full_name',
-                  label: 'Name',
-                  render: (r, { disabled }) => (
-                    <div>
-                      <span className={disabled ? 'text-ink-tertiary' : 'font-medium text-ink'}>
-                        {r.full_name}
-                      </span>
-                      {disabled && (
-                        <span className="mt-0.5 block text-2xs text-ink-tertiary">Already on campaign</span>
-                      )}
-                    </div>
-                  ),
-                },
-                {
-                  key: 'instagram',
-                  label: 'Instagram',
-                  render: (r) => <InstagramHandle contact={r} />,
-                },
-                { key: 'city', label: 'City', render: (r) => r.city ?? '—' },
-                {
-                  key: 'primary_category_name',
-                  label: 'Category',
-                  render: (r) => r.primary_category_name ?? '—',
-                },
-                {
-                  key: 'classification',
-                  label: 'Class',
-                  render: (r) => r.classification?.replace('_', ' ') ?? '—',
-                },
-              ]}
-              rows={filteredRows}
+            <div className={loading ? 'pointer-events-none opacity-60' : ''}>
+              <DataTable
+                selectable
+                selected={selected}
+                onSelect={toggleSelect}
+                onSelectAll={toggleSelectAll}
+                allSelected={allSelected}
+                someSelected={someSelected}
+                isRowDisabled={(row) => inCampaignIds.has(String(row.id))}
+                columns={[
+                  {
+                    key: 'full_name',
+                    label: 'Name',
+                    render: (r, { disabled }) => (
+                      <div>
+                        <span className={disabled ? 'text-ink-tertiary' : 'font-medium text-ink'}>
+                          {r.full_name}
+                        </span>
+                        {disabled && (
+                          <span className="mt-0.5 block text-2xs text-ink-tertiary">Already on campaign</span>
+                        )}
+                      </div>
+                    ),
+                  },
+                  {
+                    key: 'instagram',
+                    label: 'Instagram',
+                    render: (r) => <InstagramHandle contact={r} />,
+                  },
+                  { key: 'city', label: 'City', render: (r) => r.city ?? '—' },
+                  {
+                    key: 'primary_category_name',
+                    label: 'Category',
+                    render: (r) => r.primary_category_name ?? '—',
+                  },
+                  {
+                    key: 'classification',
+                    label: 'Class',
+                    render: (r) => r.classification?.replace('_', ' ') ?? '—',
+                  },
+                ]}
+                rows={rows}
+              />
+            </div>
+          )}
+
+          {!showEmpty && (
+            <ListPagination
+              page={page}
+              pageSize={PAGE_SIZE}
+              total={total}
+              loading={loading}
+              onPageChange={setPage}
             />
           )}
         </div>
@@ -263,7 +302,8 @@ export function AddCreatorsDrawer({
         open={quickOpen}
         onClose={() => setQuickOpen(false)}
         onSaved={() => {
-          loadPool();
+          if (page !== 1) setPage(1);
+          else fetchPage(1);
           setToast('Contact added — select them above to add to campaign');
         }}
       />

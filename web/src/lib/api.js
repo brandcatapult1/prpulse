@@ -1,4 +1,4 @@
-import { buildContactListSearchParams } from './contactListParams.js';
+import { buildContactListSearchParams, buildPopulationListSearchParams } from './contactListParams.js';
 
 export async function api(path, options = {}) {
   const res = await fetch(`/api${path}`, {
@@ -125,8 +125,15 @@ export const contactsApi = {
     const q = countryCode ? `?country=${encodeURIComponent(countryCode)}` : '';
     return api(`/contacts/lookup/mobile/${encodeURIComponent(mobile)}${q}`);
   },
-  populationForCampaign: (campaignId) =>
-    api(`/contacts/population/campaign/${campaignId}`),
+  populationForCampaign: (campaignId, {
+    page = 1,
+    pageSize = 50,
+    query = '',
+    filters = {},
+  } = {}) => {
+    const params = buildPopulationListSearchParams({ page, pageSize, query, filters });
+    return api(`/contacts/population/campaign/${campaignId}?${params.toString()}`);
+  },
   blacklist: (id, reason) =>
     api(`/contacts/${id}/blacklist`, { method: 'POST', body: JSON.stringify({ reason }) }),
   clearBlacklist: (id) => api(`/contacts/${id}/blacklist`, { method: 'DELETE' }),

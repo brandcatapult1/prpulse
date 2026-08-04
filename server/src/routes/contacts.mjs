@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { pool, withUserTransaction } from '../db.mjs';
-import { requireAuth, scopeBlacklisted } from '../middleware/auth.mjs';
+import { requireAuth } from '../middleware/auth.mjs';
 import { requireSeniorOrAdmin, requireAdmin } from '../middleware/permissions.mjs';
 import { findContactByMobile } from '../lib/mobileNumber.mjs';
 import { applyContactPatch, loadContactDetail, CLASSIFICATION_VALUES } from '../lib/contactDetail.mjs';
 import { createContactDeduped } from '../lib/contactCreate.mjs';
 import { batchAddTagToContacts, batchSetContactStatus, batchSetPrimaryCategory } from '../lib/contactBatch.mjs';
 import { syncContactTags } from '../lib/contactTags.mjs';
-import { listContactsPaginated } from '../lib/contactList.mjs';
+import { listContactsPaginated, listPopulationContactsPaginated } from '../lib/contactList.mjs';
 
 export const contactsRouter = Router();
 
@@ -229,31 +229,10 @@ contactsRouter.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
 });
 
 contactsRouter.get('/population/campaign/:campaignId', requireAuth, async (req, res) => {
-  const { rows } = await pool.query(
-    `SELECT c.id, c.full_name, c.city, c.classification, c.status, c.is_blacklisted,
-            c.mobile_number, c.open_to_paid, c.open_to_barter, c.primary_category_id,
-            c.instagram_url,
-            pc.name AS primary_category_name,
-            COALESCE(
-              (
-                SELECT array_agg(t.name ORDER BY t.name)
-                FROM contact_tags ct
-                JOIN tags t ON t.id = ct.tag_id
-                WHERE ct.contact_id = c.id
-              ),
-              ARRAY[]::text[]
-            ) AS tags
-     FROM contacts c
-     LEFT JOIN categories pc ON pc.id = c.primary_category_id
-     WHERE c.status = 'active'
-       ${scopeBlacklisted(false)}
-       AND NOT EXISTS (
-         SELECT 1 FROM engagements e
-         WHERE e.contact_id = c.id AND e.campaign_id = $1
-       )
-     ORDER BY c.full_name
-     LIMIT 500`,
-    [req.params.campaignId],
-  );
-  res.json(rows);
+  try {
+    const result = await listPopulationContactsPaginated(pool, req.params.campaignId, req.query);
+    res.json(result);
+  } catch (err) {
+    res.status(err.status ?? 500).json({ error: err.message ?? 'Could not load creators' });
+  }
 });

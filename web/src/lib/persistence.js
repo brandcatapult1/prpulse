@@ -132,8 +132,8 @@ export async function populateCampaign(campaignId, contactIds, assignedManager) 
   });
 }
 
-export async function fetchPopulationContacts(campaignId) {
-  return contactsApi.populationForCampaign(campaignId);
+export async function fetchPopulationContacts(campaignId, options = {}) {
+  return contactsApi.populationForCampaign(campaignId, options);
 }
 
 export async function fetchDashboardWorkspace(scopeUserId) {

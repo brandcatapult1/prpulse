@@ -19,15 +19,28 @@ export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
   const { user } = useAuth();
   const [draft, setDraft] = useState(null);
   const [tagOptions, setTagOptions] = useState([]);
+  const [managerOptions, setManagerOptions] = useState([]);
+  const [managersLoading, setManagersLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
 
   const isMonthly = campaign?.campaign_type === 'monthly';
   const canEditTermMonths = canEditCampaignTermMonths(user?.role);
+  // Only editable when the campaign payload includes the current manager list.
+  const canEditManagers = Array.isArray(campaign?.managers);
 
   useEffect(() => {
     if (!open) return;
     lookupApi.tags().then((rows) => setTagOptions(Array.isArray(rows) ? rows : [])).catch(() => setTagOptions([]));
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    setManagersLoading(true);
+    campaignsApi.assignableManagers()
+      .then((rows) => setManagerOptions(Array.isArray(rows) ? rows : []))
+      .catch(() => setManagerOptions([]))
+      .finally(() => setManagersLoading(false));
   }, [open]);
 
   useEffect(() => {
@@ -38,11 +51,23 @@ export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
         target_collaborations: campaign.target_collaborations ?? '',
         term_months: campaign.term_months ?? '',
         tag_ids: (campaign.tags ?? []).map((t) => t.id),
+        manager_ids: (campaign.managers ?? []).map((m) => String(m.id)),
       });
     }
   }, [campaign]);
 
   if (!open || !campaign || !draft) return null;
+
+  function toggleManager(id) {
+    setDraft((d) => {
+      const key = String(id);
+      const has = d.manager_ids.includes(key);
+      return {
+        ...d,
+        manager_ids: has ? d.manager_ids.filter((m) => m !== key) : [...d.manager_ids, key],
+      };
+    });
+  }
 
   const targetError = validateCampaignTarget({
     campaign_type: campaign.campaign_type,
@@ -51,15 +76,18 @@ export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
   const termMonthsError = isMonthly && canEditTermMonths
     ? validateTermMonths({ campaign_type: 'monthly', term_months: draft.term_months })
     : null;
-  const canSave = draft.campaign_name.trim() && !targetError && !termMonthsError && !saving;
+  const managersError = canEditManagers && draft.manager_ids.length === 0
+    ? 'Select at least one account manager'
+    : null;
+  const canSave = draft.campaign_name.trim() && !targetError && !termMonthsError && !managersError && !saving;
 
   async function save() {
     if (!draft.campaign_name.trim()) {
       setToast('Campaign name is required');
       return;
     }
-    if (targetError || termMonthsError) {
-      setToast(targetError ?? termMonthsError);
+    if (targetError || termMonthsError || managersError) {
+      setToast(targetError ?? termMonthsError ?? managersError);
       return;
     }
     setSaving(true);
@@ -72,6 +100,9 @@ export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
       };
       if (isMonthly && canEditTermMonths) {
         body.term_months = parseTermMonthsInput(draft.term_months);
+      }
+      if (canEditManagers) {
+        body.manager_ids = draft.manager_ids;
       }
       const saved = await campaignsApi.update(campaign.id, body);
       onSaved?.(saved);
@@ -183,6 +214,46 @@ export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
               />
             </div>
           </div>
+
+          {canEditManagers && (
+            <div>
+              <span className="text-2xs font-medium text-ink-secondary">Account managers</span>
+              <p className="mt-0.5 text-[10px] text-ink-tertiary">
+                Who can see and run this campaign
+              </p>
+              {managersLoading ? (
+                <p className="mt-1 text-2xs text-ink-tertiary">Loading team…</p>
+              ) : managerOptions.length === 0 ? (
+                <p className="mt-1 text-2xs text-ink-tertiary">No managers available</p>
+              ) : (
+                <div className="mt-1.5 max-h-32 space-y-1 overflow-y-auto rounded-md border border-line/80 p-2">
+                  {managerOptions.map((m) => {
+                    const checked = draft.manager_ids.includes(String(m.id));
+                    const isSelf = String(m.id) === String(user?.id);
+                    const lockedSelf = isSelf && user?.role === 'campaign_manager';
+                    return (
+                      <label
+                        key={m.id}
+                        className={`flex items-center gap-2 rounded px-1 py-0.5 text-2xs text-ink ${lockedSelf ? 'opacity-70' : 'cursor-pointer hover:bg-canvas/80'}`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="rounded border-line text-brand focus:ring-brand/30"
+                          checked={checked}
+                          disabled={lockedSelf}
+                          onChange={() => toggleManager(m.id)}
+                        />
+                        <span>{m.full_name}{isSelf ? ' (you)' : ''}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              {managersError && (
+                <p className="mt-1 text-2xs text-red-700">{managersError}</p>
+              )}
+            </div>
+          )}
         </div>
       </Drawer>
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}

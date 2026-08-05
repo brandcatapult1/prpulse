@@ -10,7 +10,7 @@ import {
   adjustMonthlyCampaignTermMonths,
 } from './campaignCycles.mjs';
 import { todayIst } from './constants.mjs';
-import { isAdmin } from './permissions.mjs';
+import { isAdmin, assertCreatorAssignedForCampaignManager } from './permissions.mjs';
 
 const SCALAR_FIELDS = new Set([
   'campaign_name',
@@ -100,11 +100,23 @@ export function parseCampaignPatch(body) {
     tag_ids = [...new Set(input.tag_ids.filter(Boolean))];
   }
 
+  let manager_ids;
+  if (Object.prototype.hasOwnProperty.call(input, 'manager_ids')) {
+    hasChange = true;
+    if (!Array.isArray(input.manager_ids)) {
+      throw Object.assign(new Error('manager_ids must be an array'), { status: 400 });
+    }
+    manager_ids = [...new Set(input.manager_ids.filter(Boolean).map(String))];
+    if (manager_ids.length === 0) {
+      throw Object.assign(new Error('Select at least one account manager'), { status: 400 });
+    }
+  }
+
   if (!hasChange) {
     throw Object.assign(new Error('No valid fields to update'), { status: 400 });
   }
 
-  return { scalars, tag_ids };
+  return { scalars, tag_ids, manager_ids };
 }
 
 function coerceCampaignScalars(row) {
@@ -118,6 +130,18 @@ function coerceCampaignScalars(row) {
       row.remaining_collaborations != null ? Number(row.remaining_collaborations) : null,
     achievement_pct: row.achievement_pct != null ? Number(row.achievement_pct) : null,
   };
+}
+
+export async function loadCampaignManagers(client, campaignId) {
+  const { rows } = await client.query(
+    `SELECT u.id, u.full_name, u.role
+     FROM campaign_managers cm
+     JOIN users u ON u.id = cm.user_id
+     WHERE cm.campaign_id = $1
+     ORDER BY u.full_name`,
+    [campaignId],
+  );
+  return rows;
 }
 
 export async function loadCampaignDetail(client, campaignId) {
@@ -150,6 +174,7 @@ export async function loadCampaignDetail(client, campaignId) {
   const tags = await loadCampaignTags(client, campaignId);
   const cycles = await listCampaignCycles(client, campaignId);
   const current_cycle = pickCurrentCycle(cycles, todayIst());
+  const managers = await loadCampaignManagers(client, campaignId);
 
   return {
     ...campaign,
@@ -157,6 +182,7 @@ export async function loadCampaignDetail(client, campaignId) {
     tag_names: tags.map((t) => t.name),
     cycles,
     current_cycle,
+    managers,
   };
 }
 
@@ -215,6 +241,23 @@ export async function applyCampaignPatch(client, campaignId, body, actor = null)
     await assertTagIdsExist(client, patch.tag_ids);
   }
 
+  if (patch.manager_ids !== undefined) {
+    // A campaign manager cannot remove themselves — mirrors the create rule
+    // and prevents CMs from cutting off their own access mid-edit.
+    if (actor) assertCreatorAssignedForCampaignManager(actor, patch.manager_ids);
+
+    const { rows: validManagers } = await client.query(
+      `SELECT id FROM users
+       WHERE id = ANY($1::uuid[])
+         AND is_active
+         AND role IN ('campaign_manager', 'senior_manager', 'admin')`,
+      [patch.manager_ids],
+    );
+    if (validManagers.length !== patch.manager_ids.length) {
+      throw Object.assign(new Error('One or more account managers are invalid'), { status: 400 });
+    }
+  }
+
   const sets = [];
   const params = [campaignId];
   let idx = 2;
@@ -234,6 +277,21 @@ export async function applyCampaignPatch(client, campaignId, body, actor = null)
 
   if (patch.tag_ids !== undefined) {
     await syncCampaignTags(client, campaignId, patch.tag_ids);
+  }
+
+  if (patch.manager_ids !== undefined) {
+    await client.query(
+      `DELETE FROM campaign_managers
+       WHERE campaign_id = $1 AND user_id <> ALL($2::uuid[])`,
+      [campaignId, patch.manager_ids],
+    );
+    for (const managerId of patch.manager_ids) {
+      await client.query(
+        `INSERT INTO campaign_managers (campaign_id, user_id) VALUES ($1, $2)
+         ON CONFLICT DO NOTHING`,
+        [campaignId, managerId],
+      );
+    }
   }
 
   // Changing the target re-bases remaining_collaborations, achievement_pct and

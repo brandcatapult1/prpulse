@@ -269,16 +269,10 @@ export function AddCreatorsDrawer({
                     label: 'Instagram',
                     render: (r) => <InstagramHandle contact={r} />,
                   },
-                  { key: 'city', label: 'City', render: (r) => r.city ?? '—' },
                   {
                     key: 'primary_category_name',
                     label: 'Category',
                     render: (r) => r.primary_category_name ?? '—',
-                  },
-                  {
-                    key: 'classification',
-                    label: 'Class',
-                    render: (r) => r.classification?.replace('_', ' ') ?? '—',
                   },
                 ]}
                 rows={rows}

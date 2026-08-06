@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { pool, isDatabaseConfigured } from '../db.mjs';
+import { isCloudinaryConfigured, getCloudinaryUploadFolder } from '../lib/cloudinary.mjs';
 
 export const healthRouter = Router();
 
@@ -26,6 +27,8 @@ healthRouter.get('/', async (_req, res) => {
     service: 'pr-pulse',
     db,
     database_url_set: isDatabaseConfigured(),
+    image_uploads: isCloudinaryConfigured() ? 'configured' : 'not_configured',
+    upload_folder: getCloudinaryUploadFolder(),
     time: new Date().toISOString(),
   });
 });

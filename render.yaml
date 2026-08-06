@@ -27,6 +27,6 @@ services:
       - key: CLOUDINARY_API_SECRET
         sync: false
       - key: CLOUDINARY_FOLDER
-        value: prod
+        value: dev
       - key: ALLOW_DEMO_SEED
         value: false

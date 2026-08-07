@@ -14,6 +14,7 @@ export const DEFAULT_CREATOR_CATEGORIES = [
   'Finance',
   'Auto',
   'UGC',
+  'Discovery Platform',
 ];
 
 export const DEFAULT_TAGS = [

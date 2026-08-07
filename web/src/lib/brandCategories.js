@@ -1,6 +1,7 @@
 /** Brand categories for Module 3 reference data. */
 export const BRAND_CATEGORIES = [
   'Food & Beverage',
+  'AlcoBev',
   'Luxury',
   'Beauty',
   'Travel',

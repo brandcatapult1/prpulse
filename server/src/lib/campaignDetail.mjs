@@ -246,14 +246,24 @@ export async function applyCampaignPatch(client, campaignId, body, actor = null)
     // and prevents CMs from cutting off their own access mid-edit.
     if (actor) assertCreatorAssignedForCampaignManager(actor, patch.manager_ids);
 
+    // Only managers being newly added must be active and eligible. Managers
+    // already on the campaign are kept as-is, so a deactivated or re-roled
+    // manager cannot block unrelated edits such as completing or archiving.
+    const { rows: assigned } = await client.query(
+      'SELECT user_id FROM campaign_managers WHERE campaign_id = $1',
+      [campaignId],
+    );
+    const alreadyAssigned = new Set(assigned.map((r) => String(r.user_id)));
+    const added = patch.manager_ids.filter((id) => !alreadyAssigned.has(String(id)));
+
     const { rows: validManagers } = await client.query(
       `SELECT id FROM users
        WHERE id = ANY($1::uuid[])
          AND is_active
          AND role IN ('campaign_manager', 'senior_manager', 'admin')`,
-      [patch.manager_ids],
+      [added],
     );
-    if (validManagers.length !== patch.manager_ids.length) {
+    if (validManagers.length !== added.length) {
       throw Object.assign(new Error('One or more account managers are invalid'), { status: 400 });
     }
   }

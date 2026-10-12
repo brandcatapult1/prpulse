@@ -102,7 +102,11 @@ export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
         body.term_months = parseTermMonthsInput(draft.term_months);
       }
       if (canEditManagers) {
-        body.manager_ids = draft.manager_ids;
+        // Send managers only when changed, so a status-only edit never
+        // re-validates the existing assignments.
+        const before = (campaign.managers ?? []).map((m) => String(m.id)).sort().join(',');
+        const after = [...draft.manager_ids].sort().join(',');
+        if (before !== after) body.manager_ids = draft.manager_ids;
       }
       const saved = await campaignsApi.update(campaign.id, body);
       onSaved?.(saved);

@@ -22,9 +22,14 @@ campaignsRouter.get('/', requireAuth, async (req, res) => {
     SELECT cam.*, b.brand_name
     FROM campaigns cam
     JOIN brands b ON b.id = cam.brand_id
-    WHERE cam.status <> 'archived'
+    WHERE TRUE
   `;
   const params = [];
+
+  // Archived campaigns stay hidden unless asked for (the list page's status filter).
+  if (req.query.include_archived !== '1') {
+    query += ` AND cam.status <> 'archived'`;
+  }
 
   if (req.user.role === 'campaign_manager') {
     params.push(req.user.id);
@@ -34,7 +39,7 @@ campaignsRouter.get('/', requireAuth, async (req, res) => {
     )`;
   }
 
-  query += ' ORDER BY cam.created_at DESC LIMIT 100';
+  query += ' ORDER BY cam.created_at DESC LIMIT 500';
   const { rows } = await pool.query(query, params);
   res.json(rows);
 });

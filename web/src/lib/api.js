@@ -158,7 +158,7 @@ export async function fetchAllContacts(options = {}) {
 }
 
 export const campaignsApi = {
-  list: () => api('/campaigns'),
+  list: (opts = {}) => api(opts.includeArchived ? '/campaigns?include_archived=1' : '/campaigns'),
   assignableManagers: () => api('/campaigns/assignable-managers'),
   create: (body) => api('/campaigns', { method: 'POST', body: JSON.stringify(body) }),
   get: (id) => api(`/campaigns/${id}`),

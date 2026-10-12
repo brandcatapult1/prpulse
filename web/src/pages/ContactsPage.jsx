@@ -15,6 +15,31 @@ import { useAuth } from '../context/AuthContext.jsx';
 
 const PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 300;
+const LIST_STATE_KEY = 'prpulse.contacts.listState';
+
+// Page, search and filters survive opening a contact and coming back, so you
+// land on the page you left instead of page 1. Per-tab, cleared on tab close.
+function loadListState() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(LIST_STATE_KEY) ?? 'null');
+    if (!saved || typeof saved !== 'object') return null;
+    return {
+      page: Number.isInteger(saved.page) && saved.page > 0 ? saved.page : 1,
+      query: typeof saved.query === 'string' ? saved.query : '',
+      filters: { ...CONTACT_PAGE_FILTER_DEFAULTS, ...(saved.filters ?? {}) },
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveListState(state) {
+  try {
+    sessionStorage.setItem(LIST_STATE_KEY, JSON.stringify(state));
+  } catch {
+    // storage unavailable — list just opens on page 1 next time
+  }
+}
 
 export function ContactsPage() {
   const navigate = useNavigate();
@@ -22,14 +47,15 @@ export function ContactsPage() {
   const canImport = canBulkImport(user?.role);
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const [saved] = useState(loadListState);
+  const [page, setPage] = useState(saved?.page ?? 1);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
-  const [query, setQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [filters, setFilters] = useState(CONTACT_PAGE_FILTER_DEFAULTS);
+  const [query, setQuery] = useState(saved?.query ?? '');
+  const [debouncedQuery, setDebouncedQuery] = useState(saved?.query ?? '');
+  const [filters, setFilters] = useState(saved?.filters ?? CONTACT_PAGE_FILTER_DEFAULTS);
   const [tagOptions, setTagOptions] = useState([]);
   const [cityOptions, setCityOptions] = useState([]);
   const [categoryOptions, setCategoryOptions] = useState([]);
@@ -81,6 +107,17 @@ export function ContactsPage() {
   useEffect(() => {
     fetchPage(page);
   }, [page, fetchPage]);
+
+  useEffect(() => {
+    saveListState({ page, query, filters });
+  }, [page, query, filters]);
+
+  // A restored page can be past the end if contacts were removed meanwhile.
+  useEffect(() => {
+    if (!loading && rows.length === 0 && total > 0 && page > 1) {
+      setPage(Math.max(1, Math.ceil(total / PAGE_SIZE)));
+    }
+  }, [loading, rows.length, total, page]);
 
   function updateFilters(patch) {
     setPage(1);

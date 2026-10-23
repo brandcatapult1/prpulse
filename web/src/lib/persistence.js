@@ -160,6 +160,10 @@ export async function fetchCycleReport(cycleId) {
   return reportsApi.cycleReport(cycleId);
 }
 
+export async function refreshCycleMetrics(cycleId) {
+  return reportsApi.refreshMetrics(cycleId);
+}
+
 export async function exportCycleReportPdf(cycleId) {
   return reportsApi.cyclePdf(cycleId);
 }

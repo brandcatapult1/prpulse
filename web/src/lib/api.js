@@ -251,6 +251,7 @@ export const reportsApi = {
   brandCampaigns: (brandId) => api(`/reports/brands/${brandId}/campaigns`),
   campaignCycles: (campaignId) => api(`/reports/campaigns/${campaignId}/cycles`),
   cycleReport: (cycleId) => api(`/reports/cycles/${cycleId}`),
+  refreshMetrics: (cycleId) => api(`/reports/cycles/${cycleId}/refresh-metrics`, { method: 'POST' }),
   cyclePdf: (cycleId) => download(`/reports/cycles/${cycleId}/pdf`),
 };
 

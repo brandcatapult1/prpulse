@@ -137,6 +137,7 @@ export async function loadCycleReport(client, cycleId) {
   const engagementIds = engagementRows.map((r) => r.id);
   let collaborations = [];
   const metricsTotals = { ...ZERO_METRICS };
+  let metricsSyncedAt = null;
 
   if (engagementIds.length) {
     const { rows: dels } = await client.query(
@@ -192,7 +193,7 @@ export async function loadCycleReport(client, cycleId) {
     if (deliverableIds.length) {
       const { rows: mrows } = await client.query(
         `SELECT m.deliverable_id, d.engagement_id, m.content_url,
-                m.likes, m.comments, m.views, m.reach, m.shares, m.reposts, m.saves
+                m.likes, m.comments, m.views, m.reach, m.shares, m.reposts, m.saves, m.synced_at
          FROM deliverable_metrics m
          JOIN deliverables d ON d.id = m.deliverable_id AND d.status = 'posted'
          WHERE d.id = ANY($1::uuid[])`,
@@ -200,6 +201,7 @@ export async function loadCycleReport(client, cycleId) {
       );
       for (const r of mrows) {
         const m = Object.fromEntries(Object.keys(ZERO_METRICS).map((k) => [k, Number(r[k] ?? 0)]));
+        if (r.synced_at && (!metricsSyncedAt || r.synced_at > metricsSyncedAt)) metricsSyncedAt = r.synced_at;
         const list = metricRowsByDeliverable.get(r.deliverable_id) ?? [];
         list.push({ content_url: r.content_url, ...m });
         metricRowsByDeliverable.set(r.deliverable_id, list);
@@ -256,6 +258,7 @@ export async function loadCycleReport(client, cycleId) {
       visits_completed: visitsCompleted,
     },
     metrics: metricsTotals,
+    metrics_synced_at: metricsSyncedAt,
     collaborations,
   };
 }

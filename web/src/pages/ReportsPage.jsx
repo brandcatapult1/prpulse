@@ -13,6 +13,7 @@ import {
   fetchReportBrandCampaigns,
   fetchReportBrands,
   fetchReportCampaignCycles,
+  refreshCycleMetrics,
 } from '../lib/persistence.js';
 
 const ENGAGEMENT_METRICS = [
@@ -42,6 +43,8 @@ export function ReportsPage() {
   const [loadingNav, setLoadingNav] = useState(true);
   const [loadingReport, setLoadingReport] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshNote, setRefreshNote] = useState(null);
   const [error, setError] = useState(null);
 
   const selectedCampaign = useMemo(
@@ -148,6 +151,28 @@ export function ReportsPage() {
   const heroHealth = hero?.cycle_health ?? 'not_set';
   const heroHasHealth = heroHealth !== 'not_set';
   const heroPct = hero?.achievement_pct != null ? Math.round(Number(hero.achievement_pct)) : null;
+
+  async function handleRefreshMetrics() {
+    if (!cycleId || refreshing) return;
+    setRefreshing(true);
+    setRefreshNote(null);
+    try {
+      const res = await refreshCycleMetrics(cycleId);
+      const data = await fetchCycleReport(cycleId);
+      setReport(data);
+      setRefreshNote(
+        !res.configured
+          ? 'Live sync is not set up on the server — showing saved numbers.'
+          : res.errors?.length
+            ? `Refreshed ${res.refreshed} post(s). ${res.errors.join(' · ')}`
+            : `Refreshed ${res.refreshed} post(s) just now.`,
+      );
+    } catch (err) {
+      setRefreshNote(err.message ?? 'Could not refresh metrics');
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   async function handleExportPdf() {
     if (!cycleId || exportingPdf) return;
@@ -298,7 +323,22 @@ export function ReportsPage() {
             />
           </div>
 
-          <ReportSection title="Engagement on completed deliverables">
+          <ReportSection
+            title="Engagement on completed deliverables"
+            action={
+              <div className="flex items-center gap-3">
+                <span className="text-2xs text-ink-tertiary">
+                  {report.metrics_synced_at
+                    ? `Last updated ${new Date(report.metrics_synced_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}`
+                    : 'Not refreshed yet'}
+                </span>
+                <button type="button" className="btn-secondary" disabled={refreshing} onClick={handleRefreshMetrics}>
+                  {refreshing ? 'Refreshing…' : 'Refresh metrics'}
+                </button>
+              </div>
+            }
+          >
+            {refreshNote && <p className="mb-2 text-2xs text-ink-secondary">{refreshNote}</p>}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
               {ENGAGEMENT_METRICS.map(([key, label]) => (
                 <MetricTile key={key} label={label} value={formatMetric(report.metrics?.[key])} />
@@ -394,10 +434,13 @@ function DrillDownSelect({ label, value, onChange, options, disabled, hint }) {
   );
 }
 
-function ReportSection({ title, children }) {
+function ReportSection({ title, action, children }) {
   return (
     <Card className="!p-5">
-      <h2 className="text-sm font-semibold text-ink">{title}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-ink">{title}</h2>
+        {action}
+      </div>
       <div className="mt-3">{children}</div>
     </Card>
   );

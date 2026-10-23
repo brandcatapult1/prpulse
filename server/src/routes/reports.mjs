@@ -8,6 +8,7 @@ import {
 } from '../lib/reportAccess.mjs';
 import { loadCampaignCyclesForReport, loadCycleReport } from '../lib/cycleReport.mjs';
 import { ensureCampaignCycles } from '../lib/campaignCycles.mjs';
+import { syncContactSocial, syncProviders } from '../lib/socialSync.mjs';
 import { buildCycleReportPdf, reportPdfFileName } from '../lib/reportPdf.mjs';
 
 export const reportsRouter = Router();
@@ -101,6 +102,37 @@ reportsRouter.get('/cycles/:cycleId', requireAuth, async (req, res) => {
     res.json(report);
   } catch (err) {
     res.status(err.status ?? 503).json({ error: err.message ?? 'Could not load report' });
+  }
+});
+
+/** Re-fetch engagement numbers from Instagram/YouTube for creators in this cycle's report. */
+reportsRouter.post('/cycles/:cycleId/refresh-metrics', requireAuth, async (req, res) => {
+  try {
+    await assertCanViewCycleReport(pool, req.user, req.params.cycleId);
+    const report = await loadCycleReport(pool, req.params.cycleId);
+    if (!report) return res.status(404).json({ error: 'Cycle not found' });
+
+    const providers = syncProviders();
+    if (!providers.instagram && !providers.youtube) {
+      return res.json({ refreshed: 0, configured: false, errors: [] });
+    }
+    const contactIds = [...new Set(report.collaborations.map((c) => c.contact_id))];
+    let refreshed = 0;
+    const errors = [];
+    for (const id of contactIds) {
+      try {
+        const r = await syncContactSocial(pool, id);
+        refreshed += r.metrics_updated;
+        for (const p of ['instagram', 'youtube']) {
+          if (String(r[p]).startsWith('error')) errors.push(`${p}: ${r[p].slice(7)}`);
+        }
+      } catch (err) {
+        errors.push(err.message);
+      }
+    }
+    res.json({ refreshed, configured: true, errors: [...new Set(errors)].slice(0, 3) });
+  } catch (err) {
+    res.status(err.status ?? 503).json({ error: err.message ?? 'Could not refresh metrics' });
   }
 });
 

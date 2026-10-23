@@ -7,6 +7,12 @@ import { applyContactPatch, loadContactDetail, CLASSIFICATION_VALUES } from '../
 import { createContactDeduped } from '../lib/contactCreate.mjs';
 import { batchAddTagToContacts, batchSetContactStatus, batchSetPrimaryCategory } from '../lib/contactBatch.mjs';
 import { syncContactTags } from '../lib/contactTags.mjs';
+import {
+  loadCreatorStats,
+  upsertManualDeliverableMetrics,
+  upsertManualSocialStats,
+} from '../lib/creatorStats.mjs';
+import { syncContactSocial, syncProviders } from '../lib/socialSync.mjs';
 import { listContactsPaginated, listPopulationContactsPaginated } from '../lib/contactList.mjs';
 
 export const contactsRouter = Router();
@@ -38,6 +44,47 @@ contactsRouter.get('/:id', requireAuth, async (req, res) => {
   const contact = await loadContactDetail(pool, req.params.id);
   if (!contact) return res.status(404).json({ error: 'Contact not found' });
   res.json(contact);
+});
+
+contactsRouter.get('/:id/creator-stats', requireAuth, async (req, res) => {
+  try {
+    const stats = await loadCreatorStats(pool, req.params.id);
+    res.json({ ...stats, sync_available: syncProviders() });
+  } catch (err) {
+    res.status(err.status ?? 500).json({ error: err.message ?? 'Could not load creator stats' });
+  }
+});
+
+contactsRouter.post('/:id/creator-stats/sync', requireAuth, async (req, res) => {
+  try {
+    const result = await syncContactSocial(pool, req.params.id);
+    const stats = await loadCreatorStats(pool, req.params.id);
+    res.json({ result, ...stats, sync_available: syncProviders() });
+  } catch (err) {
+    res.status(err.status ?? 503).json({ error: err.message ?? 'Sync failed' });
+  }
+});
+
+contactsRouter.put('/:id/social-stats/:platform', requireAuth, async (req, res) => {
+  try {
+    await withUserTransaction(req.user.id, (client) =>
+      upsertManualSocialStats(client, req.params.id, req.params.platform, req.body),
+    );
+    res.json(await loadCreatorStats(pool, req.params.id));
+  } catch (err) {
+    res.status(err.status ?? 503).json({ error: err.message ?? 'Could not save stats' });
+  }
+});
+
+contactsRouter.put('/:id/deliverable-metrics/:deliverableId', requireAuth, async (req, res) => {
+  try {
+    await withUserTransaction(req.user.id, (client) =>
+      upsertManualDeliverableMetrics(client, req.params.deliverableId, req.body),
+    );
+    res.json(await loadCreatorStats(pool, req.params.id));
+  } catch (err) {
+    res.status(err.status ?? 503).json({ error: err.message ?? 'Could not save metrics' });
+  }
 });
 
 contactsRouter.post('/batch/set-status', requireAuth, async (req, res) => {

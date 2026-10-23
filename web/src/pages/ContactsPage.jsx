@@ -6,6 +6,7 @@ import { AddContactDrawer } from '../components/contacts/AddContactDrawer.jsx';
 import { ContactBatchActionBar } from '../components/contacts/ContactBatchActionBar.jsx';
 import { ContactFilters } from '../components/contacts/ContactFilters.jsx';
 import { Pill, statusTone } from '../lib/format.jsx';
+import { SystemLabelPills, formatCount } from '../components/contacts/SystemLabelPills.jsx';
 import { MODULES } from '../lib/modules.js';
 import { contactsApi, lookupApi } from '../lib/api.js';
 import { setContactsCache } from '../lib/contactsCache.js';
@@ -153,8 +154,26 @@ export function ContactsPage() {
   }
 
   const columns = [
-    { key: 'full_name', label: 'Name', render: (r) => <span className="font-medium">{r.full_name}</span> },
+    {
+      key: 'full_name',
+      label: 'Name',
+      render: (r) => (
+        <span className="flex flex-wrap items-center gap-1.5">
+          <span className="font-medium">{r.full_name}</span>
+          <SystemLabelPills labels={r.system_labels} />
+        </span>
+      ),
+    },
     { key: 'city', label: 'City' },
+    {
+      key: 'followers',
+      label: 'Followers',
+      render: (r) => (
+        <span title={`Instagram ${r.instagram_followers ?? '—'} · YouTube ${r.youtube_subscribers ?? '—'}`}>
+          {formatCount(r.instagram_followers ?? r.youtube_subscribers)}
+        </span>
+      ),
+    },
     { key: 'primary_category_name', label: 'Category', render: (r) => r.primary_category_name ?? '—' },
     { key: 'classification', label: 'Class', render: (r) => r.classification?.replace('_', ' ') ?? '—' },
     {

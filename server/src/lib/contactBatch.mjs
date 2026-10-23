@@ -40,9 +40,12 @@ export async function batchAddTagToContacts(client, contactIds, tagId, { userId 
     throw Object.assign(new Error('tag_id required'), { status: 400 });
   }
 
-  const { rows: tagRows } = await client.query('SELECT id, name FROM tags WHERE id = $1', [tagId]);
+  const { rows: tagRows } = await client.query('SELECT id, name, type FROM tags WHERE id = $1', [tagId]);
   if (!tagRows[0]) {
     throw Object.assign(new Error('Tag not found'), { status: 404 });
+  }
+  if (tagRows[0].type !== 'influencer') {
+    throw Object.assign(new Error('Only influencer tags can be added manually'), { status: 400 });
   }
   const tagName = tagRows[0].name;
 

@@ -24,6 +24,8 @@ import {
   e164FromDraft,
 } from '../lib/contactDraft.js';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
+import { CreatorStatsPanel } from '../components/contacts/CreatorStatsPanel.jsx';
+import { SystemLabelPills } from '../components/contacts/SystemLabelPills.jsx';
 import { ContactEditOverview } from '../components/contacts/ContactEditOverview.jsx';
 
 export function ContactProfilePage() {
@@ -166,6 +168,8 @@ export function ContactProfilePage() {
   }
 
   const tagLabels = tagNamesFromContact(contact);
+  const systemLabels = (contact.tags ?? []).filter((t) => t.type === 'system').map((t) => t.name);
+  const manualTagLabels = (contact.tags ?? []).filter((t) => t.type !== 'system').map((t) => t.name);
   const classification = formatClassification(contact.classification);
   const canSave = isDraftSaveable(draft, { duplicateId: duplicate?.id, contactId: contact.id });
 
@@ -210,7 +214,8 @@ export function ContactProfilePage() {
             )}
           </div>
           <div className="flex flex-wrap gap-1">
-            {tagLabels.map((t) => (
+            <SystemLabelPills labels={systemLabels} />
+            {manualTagLabels.map((t) => (
               <Pill key={t} tone="info">{t}</Pill>
             ))}
             <Pill tone={statusTone(contact.status)}>{contact.status}</Pill>
@@ -256,6 +261,8 @@ export function ContactProfilePage() {
           contactId={contact.id}
         />
       )}
+
+      {activeTab === 'Creator Stats' && <CreatorStatsPanel contactId={contact.id} />}
 
       {activeTab === 'Collaboration History' && (
         <DataTable

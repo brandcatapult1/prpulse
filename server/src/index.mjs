@@ -14,6 +14,7 @@ import {
 } from '../../scripts/seed-demo.mjs';
 import { pool } from './db.mjs';
 import { ensureCriticalSchema } from './lib/ensureSchema.mjs';
+import { startBackgroundJobs } from './lib/backgroundJobs.mjs';
 import { healthRouter } from './routes/health.mjs';
 import { authRouter } from './routes/auth.mjs';
 import { contactsRouter } from './routes/contacts.mjs';
@@ -99,6 +100,7 @@ app.listen(port, () => {
   );
   migrateUp()
     .then(() => ensureCriticalSchema(pool))
+    .then(() => startBackgroundJobs(pool))
     .then(async () => {
       if (!databaseConfigured || !pool) return;
       try {

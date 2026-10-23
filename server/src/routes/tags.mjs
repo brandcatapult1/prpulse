@@ -70,6 +70,9 @@ tagsRouter.patch('/:id', async (req, res) => {
   try {
     const existing = await findTagById(pool, id);
     if (!existing) return res.status(404).json({ error: 'Tag not found' });
+    if (existing.type === 'system') {
+      return res.status(403).json({ error: 'System tags are managed automatically' });
+    }
 
     let row = existing;
 

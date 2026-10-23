@@ -8,7 +8,14 @@ const TAG_TYPES = [
   { value: 'campaign', label: 'Campaign' },
 ];
 
+const SYSTEM_RULES = {
+  new: 'Registered in the last 45 days',
+  recent: 'Completed a collaboration in the last 15 days',
+  frequent: '3+ completed collaborations in the last 60 days',
+};
+
 function typeLabel(type) {
+  if (type === 'system') return 'Automatic';
   return TAG_TYPES.find((t) => t.value === type)?.label ?? type;
 }
 
@@ -60,11 +67,13 @@ export function TagsSettingsSection() {
   const grouped = useMemo(() => {
     const influencer = [];
     const campaign = [];
+    const system = [];
     for (const tag of tags) {
       if (tag.type === 'campaign') campaign.push(tag);
+      else if (tag.type === 'system') system.push(tag);
       else influencer.push(tag);
     }
-    return { influencer, campaign };
+    return { influencer, campaign, system };
   }, [tags]);
 
   async function handleCreate(e) {
@@ -206,6 +215,10 @@ export function TagsSettingsSection() {
                             Cancel
                           </button>
                         </>
+                      ) : tag.type === 'system' ? (
+                        <span className="text-2xs text-ink-tertiary">
+                          {SYSTEM_RULES[tag.system_key] ?? 'Managed automatically'}
+                        </span>
                       ) : (
                         <>
                           <button
@@ -315,6 +328,7 @@ export function TagsSettingsSection() {
         <div className="space-y-4">
           {renderGroup('Influencer tags', grouped.influencer)}
           {renderGroup('Campaign tags', grouped.campaign)}
+          {grouped.system.length > 0 && renderGroup('System labels (automatic)', grouped.system)}
         </div>
       )}
 

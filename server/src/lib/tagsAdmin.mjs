@@ -2,7 +2,7 @@
 
 export const TAG_TYPES = new Set(['influencer', 'campaign']);
 
-const TAG_SELECT = `id, name, type, is_active, created_by, created_at`;
+const TAG_SELECT = `id, name, type, is_active, created_by, created_at, system_key`;
 
 export function parseTagName(raw) {
   const name = String(raw ?? '').trim();

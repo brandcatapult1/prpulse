@@ -6,6 +6,17 @@ const CONTACT_LIST_SELECT = `
          pc.name AS primary_category_name,
          COALESCE(
            (
+             SELECT array_agg(t.name ORDER BY t.system_key)
+             FROM contact_tags ctl
+             JOIN tags t ON t.id = ctl.tag_id AND t.type = 'system'
+             WHERE ctl.contact_id = c.id
+           ),
+           ARRAY[]::text[]
+         ) AS system_labels,
+         (SELECT followers FROM creator_social_stats s WHERE s.contact_id = c.id AND s.platform = 'instagram') AS instagram_followers,
+         (SELECT followers FROM creator_social_stats s WHERE s.contact_id = c.id AND s.platform = 'youtube') AS youtube_subscribers,
+         COALESCE(
+           (
              SELECT array_agg(t.name ORDER BY t.name)
              FROM contact_tags ct
              JOIN tags t ON t.id = ct.tag_id
@@ -129,6 +140,17 @@ const POPULATION_LIST_SELECT = `
          c.is_blacklisted, c.mobile_number, c.open_to_paid, c.open_to_barter,
          c.primary_category_id, c.instagram_url,
          pc.name AS primary_category_name,
+         COALESCE(
+           (
+             SELECT array_agg(t.name ORDER BY t.system_key)
+             FROM contact_tags ctl
+             JOIN tags t ON t.id = ctl.tag_id AND t.type = 'system'
+             WHERE ctl.contact_id = c.id
+           ),
+           ARRAY[]::text[]
+         ) AS system_labels,
+         (SELECT followers FROM creator_social_stats s WHERE s.contact_id = c.id AND s.platform = 'instagram') AS instagram_followers,
+         (SELECT followers FROM creator_social_stats s WHERE s.contact_id = c.id AND s.platform = 'youtube') AS youtube_subscribers,
          COALESCE(
            (
              SELECT array_agg(t.name ORDER BY t.name)

@@ -14,6 +14,7 @@ const METRICS = [
   ['reposts', 'Reposts'],
   ['saves', 'Saves'],
 ];
+const TYPE_LABEL = { reel: 'Reel', story: 'Story', other: 'Post', static_carousel_post: 'Carousel' };
 const PLATFORMS = [
   ['instagram', 'Instagram', 'Followers'],
   ['youtube', 'YouTube', 'Subscribers'],
@@ -176,7 +177,7 @@ export function CreatorStatsPanel({ contactId }) {
                 {data.deliverables.flatMap((d) => (d.links.length ? d.links : [{ content_url: null }]).map((l, i) => (
                   <tr key={`${d.deliverable_id}-${i}`} className="border-b border-line/60">
                     <td className="px-3 py-2">
-                      <div className="font-medium text-ink">{d.campaign_name} · {formatStatus(d.deliverable_type)}</div>
+                      <div className="font-medium text-ink">{d.campaign_name} · {TYPE_LABEL[d.deliverable_type] ?? formatStatus(d.deliverable_type)}</div>
                       <div className="text-ink-tertiary">
                         {l.content_url
                           ? <a href={l.content_url} target="_blank" rel="noreferrer" className="text-brand hover:underline">{l.content_url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 40)}</a>

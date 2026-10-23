@@ -97,16 +97,31 @@ async function main() {
            VALUES ($1,$2,$3,'awaiting_final_deliverables',$3) RETURNING id`,
           [cid, camp, user.id],
         );
-        const url = `https://www.instagram.com/reel/DEMO${mobile.slice(-1)}${n}/`;
-        const { rows: [del] } = await client.query(
-          `INSERT INTO deliverables (engagement_id, deliverable_type, quantity, status)
-           VALUES ($1,'reel',1,'pending') RETURNING id`, [eng.id],
-        );
-        await client.query(
-          `UPDATE deliverables SET status='posted', posted_quantity = 1, published_date = CURRENT_DATE - $2::int, content_link = $3,
-             unit_proofs = jsonb_build_array(jsonb_build_object('content_link', $3::text, 'screenshots', '[]'::jsonb))
-           WHERE id = $1`, [del.id, daysAgo, url],
-        );
+        const base = followers / 100;
+        // reel / post (enum 'other') / carousel (enum 'static_carousel_post'), each with its own link + numbers
+        const kinds = [
+          ['reel', 'reel', 'reel', 1],
+          ['other', 'p', 'post', 0.45],
+          ['static_carousel_post', 'p', 'carousel', 0.7],
+        ];
+        for (const [dbType, path, tag, k] of kinds) {
+          const url = `https://www.instagram.com/${path}/DEMO${tag}${mobile.slice(-1)}${n}/`;
+          const { rows: [del] } = await client.query(
+            `INSERT INTO deliverables (engagement_id, deliverable_type, quantity, status)
+             VALUES ($1,$2,1,'pending') RETURNING id`, [eng.id, dbType],
+          );
+          await client.query(
+            `UPDATE deliverables SET status='posted', posted_quantity = 1, published_date = CURRENT_DATE - $2::int, content_link = $3,
+               unit_proofs = jsonb_build_array(jsonb_build_object('content_link', $3::text, 'screenshots', '[]'::jsonb))
+             WHERE id = $1`, [del.id, daysAgo, url],
+          );
+          await client.query(
+            `INSERT INTO deliverable_metrics (deliverable_id, content_url, platform, likes, comments, views, reach, shares, reposts, saves, source, synced_at)
+             VALUES ($1,$2,'instagram',$3,$4,$5,$6,$7,$8,$9,'manual',now())`,
+            [del.id, url, Math.round(base * 9 * k), Math.round(base * 0.6 * k), Math.round(base * 40 * k),
+              Math.round(base * 65 * k), Math.round(base * 1.2 * k), Math.round(base * 0.4 * k), Math.round(base * 2.1 * k)],
+          );
+        }
         await client.query(
           `UPDATE engagements SET conversation_status='collaboration_complete',
              primary_collaboration_reason='virality' WHERE id = $1`, [eng.id],
@@ -114,13 +129,6 @@ async function main() {
         await client.query(
           `UPDATE engagements SET completed_at = now() - ($2 || ' days')::interval WHERE id = $1`,
           [eng.id, String(daysAgo)],
-        );
-        const base = followers / 100;
-        await client.query(
-          `INSERT INTO deliverable_metrics (deliverable_id, content_url, platform, likes, comments, views, reach, shares, reposts, saves, source, synced_at)
-           VALUES ($1,$2,'instagram',$3,$4,$5,$6,$7,$8,$9,'manual',now())`,
-          [del.id, url, Math.round(base * 9), Math.round(base * 0.6), Math.round(base * 40),
-            Math.round(base * 65), Math.round(base * 1.2), Math.round(base * 0.4), Math.round(base * 2.1)],
         );
       }
     }

@@ -58,8 +58,9 @@ async function main() {
     const campaigns = [];
     for (let i = 1; i <= 3; i += 1) {
       const { rows: [c] } = await client.query(
-        `INSERT INTO campaigns (campaign_name, brand_id, status, created_by)
-         VALUES ($1, $2, 'active', $3) RETURNING id`,
+        `INSERT INTO campaigns (campaign_name, brand_id, status, created_by,
+                                campaign_type, term_months, start_date, target_collaborations)
+         VALUES ($1, $2, 'active', $3, 'monthly', 6, CURRENT_DATE - 130, 5) RETURNING id`,
         [`${MARK} Campaign ${i}`, brand.id, user.id],
       );
       campaigns.push(c.id);
@@ -102,7 +103,7 @@ async function main() {
            VALUES ($1,'reel',1,'pending') RETURNING id`, [eng.id],
         );
         await client.query(
-          `UPDATE deliverables SET status='posted', published_date = CURRENT_DATE - $2::int, content_link = $3,
+          `UPDATE deliverables SET status='posted', posted_quantity = 1, published_date = CURRENT_DATE - $2::int, content_link = $3,
              unit_proofs = jsonb_build_array(jsonb_build_object('content_link', $3::text, 'screenshots', '[]'::jsonb))
            WHERE id = $1`, [del.id, daysAgo, url],
         );

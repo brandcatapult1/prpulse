@@ -56,6 +56,8 @@ export async function loadCampaignCyclesForReport(client, campaignId) {
   return { cycles, current_cycle };
 }
 
+const ZERO_METRICS = { likes: 0, comments: 0, views: 0, reach: 0, shares: 0, reposts: 0, saves: 0 };
+
 export async function loadCycleReport(client, cycleId) {
   const { rows: cycleRows } = await client.query(
     `SELECT cc.*, cam.campaign_name, cam.campaign_type, cam.term_months, cam.brand_id, b.brand_name
@@ -134,6 +136,7 @@ export async function loadCycleReport(client, cycleId) {
 
   const engagementIds = engagementRows.map((r) => r.id);
   let collaborations = [];
+  const metricsTotals = { ...ZERO_METRICS };
 
   if (engagementIds.length) {
     const { rows: dels } = await client.query(
@@ -184,13 +187,41 @@ export async function loadCycleReport(client, cycleId) {
       deliverablesByEngagement.set(row.engagement_id, list);
     }
 
+    const metricsByEngagement = new Map();
+    const metricRowsByDeliverable = new Map();
+    if (deliverableIds.length) {
+      const { rows: mrows } = await client.query(
+        `SELECT m.deliverable_id, d.engagement_id, m.content_url,
+                m.likes, m.comments, m.views, m.reach, m.shares, m.reposts, m.saves
+         FROM deliverable_metrics m
+         JOIN deliverables d ON d.id = m.deliverable_id AND d.status = 'posted'
+         WHERE d.id = ANY($1::uuid[])`,
+        [deliverableIds],
+      );
+      for (const r of mrows) {
+        const m = Object.fromEntries(Object.keys(ZERO_METRICS).map((k) => [k, Number(r[k] ?? 0)]));
+        const list = metricRowsByDeliverable.get(r.deliverable_id) ?? [];
+        list.push({ content_url: r.content_url, ...m });
+        metricRowsByDeliverable.set(r.deliverable_id, list);
+        const eTotal = metricsByEngagement.get(r.engagement_id) ?? { ...ZERO_METRICS };
+        Object.keys(ZERO_METRICS).forEach((k) => { eTotal[k] += m[k]; metricsTotals[k] += m[k]; });
+        metricsByEngagement.set(r.engagement_id, eTotal);
+      }
+    }
+
     collaborations = engagementRows.map((eng) => ({
+      metrics: metricsByEngagement.get(eng.id) ?? { ...ZERO_METRICS },
       id: eng.id,
       contact_id: eng.contact_id,
       contact_name: eng.contact_name,
       collaboration_type: normalizeCollaborationType(eng.engagement_collaboration_type),
       completed_at_ist: eng.completed_at_ist,
-      proof: buildDeliverableProofItems(deliverablesByEngagement.get(eng.id) ?? []),
+      proof: buildDeliverableProofItems(deliverablesByEngagement.get(eng.id) ?? []).map((item) => {
+        const rows = metricRowsByDeliverable.get(item.id) ?? [];
+        const total = { ...ZERO_METRICS };
+        rows.forEach((r) => Object.keys(ZERO_METRICS).forEach((k) => { total[k] += r[k]; }));
+        return { ...item, metrics: total, link_metrics: rows };
+      }),
     }));
   }
 
@@ -224,6 +255,7 @@ export async function loadCycleReport(client, cycleId) {
       deliverables_awaited: deliverablesAwaited,
       visits_completed: visitsCompleted,
     },
+    metrics: metricsTotals,
     collaborations,
   };
 }

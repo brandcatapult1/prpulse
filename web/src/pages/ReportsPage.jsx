@@ -15,6 +15,20 @@ import {
   fetchReportCampaignCycles,
 } from '../lib/persistence.js';
 
+const ENGAGEMENT_METRICS = [
+  ['likes', 'Likes'],
+  ['comments', 'Comments'],
+  ['views', 'Views'],
+  ['reach', 'Reach'],
+  ['shares', 'Shares'],
+  ['reposts', 'Reposts'],
+  ['saves', 'Saves'],
+];
+
+function formatMetric(n) {
+  return Number(n ?? 0).toLocaleString('en-IN');
+}
+
 export function ReportsPage() {
   const [brands, setBrands] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
@@ -284,6 +298,19 @@ export function ReportsPage() {
             />
           </div>
 
+          <ReportSection title="Engagement on completed deliverables">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+              {ENGAGEMENT_METRICS.map(([key, label]) => (
+                <MetricTile key={key} label={label} value={formatMetric(report.metrics?.[key])} />
+              ))}
+            </div>
+            {!Object.values(report.metrics ?? {}).some((v) => v > 0) && (
+              <p className="mt-2 text-2xs text-ink-tertiary">
+                No engagement numbers recorded yet — add them from each creator's Creator Stats tab.
+              </p>
+            )}
+          </ReportSection>
+
           <ReportSection title="Proof of delivery">
             {(report.collaborations ?? []).length === 0 ? (
               <p className="text-2xs text-ink-tertiary">
@@ -315,6 +342,13 @@ export function ReportsPage() {
                         </p>
                       )}
                     </div>
+                    {Object.values(collab.metrics ?? {}).some((v) => v > 0) && (
+                      <p className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-2xs text-ink-secondary">
+                        {ENGAGEMENT_METRICS.filter(([k]) => collab.metrics[k] > 0).map(([k, label]) => (
+                          <span key={k}>{label}: <b className="text-ink">{formatMetric(collab.metrics[k])}</b></span>
+                        ))}
+                      </p>
+                    )}
                     <DeliverableProofList proofItems={collab.proof} />
                   </li>
                   );

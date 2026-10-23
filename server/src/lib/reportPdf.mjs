@@ -179,6 +179,18 @@ export async function buildCycleReportPdf({ report, logoUrl }) {
   drawStatCard(doc, left + (metricWidth + metricGap) * 2, metricY, metricWidth, 'Successful visits', Number(report.stats?.visits_completed ?? 0));
   doc.y = metricY + 72;
 
+  const m = report.metrics ?? {};
+  const engagementLine = [['Likes', 'likes'], ['Comments', 'comments'], ['Views', 'views'], ['Reach', 'reach'],
+    ['Shares', 'shares'], ['Reposts', 'reposts'], ['Saves', 'saves']]
+    .filter(([, k]) => Number(m[k]) > 0)
+    .map(([label, k]) => `${label} ${Number(m[k]).toLocaleString('en-IN')}`)
+    .join('  ·  ');
+  if (engagementLine) {
+    doc.font('Helvetica-Bold').fontSize(11).fillColor('#101828').text('Engagement on completed deliverables', left, doc.y);
+    doc.font('Helvetica').fontSize(10).fillColor('#475467').text(engagementLine, left, doc.y + 2, { width: right - left });
+    doc.y += 14;
+  }
+
   doc.font('Helvetica-Bold').fontSize(18).fillColor('#101828').text('Proof of delivery', left, doc.y + 4);
   doc.y += 24;
   const collaborations = Array.isArray(report.collaborations) ? report.collaborations : [];

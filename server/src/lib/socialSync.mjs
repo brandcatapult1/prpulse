@@ -87,25 +87,41 @@ export async function fetchLatestInstagramMedia(handle, limit = 12) {
   };
 }
 
-/** Followers/following/posts + a map shortcode → {likes, comments} for recent media. */
-export async function fetchInstagramProfile(handle, { mediaLimit = 50 } = {}) {
+/**
+ * Followers/following/posts + a map shortcode → {likes, comments, views}.
+ * Pages back through the account's posts (50 per page) until every wanted shortcode is found
+ * or `maxPages` is reached, so older deliverables are still matched.
+ */
+export async function fetchInstagramProfile(handle, { wantedCodes = [], mediaLimit = 50, maxPages = 30 } = {}) {
   const { META_ACCESS_TOKEN: token, META_IG_USER_ID: igId } = process.env;
   if (!token || !igId) throw new Error('Instagram sync not configured (META_ACCESS_TOKEN / META_IG_USER_ID)');
-  const fields = `business_discovery.username(${handle}){followers_count,follows_count,media_count,`
-    + `media.limit(${mediaLimit}){permalink,like_count,comments_count,view_count}}`;
-  const body = await getJson(
-    `${GRAPH}/${igId}?fields=${encodeURIComponent(fields)}&access_token=${encodeURIComponent(token)}`,
-  );
-  const bd = body.business_discovery ?? {};
+  const wanted = new Set(wantedCodes);
   const posts = new Map();
-  for (const m of bd.media?.data ?? []) {
-    const code = instagramShortcode(m.permalink);
-    if (code) posts.set(code, { likes: num(m.like_count), comments: num(m.comments_count), views: num(m.view_count) });
+  let profile = null;
+  let after = null;
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const mediaArg = `media.limit(${mediaLimit})${after ? `.after(${after})` : ''}`;
+    const fields = `business_discovery.username(${handle}){followers_count,follows_count,media_count,`
+      + `${mediaArg}{permalink,like_count,comments_count,view_count}}`;
+    const body = await getJson(
+      `${GRAPH}/${igId}?fields=${encodeURIComponent(fields)}&access_token=${encodeURIComponent(token)}`,
+    );
+    const bd = body.business_discovery ?? {};
+    profile ??= bd;
+    for (const m of bd.media?.data ?? []) {
+      const code = instagramShortcode(m.permalink);
+      if (code) posts.set(code, { likes: num(m.like_count), comments: num(m.comments_count), views: num(m.view_count) });
+    }
+    after = bd.media?.paging?.cursors?.after ?? null;
+    const done = wanted.size === 0 || [...wanted].every((c) => posts.has(c));
+    if (done || !after || !bd.media?.paging?.cursors?.after || (bd.media?.data ?? []).length === 0) break;
   }
+
   return {
-    followers: num(bd.followers_count),
-    following: num(bd.follows_count),
-    posts_count: num(bd.media_count),
+    followers: num(profile?.followers_count),
+    following: num(profile?.follows_count),
+    posts_count: num(profile?.media_count),
     posts,
   };
 }
@@ -179,7 +195,11 @@ export async function syncContactSocial(pool, contactId) {
       result.instagram = 'not_configured';
     } else {
       try {
-        const p = await fetchInstagramProfile(handle);
+        const wantedCodes = deliverables
+          .flatMap((d) => deliverableContentUrls(d))
+          .map((u) => instagramShortcode(u))
+          .filter(Boolean);
+        const p = await fetchInstagramProfile(handle, { wantedCodes });
         await pool.query(STATS_UPSERT, [contactId, 'instagram', handle, p.followers, p.following, p.posts_count, null]);
         for (const d of deliverables) {
           for (const url of deliverableContentUrls(d)) {

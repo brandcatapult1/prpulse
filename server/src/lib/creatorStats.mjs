@@ -2,16 +2,6 @@
 import { deliverableContentUrls } from './socialSync.mjs';
 
 const METRIC_FIELDS = ['likes', 'comments', 'views', 'reach', 'shares', 'reposts', 'saves'];
-const STAT_FIELDS = ['followers', 'following', 'posts_count', 'total_views'];
-
-function parseCount(value, label) {
-  if (value == null || value === '') return null;
-  const n = Number(value);
-  if (!Number.isInteger(n) || n < 0) {
-    throw Object.assign(new Error(`${label} must be a non-negative whole number`), { status: 400 });
-  }
-  return n;
-}
 
 export async function loadCreatorStats(client, contactId) {
   const { rows: social } = await client.query(
@@ -92,42 +82,4 @@ export async function loadCreatorStats(client, contactId) {
     campaigns: [...byCampaign.values()],
     deliverables: items,
   };
-}
-
-export async function upsertManualSocialStats(client, contactId, platform, body) {
-  if (!['instagram', 'youtube'].includes(platform)) {
-    throw Object.assign(new Error('platform must be instagram or youtube'), { status: 400 });
-  }
-  const v = Object.fromEntries(STAT_FIELDS.map((f) => [f, parseCount(body?.[f], f)]));
-  await client.query(
-    `INSERT INTO creator_social_stats
-       (contact_id, platform, followers, following, posts_count, total_views, source, synced_at)
-     VALUES ($1,$2,$3,$4,$5,$6,'manual',now())
-     ON CONFLICT (contact_id, platform) DO UPDATE SET
-       followers = EXCLUDED.followers, following = EXCLUDED.following,
-       posts_count = EXCLUDED.posts_count, total_views = EXCLUDED.total_views,
-       source = 'manual', synced_at = now(), sync_error = NULL, updated_at = now()`,
-    [contactId, platform, v.followers, v.following, v.posts_count, v.total_views],
-  );
-}
-
-export async function upsertManualDeliverableMetrics(client, deliverableId, body) {
-  const url = String(body?.content_url ?? '').trim();
-  if (!url) throw Object.assign(new Error('content_url is required'), { status: 400 });
-  const { rows: [d] } = await client.query(
-    `SELECT id, status FROM deliverables WHERE id = $1`,
-    [deliverableId],
-  );
-  if (!d) throw Object.assign(new Error('Deliverable not found'), { status: 404 });
-  const v = Object.fromEntries(METRIC_FIELDS.map((f) => [f, parseCount(body?.[f], f)]));
-  await client.query(
-    `INSERT INTO deliverable_metrics
-       (deliverable_id, content_url, likes, comments, views, reach, shares, reposts, saves, source, synced_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'manual',now())
-     ON CONFLICT (deliverable_id, content_url) DO UPDATE SET
-       likes = EXCLUDED.likes, comments = EXCLUDED.comments, views = EXCLUDED.views,
-       reach = EXCLUDED.reach, shares = EXCLUDED.shares, reposts = EXCLUDED.reposts,
-       saves = EXCLUDED.saves, source = 'manual', synced_at = now(), sync_error = NULL, updated_at = now()`,
-    [deliverableId, url, v.likes, v.comments, v.views, v.reach, v.shares, v.reposts, v.saves],
-  );
 }

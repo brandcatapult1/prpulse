@@ -105,13 +105,6 @@ export const contactsApi = {
   engagements: (id) => api(`/contacts/${id}/engagements`),
   creatorStats: (id) => api(`/contacts/${id}/creator-stats`),
   syncCreatorStats: (id) => api(`/contacts/${id}/creator-stats/sync`, { method: 'POST' }),
-  saveSocialStats: (id, platform, body) =>
-    api(`/contacts/${id}/social-stats/${platform}`, { method: 'PUT', body: JSON.stringify(body) }),
-  saveDeliverableMetrics: (id, deliverableId, body) =>
-    api(`/contacts/${id}/deliverable-metrics/${deliverableId}`, { method: 'PUT', body: JSON.stringify(body) }),
-  update: (id, body) => api(`/contacts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
-  create: (body) => api('/contacts/quick-add', { method: 'POST', body: JSON.stringify(body) }),
-  quickAdd: (body) => api('/contacts/quick-add', { method: 'POST', body: JSON.stringify(body) }),
   batchSetStatus: (contactIds, status) =>
     api('/contacts/batch/set-status', {
       method: 'POST',

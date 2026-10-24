@@ -20,10 +20,6 @@ const ENGAGEMENT_METRICS = [
   ['likes', 'Likes'],
   ['comments', 'Comments'],
   ['views', 'Views'],
-  ['reach', 'Reach'],
-  ['shares', 'Shares'],
-  ['reposts', 'Reposts'],
-  ['saves', 'Saves'],
 ];
 
 function formatMetric(n) {
@@ -339,7 +335,7 @@ export function ReportsPage() {
             }
           >
             {refreshNote && <p className="mb-2 text-2xs text-ink-secondary">{refreshNote}</p>}
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+            <div className="grid grid-cols-3 gap-2">
               {ENGAGEMENT_METRICS.map(([key, label]) => (
                 <MetricTile key={key} label={label} value={formatMetric(report.metrics?.[key])} />
               ))}

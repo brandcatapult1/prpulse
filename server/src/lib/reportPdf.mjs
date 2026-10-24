@@ -180,8 +180,7 @@ export async function buildCycleReportPdf({ report, logoUrl }) {
   doc.y = metricY + 72;
 
   const m = report.metrics ?? {};
-  const engagementLine = [['Likes', 'likes'], ['Comments', 'comments'], ['Views', 'views'], ['Reach', 'reach'],
-    ['Shares', 'shares'], ['Reposts', 'reposts'], ['Saves', 'saves']]
+  const engagementLine = [['Likes', 'likes'], ['Comments', 'comments'], ['Views', 'views']]
     .filter(([, k]) => Number(m[k]) > 0)
     .map(([label, k]) => `${label} ${Number(m[k]).toLocaleString('en-IN')}`)
     .join('  ·  ');

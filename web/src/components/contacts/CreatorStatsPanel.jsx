@@ -5,14 +5,12 @@ import { EmptyState, Toast } from '../ui/Primitives.jsx';
 import { Pill, formatDate, formatStatus } from '../../lib/format.jsx';
 import { formatCount } from './SystemLabelPills.jsx';
 
+// Only what Instagram/YouTube expose publicly. Reach, saves, shares and reposts are private
+// to the account owner, so they are not shown.
 const METRICS = [
   ['likes', 'Likes'],
   ['comments', 'Comments'],
   ['views', 'Views'],
-  ['reach', 'Reach'],
-  ['shares', 'Shares'],
-  ['reposts', 'Reposts'],
-  ['saves', 'Saves'],
 ];
 const TYPE_LABEL = { reel: 'Reel', story: 'Story', other: 'Post', static_carousel_post: 'Carousel' };
 const PLATFORMS = [
@@ -31,27 +29,11 @@ function Stat({ label, value }) {
   );
 }
 
-function NumberField({ label, value, onChange }) {
-  return (
-    <label className="text-2xs text-ink-secondary">
-      {label}
-      <input
-        className="input-field mt-1 h-8"
-        inputMode="numeric"
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value.replace(/[^0-9]/g, ''))}
-      />
-    </label>
-  );
-}
-
 export function CreatorStatsPanel({ contactId }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState(null);
-  const [editStats, setEditStats] = useState(null); // { platform, values }
-  const [editMetric, setEditMetric] = useState(null); // { deliverableId, content_url, values }
 
   const load = useCallback(() => {
     setError(null);
@@ -77,23 +59,6 @@ export function CreatorStatsPanel({ contactId }) {
     }
   }
 
-  async function saveStats() {
-    try {
-      setData(await contactsApi.saveSocialStats(contactId, editStats.platform, editStats.values));
-      setEditStats(null);
-    } catch (e) { setToast(e.message); }
-  }
-
-  async function saveMetric() {
-    try {
-      setData(await contactsApi.saveDeliverableMetrics(contactId, editMetric.deliverableId, {
-        content_url: editMetric.content_url,
-        ...editMetric.values,
-      }));
-      setEditMetric(null);
-    } catch (e) { setToast(e.message); }
-  }
-
   if (error) return <div className="panel p-4 text-2xs text-red-800">{error}</div>;
   if (!data) return <div className="panel p-6 text-center text-2xs text-ink-secondary">Loading stats…</div>;
 
@@ -107,7 +72,7 @@ export function CreatorStatsPanel({ contactId }) {
           <h3 className="text-sm font-medium text-ink">Audience</h3>
           <button type="button" className="btn-secondary" disabled={syncing || !configured} onClick={sync}
             title={configured ? '' : 'Set META_* / YOUTUBE_API_KEY on the server to enable sync'}>
-            {syncing ? 'Syncing…' : 'Sync from Instagram / YouTube'}
+            {syncing ? 'Syncing…' : 'Refresh from Instagram / YouTube'}
           </button>
         </div>
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
@@ -118,13 +83,6 @@ export function CreatorStatsPanel({ contactId }) {
                 <div className="mb-2 flex items-center gap-2 text-2xs text-ink-secondary">
                   <span className="font-medium text-ink">{name}</span>
                   {s?.handle && <span>@{s.handle}</span>}
-                  {s && <Pill tone={s.source === 'api' ? 'success' : 'default'}>{s.source}</Pill>}
-                  <button type="button" className="ml-auto text-brand hover:underline"
-                    onClick={() => setEditStats({ platform: key, values: {
-                      followers: s?.followers, following: s?.following,
-                      posts_count: s?.posts_count, total_views: s?.total_views } })}>
-                    Edit
-                  </button>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <Stat label={followLabel} value={s?.followers} />
@@ -170,7 +128,6 @@ export function CreatorStatsPanel({ contactId }) {
                 <tr className="border-b border-line text-left text-ink-tertiary">
                   <th className="px-3 py-2">Deliverable</th>
                   {METRICS.map(([k, label]) => <th key={k} className="px-2 py-2">{label}</th>)}
-                  <th className="px-2 py-2" />
                 </tr>
               </thead>
               <tbody>
@@ -182,64 +139,22 @@ export function CreatorStatsPanel({ contactId }) {
                         {l.content_url
                           ? <a href={l.content_url} target="_blank" rel="noreferrer" className="text-brand hover:underline">{l.content_url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 40)}</a>
                           : 'No link (screenshot proof)'}
-                        {l.source && <> · <Pill tone={l.source === 'api' ? 'success' : 'default'}>{l.source}</Pill></>}
                       </div>
                     </td>
                     {METRICS.map(([k]) => <td key={k} className="px-2 py-2">{formatCount(l[k])}</td>)}
-                    <td className="px-2 py-2">
-                      {l.content_url && (
-                        <button type="button" className="text-brand hover:underline"
-                          onClick={() => setEditMetric({ deliverableId: d.deliverable_id, content_url: l.content_url,
-                            values: Object.fromEntries(METRICS.map(([k]) => [k, l[k]])) })}>
-                          Edit
-                        </button>
-                      )}
-                    </td>
                   </tr>
                 )))}
               </tbody>
             </table>
           </div>
           <p className="text-2xs text-ink-tertiary">
-            Instagram API returns likes and comments for public Business/Creator accounts. Reach, shares, reposts and
-            saves are only available from the creator's own insights, so enter them from their screenshots (Edit).
-            Stories can't be fetched automatically.
+            Numbers are fetched automatically from each creator's public Instagram/YouTube data (Business or
+            Creator accounts). Stories can't be fetched. “—” means the platform doesn't expose it publicly.
           </p>
         </>
       )}
 
-      {editStats && (
-        <Modal title={`Edit ${editStats.platform} audience`} onCancel={() => setEditStats(null)} onSave={saveStats}>
-          {['followers', 'following', 'posts_count', 'total_views'].map((k) => (
-            <NumberField key={k} label={k.replace('_', ' ')} value={editStats.values[k]}
-              onChange={(v) => setEditStats((s) => ({ ...s, values: { ...s.values, [k]: v } }))} />
-          ))}
-        </Modal>
-      )}
-      {editMetric && (
-        <Modal title="Edit post metrics" onCancel={() => setEditMetric(null)} onSave={saveMetric}>
-          {METRICS.map(([k, label]) => (
-            <NumberField key={k} label={label} value={editMetric.values[k]}
-              onChange={(v) => setEditMetric((s) => ({ ...s, values: { ...s.values, [k]: v } }))} />
-          ))}
-        </Modal>
-      )}
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
-    </div>
-  );
-}
-
-function Modal({ title, children, onCancel, onSave }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onCancel}>
-      <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <h4 className="mb-3 text-sm font-medium capitalize text-ink">{title}</h4>
-        <div className="grid grid-cols-2 gap-3">{children}</div>
-        <div className="mt-4 flex justify-end gap-2">
-          <button type="button" className="btn-secondary" onClick={onCancel}>Cancel</button>
-          <button type="button" className="btn-primary" onClick={onSave}>Save</button>
-        </div>
-      </div>
     </div>
   );
 }

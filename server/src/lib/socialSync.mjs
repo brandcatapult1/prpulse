@@ -65,7 +65,7 @@ export async function fetchInstagramProfile(handle, { mediaLimit = 50 } = {}) {
   const { META_ACCESS_TOKEN: token, META_IG_USER_ID: igId } = process.env;
   if (!token || !igId) throw new Error('Instagram sync not configured (META_ACCESS_TOKEN / META_IG_USER_ID)');
   const fields = `business_discovery.username(${handle}){followers_count,follows_count,media_count,`
-    + `media.limit(${mediaLimit}){permalink,like_count,comments_count}}`;
+    + `media.limit(${mediaLimit}){permalink,like_count,comments_count,view_count}}`;
   const body = await getJson(
     `${GRAPH}/${igId}?fields=${encodeURIComponent(fields)}&access_token=${encodeURIComponent(token)}`,
   );
@@ -73,7 +73,7 @@ export async function fetchInstagramProfile(handle, { mediaLimit = 50 } = {}) {
   const posts = new Map();
   for (const m of bd.media?.data ?? []) {
     const code = instagramShortcode(m.permalink);
-    if (code) posts.set(code, { likes: num(m.like_count), comments: num(m.comments_count) });
+    if (code) posts.set(code, { likes: num(m.like_count), comments: num(m.comments_count), views: num(m.view_count) });
   }
   return {
     followers: num(bd.followers_count),

@@ -79,9 +79,16 @@ export function getCollaborationHistory(engagements, { deliverablesByEngagement 
   return sortEngagements(engagements)
     .filter((e) => e.conversation_status === 'collaboration_complete')
     .map((e) => {
-      const dels = deliverablesByEngagement[e.id] ?? getDeliverablesForEngagement(e.id);
-      const posted = dels.reduce((sum, d) => sum + deliverablePostedUnits(d), 0);
-      const total = dels.reduce((sum, d) => sum + deliverableTotalUnits(d), 0);
+      // The API supplies the counts; the in-memory cache is only a fallback.
+      const dels = e.deliverables_total != null
+        ? []
+        : deliverablesByEngagement[e.id] ?? getDeliverablesForEngagement(e.id);
+      const posted = e.deliverables_total != null
+        ? Number(e.deliverables_posted ?? 0)
+        : dels.reduce((sum, d) => sum + deliverablePostedUnits(d), 0);
+      const total = e.deliverables_total != null
+        ? Number(e.deliverables_total)
+        : dels.reduce((sum, d) => sum + deliverableTotalUnits(d), 0);
       const feedback = feedbackByEngagement[e.id];
       const avgRating = feedback
         ? avgRatingFromScores(
@@ -93,6 +100,7 @@ export function getCollaborationHistory(engagements, { deliverablesByEngagement 
       return {
         ...e,
         deliverables_completed: `${posted}/${total || '—'}`,
+        last_contact_date: e.last_contact_date ?? e.completed_at ?? null,
         avg_rating: avgRating,
         would_work_again: feedback?.would_work_again,
         internal_notes: feedback?.internal_notes ?? e.notes,

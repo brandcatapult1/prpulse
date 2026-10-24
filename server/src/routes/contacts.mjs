@@ -24,7 +24,9 @@ contactsRouter.get('/', requireAuth, async (req, res) => {
 
 contactsRouter.get('/:id/engagements', requireAuth, async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT e.*, cam.campaign_name, b.brand_name, u.full_name AS owner_name
+    `SELECT e.*, cam.campaign_name, b.brand_name, u.full_name AS owner_name,
+            COALESCE((SELECT SUM(d.posted_quantity) FROM deliverables d WHERE d.engagement_id = e.id), 0)::int AS deliverables_posted,
+            COALESCE((SELECT SUM(d.quantity) FROM deliverables d WHERE d.engagement_id = e.id), 0)::int AS deliverables_total
      FROM engagements e
      JOIN campaigns cam ON cam.id = e.campaign_id
      JOIN brands b ON b.id = cam.brand_id

@@ -60,6 +60,33 @@ async function getJson(url) {
 
 const num = (v) => (v == null || v === '' ? null : Number(v));
 
+/** Latest public posts of an account (read-only) — handy for picking real deliverables. */
+export async function fetchLatestInstagramMedia(handle, limit = 12) {
+  const { META_ACCESS_TOKEN: token, META_IG_USER_ID: igId } = process.env;
+  if (!token || !igId) throw new Error('Instagram sync not configured (META_ACCESS_TOKEN / META_IG_USER_ID)');
+  const fields = `business_discovery.username(${handle}){username,followers_count,follows_count,media_count,`
+    + `media.limit(${limit}){permalink,media_type,media_product_type,timestamp,like_count,comments_count,view_count}}`;
+  const body = await getJson(
+    `${GRAPH}/${igId}?fields=${encodeURIComponent(fields)}&access_token=${encodeURIComponent(token)}`,
+  );
+  const bd = body.business_discovery ?? {};
+  return {
+    username: bd.username ?? handle,
+    followers: num(bd.followers_count),
+    following: num(bd.follows_count),
+    posts_count: num(bd.media_count),
+    media: (bd.media?.data ?? []).map((m) => ({
+      permalink: m.permalink,
+      media_type: m.media_type,
+      product_type: m.media_product_type ?? null,
+      timestamp: m.timestamp,
+      likes: num(m.like_count),
+      comments: num(m.comments_count),
+      views: num(m.view_count),
+    })),
+  };
+}
+
 /** Followers/following/posts + a map shortcode → {likes, comments} for recent media. */
 export async function fetchInstagramProfile(handle, { mediaLimit = 50 } = {}) {
   const { META_ACCESS_TOKEN: token, META_IG_USER_ID: igId } = process.env;

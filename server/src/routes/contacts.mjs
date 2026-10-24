@@ -8,7 +8,7 @@ import { createContactDeduped } from '../lib/contactCreate.mjs';
 import { batchAddTagToContacts, batchSetContactStatus, batchSetPrimaryCategory } from '../lib/contactBatch.mjs';
 import { syncContactTags } from '../lib/contactTags.mjs';
 import { loadCreatorStats } from '../lib/creatorStats.mjs';
-import { syncContactSocial, syncProviders } from '../lib/socialSync.mjs';
+import { fetchLatestInstagramMedia, syncContactSocial, syncProviders } from '../lib/socialSync.mjs';
 import { listContactsPaginated, listPopulationContactsPaginated } from '../lib/contactList.mjs';
 
 export const contactsRouter = Router();
@@ -40,6 +40,15 @@ contactsRouter.get('/:id', requireAuth, async (req, res) => {
   const contact = await loadContactDetail(pool, req.params.id);
   if (!contact) return res.status(404).json({ error: 'Contact not found' });
   res.json(contact);
+});
+
+contactsRouter.get('/instagram-latest/:handle', requireAuth, async (req, res) => {
+  try {
+    const handle = String(req.params.handle).replace(/[^A-Za-z0-9._]/g, '');
+    res.json(await fetchLatestInstagramMedia(handle, Math.min(Number(req.query.limit) || 12, 50)));
+  } catch (err) {
+    res.status(err.status ?? 502).json({ error: err.message ?? 'Instagram lookup failed' });
+  }
 });
 
 contactsRouter.get('/:id/creator-stats', requireAuth, async (req, res) => {

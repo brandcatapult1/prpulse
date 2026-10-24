@@ -5,7 +5,7 @@ import { EmptyState, Toast } from '../ui/Primitives.jsx';
 import { Pill, formatDate, formatStatus } from '../../lib/format.jsx';
 import { formatCount } from './SystemLabelPills.jsx';
 
-// Only what Instagram/YouTube expose publicly. Reach, saves, shares and reposts are private
+// Only what Instagram exposes publicly. Reach, saves, shares and reposts are private
 // to the account owner, so they are not shown.
 const METRICS = [
   ['likes', 'Likes'],
@@ -13,10 +13,7 @@ const METRICS = [
   ['views', 'Views'],
 ];
 const TYPE_LABEL = { reel: 'Reel', story: 'Story', other: 'Post', static_carousel_post: 'Carousel' };
-const PLATFORMS = [
-  ['instagram', 'Instagram', 'Followers'],
-  ['youtube', 'YouTube', 'Subscribers'],
-];
+const PLATFORMS = [['instagram', 'Instagram', 'Followers']];
 
 function Stat({ label, value }) {
   return (
@@ -48,10 +45,10 @@ export function CreatorStatsPanel({ contactId }) {
       const res = await contactsApi.syncCreatorStats(contactId);
       setData(res);
       const r = res.result ?? {};
-      const notes = ['instagram', 'youtube']
+      const notes = ['instagram']
         .filter((p) => r[p] && r[p] !== 'skipped')
         .map((p) => `${p}: ${r[p] === 'not_configured' ? 'API not configured' : r[p]}`);
-      setToast(notes.length ? notes.join(' · ') : 'No linked Instagram/YouTube profile to sync');
+      setToast(notes.length ? notes.join(' · ') : 'No linked Instagram profile to sync');
     } catch (e) {
       setToast(e.message ?? 'Sync failed');
     } finally {
@@ -63,7 +60,7 @@ export function CreatorStatsPanel({ contactId }) {
   if (!data) return <div className="panel p-6 text-center text-2xs text-ink-secondary">Loading stats…</div>;
 
   const byPlatform = Object.fromEntries(data.social.map((s) => [s.platform, s]));
-  const configured = data.sync_available?.instagram || data.sync_available?.youtube;
+  const configured = data.sync_available?.instagram;
 
   return (
     <div className="space-y-4">
@@ -71,11 +68,11 @@ export function CreatorStatsPanel({ contactId }) {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-medium text-ink">Audience</h3>
           <button type="button" className="btn-secondary" disabled={syncing || !configured} onClick={sync}
-            title={configured ? '' : 'Set META_* / YOUTUBE_API_KEY on the server to enable sync'}>
-            {syncing ? 'Syncing…' : 'Refresh from Instagram / YouTube'}
+            title={configured ? '' : 'Set META_ACCESS_TOKEN / META_IG_USER_ID on the server to enable sync'}>
+            {syncing ? 'Syncing…' : 'Refresh from Instagram'}
           </button>
         </div>
-        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+        <div className="mt-3 grid gap-4">
           {PLATFORMS.map(([key, name, followLabel]) => {
             const s = byPlatform[key];
             return (
@@ -87,7 +84,7 @@ export function CreatorStatsPanel({ contactId }) {
                 <div className="grid grid-cols-3 gap-2">
                   <Stat label={followLabel} value={s?.followers} />
                   <Stat label="Following" value={s?.following} />
-                  <Stat label={key === 'youtube' ? 'Videos' : 'Posts'} value={s?.posts_count} />
+                  <Stat label="Posts" value={s?.posts_count} />
                 </div>
                 {s?.sync_error && <p className="mt-1 text-2xs text-health-red">{s.sync_error}</p>}
                 {s?.synced_at && <p className="mt-1 text-2xs text-ink-tertiary">Updated {formatDate(s.synced_at)}</p>}
@@ -148,7 +145,7 @@ export function CreatorStatsPanel({ contactId }) {
             </table>
           </div>
           <p className="text-2xs text-ink-tertiary">
-            Numbers are fetched automatically from each creator's public Instagram/YouTube data (Business or
+            Numbers are fetched automatically from each creator's public Instagram data (Business or
             Creator accounts). Stories can't be fetched. “—” means the platform doesn't expose it publicly.
           </p>
         </>

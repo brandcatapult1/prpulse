@@ -6,19 +6,15 @@
  *   Env: META_ACCESS_TOKEN, META_IG_USER_ID. Gives followers/following/posts and
  *   per-post likes + comments. Reach, shares, reposts and saves are NOT exposed for
  *   other accounts — those stay manual (source = 'manual').
- * YouTube: Data API v3. Env: YOUTUBE_API_KEY. Gives subscribers, views, per-video
- *   likes/comments/views.
  *
  * Without credentials, sync reports "not configured" and manual entry still works.
  */
 
 const GRAPH = 'https://graph.facebook.com/v21.0';
-const YT = 'https://www.googleapis.com/youtube/v3';
 
 export function syncProviders() {
   return {
     instagram: Boolean(process.env.META_ACCESS_TOKEN && process.env.META_IG_USER_ID),
-    youtube: Boolean(process.env.YOUTUBE_API_KEY),
   };
 }
 
@@ -32,7 +28,6 @@ export function detectPlatform(url) {
   const u = normalizeUrl(url);
   if (!u) return null;
   if (/instagram\.com/i.test(u)) return 'instagram';
-  if (/youtube\.com|youtu\.be/i.test(u)) return 'youtube';
   return null;
 }
 
@@ -51,28 +46,6 @@ export function instagramHandle(url) {
 export function instagramShortcode(url) {
   const m = String(url ?? '').match(/instagram\.com\/(?:[^/]+\/)?(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i);
   return m ? m[1] : null;
-}
-
-export function youtubeVideoId(url) {
-  const s = String(url ?? '');
-  const m = s.match(/youtu\.be\/([\w-]{6,})/i)
-    ?? s.match(/[?&]v=([\w-]{6,})/i)
-    ?? s.match(/youtube\.com\/(?:shorts|embed|live)\/([\w-]{6,})/i);
-  return m ? m[1] : null;
-}
-
-function youtubeChannelRef(url) {
-  const u = normalizeUrl(url);
-  if (!u) return null;
-  try {
-    const parts = new URL(u).pathname.split('/').filter(Boolean);
-    if (parts[0]?.startsWith('@')) return { forHandle: parts[0] };
-    if (parts[0] === 'channel' && parts[1]) return { id: parts[1] };
-    if ((parts[0] === 'c' || parts[0] === 'user') && parts[1]) return { forHandle: `@${parts[1]}` };
-  } catch {
-    // fall through
-  }
-  return null;
 }
 
 async function getJson(url) {
@@ -110,41 +83,6 @@ export async function fetchInstagramProfile(handle, { mediaLimit = 50 } = {}) {
   };
 }
 
-export async function fetchYoutubeChannel(channelUrl) {
-  const key = process.env.YOUTUBE_API_KEY;
-  if (!key) throw new Error('YouTube sync not configured (YOUTUBE_API_KEY)');
-  const ref = youtubeChannelRef(channelUrl);
-  if (!ref) throw new Error('Could not read a channel handle/id from the YouTube URL');
-  const q = new URLSearchParams({ part: 'statistics', key, ...ref });
-  const body = await getJson(`${YT}/channels?${q}`);
-  const s = body.items?.[0]?.statistics;
-  if (!s) throw new Error('YouTube channel not found');
-  return {
-    followers: s.hiddenSubscriberCount ? null : num(s.subscriberCount),
-    following: null,
-    posts_count: num(s.videoCount),
-    total_views: num(s.viewCount),
-  };
-}
-
-export async function fetchYoutubeVideos(videoIds) {
-  const key = process.env.YOUTUBE_API_KEY;
-  if (!key) throw new Error('YouTube sync not configured (YOUTUBE_API_KEY)');
-  const out = new Map();
-  for (let i = 0; i < videoIds.length; i += 50) {
-    const q = new URLSearchParams({ part: 'statistics', key, id: videoIds.slice(i, i + 50).join(',') });
-    const body = await getJson(`${YT}/videos?${q}`);
-    for (const v of body.items ?? []) {
-      out.set(v.id, {
-        likes: num(v.statistics?.likeCount),
-        comments: num(v.statistics?.commentCount),
-        views: num(v.statistics?.viewCount),
-      });
-    }
-  }
-  return out;
-}
-
 /** All distinct content URLs on a deliverable (row link + per-unit proofs). */
 export function deliverableContentUrls(d) {
   const urls = [];
@@ -180,7 +118,7 @@ const STATS_ERROR = `
 export async function syncContactSocial(pool, contactId) {
   const enabled = syncProviders();
   const { rows: [contact] } = await pool.query(
-    'SELECT id, instagram_url, youtube_url FROM contacts WHERE id = $1',
+    'SELECT id, instagram_url FROM contacts WHERE id = $1',
     [contactId],
   );
   if (!contact) throw Object.assign(new Error('Contact not found'), { status: 404 });
@@ -192,7 +130,7 @@ export async function syncContactSocial(pool, contactId) {
     [contactId],
   );
 
-  const result = { instagram: 'skipped', youtube: 'skipped', metrics_updated: 0 };
+  const result = { instagram: 'skipped', metrics_updated: 0 };
 
   const saveMetric = async (deliverableId, url, platform, m) => {
     await pool.query(
@@ -230,33 +168,6 @@ export async function syncContactSocial(pool, contactId) {
     }
   }
 
-  if (contact.youtube_url) {
-    if (!enabled.youtube) {
-      result.youtube = 'not_configured';
-    } else {
-      try {
-        const ch = await fetchYoutubeChannel(contact.youtube_url);
-        await pool.query(STATS_UPSERT, [contactId, 'youtube', null, ch.followers, ch.following, ch.posts_count, ch.total_views]);
-        const links = [];
-        for (const d of deliverables) {
-          for (const url of deliverableContentUrls(d)) {
-            const id = youtubeVideoId(url);
-            if (id) links.push({ d, url, id });
-          }
-        }
-        const stats = await fetchYoutubeVideos([...new Set(links.map((l) => l.id))]);
-        for (const l of links) {
-          const hit = stats.get(l.id);
-          if (hit) await saveMetric(l.d.id, l.url, 'youtube', hit);
-        }
-        result.youtube = 'ok';
-      } catch (err) {
-        await pool.query(STATS_ERROR, [contactId, 'youtube', null, err.message]);
-        result.youtube = `error: ${err.message}`;
-      }
-    }
-  }
-
   return result;
 }
 
@@ -264,7 +175,7 @@ export async function syncContactSocial(pool, contactId) {
 export async function syncAllContactsSocial(pool, { delayMs = 500 } = {}) {
   const { rows } = await pool.query(
     `SELECT id FROM contacts
-     WHERE status = 'active' AND (instagram_url IS NOT NULL OR youtube_url IS NOT NULL)`,
+     WHERE status = 'active' AND instagram_url IS NOT NULL`,
   );
   let ok = 0;
   for (const { id } of rows) {

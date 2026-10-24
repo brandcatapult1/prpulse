@@ -105,7 +105,7 @@ reportsRouter.get('/cycles/:cycleId', requireAuth, async (req, res) => {
   }
 });
 
-/** Re-fetch engagement numbers from Instagram/YouTube for creators in this cycle's report. */
+/** Re-fetch engagement numbers from Instagram for creators in this cycle's report. */
 reportsRouter.post('/cycles/:cycleId/refresh-metrics', requireAuth, async (req, res) => {
   try {
     await assertCanViewCycleReport(pool, req.user, req.params.cycleId);
@@ -113,7 +113,7 @@ reportsRouter.post('/cycles/:cycleId/refresh-metrics', requireAuth, async (req, 
     if (!report) return res.status(404).json({ error: 'Cycle not found' });
 
     const providers = syncProviders();
-    if (!providers.instagram && !providers.youtube) {
+    if (!providers.instagram) {
       return res.json({ refreshed: 0, configured: false, errors: [] });
     }
     const contactIds = [...new Set(report.collaborations.map((c) => c.contact_id))];
@@ -123,7 +123,7 @@ reportsRouter.post('/cycles/:cycleId/refresh-metrics', requireAuth, async (req, 
       try {
         const r = await syncContactSocial(pool, id);
         refreshed += r.metrics_updated;
-        for (const p of ['instagram', 'youtube']) {
+        for (const p of ['instagram']) {
           if (String(r[p]).startsWith('error')) errors.push(`${p}: ${r[p].slice(7)}`);
         }
       } catch (err) {

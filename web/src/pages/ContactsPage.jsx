@@ -169,8 +169,8 @@ export function ContactsPage() {
       key: 'followers',
       label: 'Followers',
       render: (r) => (
-        <span title={`Instagram ${r.instagram_followers ?? '—'} · YouTube ${r.youtube_subscribers ?? '—'}`}>
-          {formatCount(r.instagram_followers ?? r.youtube_subscribers)}
+        <span title={r.instagram_followers == null ? '' : String(r.instagram_followers)}>
+          {formatCount(r.instagram_followers)}
         </span>
       ),
     },

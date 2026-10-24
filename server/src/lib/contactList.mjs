@@ -14,7 +14,6 @@ const CONTACT_LIST_SELECT = `
            ARRAY[]::text[]
          ) AS system_labels,
          (SELECT followers FROM creator_social_stats s WHERE s.contact_id = c.id AND s.platform = 'instagram') AS instagram_followers,
-         (SELECT followers FROM creator_social_stats s WHERE s.contact_id = c.id AND s.platform = 'youtube') AS youtube_subscribers,
          COALESCE(
            (
              SELECT array_agg(t.name ORDER BY t.name)
@@ -150,7 +149,6 @@ const POPULATION_LIST_SELECT = `
            ARRAY[]::text[]
          ) AS system_labels,
          (SELECT followers FROM creator_social_stats s WHERE s.contact_id = c.id AND s.platform = 'instagram') AS instagram_followers,
-         (SELECT followers FROM creator_social_stats s WHERE s.contact_id = c.id AND s.platform = 'youtube') AS youtube_subscribers,
          COALESCE(
            (
              SELECT array_agg(t.name ORDER BY t.name)

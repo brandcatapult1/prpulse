@@ -8,7 +8,6 @@ const STATUS = {
   error: ['danger', 'Needs renewing'],
   none: ['muted', 'Not requested'],
 };
-const MISMATCH = ['danger', 'Wrong account'];
 
 export function accessStatus(data) {
   const c = data?.instagram_connection;
@@ -20,8 +19,7 @@ export function InstagramAccessCard({ data, contactId, onChange, onToast }) {
   const req = data.instagram_request;
   const conn = data.instagram_connection;
   const status = accessStatus(data);
-  const mismatch = conn?.last_error?.startsWith('Account mismatch');
-  const [tone, label] = mismatch ? MISMATCH : STATUS[status] ?? STATUS.none;
+  const [tone, label] = STATUS[status] ?? STATUS.none;
 
   async function record(channel) {
     try {
@@ -65,9 +63,7 @@ export function InstagramAccessCard({ data, contactId, onChange, onToast }) {
           </div>
           <p className="mt-1 text-2xs text-ink-secondary">
             {status === 'connected'
-              ? <>Connected{conn?.ig_username ? <> as <b>@{conn.ig_username}</b></> : null}. Reach, saves, shares and reposts are read from the creator’s own insights.</>
-              : conn?.last_error?.startsWith('Account mismatch')
-                ? <span className="text-health-red">{conn.last_error}. Public data is shown for this creator. Disconnect, then ask the creator to approve with their own account.</span>
+              ? <>Connected{conn?.ig_username ? <> as <b>@{conn.ig_username}</b></> : null}. Reach, saves, shares and reposts are read for the posts in this creator’s deliverables only. Audience numbers are not changed.</>
               : status === 'expired' || status === 'error'
                 ? <span className="text-health-red">Access needs renewing{conn?.last_error ? ` (${conn.last_error})` : ''}. Send a new request. Public data is used meanwhile.</span>
                 : 'Optional. Until the creator approves, only public likes, comments and views are shown.'}

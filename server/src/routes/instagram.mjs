@@ -5,7 +5,6 @@ import {
   exchangeCodeForLongLivedToken,
   facebookAuthUrl,
   findInstagramAccount,
-  accountMatchesContact,
   saveConnection,
   verifyState,
 } from '../lib/instagramConnect.mjs';
@@ -45,18 +44,6 @@ instagramRouter.get('/callback', async (req, res) => {
   try {
     const { token, expiresAt } = await exchangeCodeForLongLivedToken(String(req.query.code));
     const { igUserId, username } = await findInstagramAccount(token);
-    const { rows: [contact] } = await pool.query(
-      'SELECT full_name, instagram_url FROM contacts WHERE id = $1', [contactId]);
-    if (!contact) return page(res, 'Link expired', 'This link is no longer valid.', 400);
-    if (!accountMatchesContact(username, contact.instagram_url)) {
-      return page(
-        res,
-        'Wrong Instagram account',
-        `You approved @${username}, but this request is for ${contact.instagram_url}. `
-        + 'Please open the link again and sign in with the Instagram account that posted the content.',
-        400,
-      );
-    }
     await saveConnection(pool, contactId, { igUserId, username, token, expiresAt });
     // Pull numbers right away; a failure is recorded on the connection, not shown to the creator.
     syncContactSocial(pool, contactId).catch((err) => console.warn('Initial IG sync failed:', err.message));

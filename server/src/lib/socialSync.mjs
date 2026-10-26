@@ -13,7 +13,6 @@
 import {
   GRAPH_VERSION,
   connectConfigured,
-  accountMatchesContact,
   decryptToken,
   extendToken,
   loadConnection,
@@ -264,15 +263,7 @@ export async function syncContactSocial(pool, contactId) {
   // Creators who approved our app: read their own insights (reach, saves, shares, reposts…).
   let connectedOk = false;
   const conn = await loadConnection(pool, contactId);
-  if (conn && enabled.connect && !accountMatchesContact(conn.ig_username, contact.instagram_url)) {
-    // Connected as someone else — never show their numbers on this creator.
-    await pool.query(
-      `UPDATE creator_instagram_connections SET status = 'error', last_error = $2, updated_at = now()
-       WHERE contact_id = $1`,
-      [contactId, `Account mismatch: connected as @${conn.ig_username}, contact's Instagram is ${contact.instagram_url}`],
-    );
-    result.instagram = 'connected account does not match this creator; using public data';
-  } else if (conn && enabled.connect) {
+  if (conn && enabled.connect) {
     try {
       let token = decryptToken(conn.access_token_enc);
       const daysLeft = conn.token_expires_at
@@ -292,13 +283,10 @@ export async function syncContactSocial(pool, contactId) {
           if (code) links.push({ d, url, code });
         }
       }
-      const { profile, media } = await fetchConnectedProfile(
+      // Only the posts are read here. The creator's audience always comes from their own public profile.
+      const { media } = await fetchConnectedProfile(
         conn.ig_user_id, token, new Set(links.map((l) => l.code)),
       );
-      await pool.query(STATS_UPSERT, [
-        contactId, 'instagram', profile.username ?? conn.ig_username,
-        num(profile.followers_count), num(profile.follows_count), num(profile.media_count), null,
-      ]);
       for (const l of links) {
         const m = media.get(l.code);
         if (!m) continue;
@@ -335,9 +323,9 @@ export async function syncContactSocial(pool, contactId) {
     }
   }
 
-  // Everyone else (or a connection that failed): public data only.
+  // Public data for the creator's own profile and posts — runs for everyone, connected or not.
   const handle = instagramHandle(contact.instagram_url);
-  if (!connectedOk && handle) {
+  if (handle) {
     if (!enabled.instagram) {
       result.instagram = 'not_configured';
     } else {
@@ -354,7 +342,7 @@ export async function syncContactSocial(pool, contactId) {
             if (hit) await saveMetric(d.id, url, 'instagram', hit);
           }
         }
-        result.instagram = 'ok';
+        if (!connectedOk) result.instagram = 'ok';
       } catch (err) {
         await pool.query(STATS_ERROR, [contactId, 'instagram', handle, err.message]);
         result.instagram = `error: ${err.message}`;

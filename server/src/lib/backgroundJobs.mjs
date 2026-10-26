@@ -21,7 +21,7 @@ export function startBackgroundJobs(pool) {
   setInterval(tagsTick, SYSTEM_TAGS_EVERY_MS).unref();
 
   const providers = syncProviders();
-  if (providers.instagram) {
+  if (providers.instagram || providers.connect) {
     const socialTick = () => syncAllContactsSocial(pool)
       .then((r) => console.log('Social sync:', JSON.stringify(r)))
       .catch((err) => console.warn('Social sync failed:', err.message ?? err));

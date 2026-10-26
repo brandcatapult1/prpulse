@@ -21,6 +21,14 @@ const ENGAGEMENT_METRICS = [
   ['comments', 'Comments'],
   ['views', 'Views'],
 ];
+// Only available for creators who approved Instagram insights.
+const INSIGHT_METRICS = [
+  ['reach', 'Reach'],
+  ['saves', 'Saves'],
+  ['shares', 'Shares'],
+  ['reposts', 'Reposts'],
+];
+const ALL_METRICS = [...ENGAGEMENT_METRICS, ...INSIGHT_METRICS];
 
 function formatMetric(n) {
   return Number(n ?? 0).toLocaleString('en-IN');
@@ -340,6 +348,19 @@ export function ReportsPage() {
                 <MetricTile key={key} label={label} value={formatMetric(report.metrics?.[key])} />
               ))}
             </div>
+            {(report.insights_coverage?.connected ?? 0) > 0 && (
+              <>
+                <p className="mb-1.5 mt-4 text-2xs text-ink-secondary">
+                  From creator insights — {report.insights_coverage.connected} of {report.insights_coverage.total} creators
+                  approved access, so these totals cover only their posts.
+                </p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {INSIGHT_METRICS.map(([key, label]) => (
+                    <MetricTile key={key} label={label} value={formatMetric(report.metrics?.[key])} />
+                  ))}
+                </div>
+              </>
+            )}
             {!Object.values(report.metrics ?? {}).some((v) => v > 0) && (
               <p className="mt-2 text-2xs text-ink-tertiary">
                 No engagement numbers recorded yet — add them from each creator's Creator Stats tab.
@@ -380,7 +401,7 @@ export function ReportsPage() {
                     </div>
                     {Object.values(collab.metrics ?? {}).some((v) => v > 0) && (
                       <p className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-2xs text-ink-secondary">
-                        {ENGAGEMENT_METRICS.filter(([k]) => collab.metrics[k] > 0).map(([k, label]) => (
+                        {ALL_METRICS.filter(([k]) => collab.metrics[k] > 0).map(([k, label]) => (
                           <span key={k}>{label}: <b className="text-ink">{formatMetric(collab.metrics[k])}</b></span>
                         ))}
                       </p>

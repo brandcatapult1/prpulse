@@ -10,11 +10,21 @@
  * Without credentials, sync reports "not configured" and manual entry still works.
  */
 
-const GRAPH = 'https://graph.facebook.com/v21.0';
+import {
+  GRAPH_VERSION,
+  connectConfigured,
+  decryptToken,
+  extendToken,
+  loadConnection,
+  saveConnection,
+} from './instagramConnect.mjs';
+
+const GRAPH = `https://graph.facebook.com/${GRAPH_VERSION}`;
 
 export function syncProviders() {
   return {
     instagram: Boolean(process.env.META_ACCESS_TOKEN && process.env.META_IG_USER_ID),
+    connect: connectConfigured(),
   };
 }
 
@@ -92,6 +102,67 @@ export async function fetchLatestInstagramMedia(handle, limit = 12) {
  * Pages back through the account's posts (50 per page) until every wanted shortcode is found
  * or `maxPages` is reached, so older deliverables are still matched.
  */
+const INSIGHT_METRICS = ['reach', 'saved', 'shares', 'views', 'likes', 'comments', 'reposts'];
+
+function insightsToMetrics(data) {
+  const out = {};
+  for (const m of data ?? []) {
+    const v = m.total_value?.value ?? m.values?.[0]?.value;
+    if (v == null) continue;
+    out[m.name === 'saved' ? 'saves' : m.name] = Number(v);
+  }
+  return out;
+}
+
+/** One call for all metrics; if a post type rejects one, retry metric by metric. */
+export async function fetchMediaInsights(mediaId, token) {
+  try {
+    const body = await getJson(
+      `${GRAPH}/${mediaId}/insights?${new URLSearchParams({ metric: INSIGHT_METRICS.join(','), access_token: token })}`,
+    );
+    return insightsToMetrics(body.data);
+  } catch (err) {
+    if (/\(#190\)|access token|OAuthException/i.test(err.message)) throw err;
+    const merged = {};
+    for (const metric of INSIGHT_METRICS) {
+      try {
+        const body = await getJson(
+          `${GRAPH}/${mediaId}/insights?${new URLSearchParams({ metric, access_token: token })}`,
+        );
+        Object.assign(merged, insightsToMetrics(body.data));
+      } catch {
+        // metric not supported for this media type — leave it unset
+      }
+    }
+    return merged;
+  }
+}
+
+async function fetchConnectedProfile(igUserId, token, wantedCodes) {
+  const profile = await getJson(
+    `${GRAPH}/${igUserId}?${new URLSearchParams({
+      fields: 'username,followers_count,follows_count,media_count',
+      access_token: token,
+    })}`,
+  );
+  const media = new Map();
+  let next = `${GRAPH}/${igUserId}/media?${new URLSearchParams({
+    fields: 'id,permalink,like_count,comments_count',
+    limit: '50',
+    access_token: token,
+  })}`;
+  for (let page = 0; next && page < 40; page += 1) {
+    const body = await getJson(next);
+    for (const m of body.data ?? []) {
+      const code = instagramShortcode(m.permalink);
+      if (code) media.set(code, m);
+    }
+    if ([...wantedCodes].every((c) => media.has(c))) break;
+    next = body.paging?.next ?? null;
+  }
+  return { profile, media };
+}
+
 export async function fetchInstagramProfile(handle, { wantedCodes = [], mediaLimit = 50, maxPages = 30 } = {}) {
   const { META_ACCESS_TOKEN: token, META_IG_USER_ID: igId } = process.env;
   if (!token || !igId) throw new Error('Instagram sync not configured (META_ACCESS_TOKEN / META_IG_USER_ID)');
@@ -189,8 +260,75 @@ export async function syncContactSocial(pool, contactId) {
     result.metrics_updated += 1;
   };
 
+  // Creators who approved our app: read their own insights (reach, saves, shares, reposts…).
+  let connectedOk = false;
+  const conn = await loadConnection(pool, contactId);
+  if (conn && enabled.connect) {
+    try {
+      let token = decryptToken(conn.access_token_enc);
+      const daysLeft = conn.token_expires_at
+        ? (new Date(conn.token_expires_at).getTime() - Date.now()) / 86_400_000
+        : null;
+      if (daysLeft != null && daysLeft < 15) {
+        const fresh = await extendToken(token);
+        token = fresh.token;
+        await saveConnection(pool, contactId, {
+          igUserId: conn.ig_user_id, username: conn.ig_username, token, expiresAt: fresh.expiresAt,
+        });
+      }
+      const links = [];
+      for (const d of deliverables) {
+        for (const url of deliverableContentUrls(d)) {
+          const code = instagramShortcode(url);
+          if (code) links.push({ d, url, code });
+        }
+      }
+      const { profile, media } = await fetchConnectedProfile(
+        conn.ig_user_id, token, new Set(links.map((l) => l.code)),
+      );
+      await pool.query(STATS_UPSERT, [
+        contactId, 'instagram', profile.username ?? conn.ig_username,
+        num(profile.followers_count), num(profile.follows_count), num(profile.media_count), null,
+      ]);
+      for (const l of links) {
+        const m = media.get(l.code);
+        if (!m) continue;
+        const ins = await fetchMediaInsights(m.id, token);
+        await pool.query(
+          `INSERT INTO deliverable_metrics
+             (deliverable_id, content_url, platform, likes, comments, views, reach, shares, reposts, saves,
+              source, synced_at, sync_error)
+           VALUES ($1,$2,'instagram',$3,$4,$5,$6,$7,$8,$9,'insights',now(),NULL)
+           ON CONFLICT (deliverable_id, content_url) DO UPDATE SET
+             likes = EXCLUDED.likes, comments = EXCLUDED.comments, views = EXCLUDED.views,
+             reach = EXCLUDED.reach, shares = EXCLUDED.shares, reposts = EXCLUDED.reposts,
+             saves = EXCLUDED.saves, platform = 'instagram', source = 'insights',
+             synced_at = now(), sync_error = NULL, updated_at = now()`,
+          [l.d.id, l.url, ins.likes ?? num(m.like_count), ins.comments ?? num(m.comments_count),
+            ins.views ?? null, ins.reach ?? null, ins.shares ?? null, ins.reposts ?? null, ins.saves ?? null],
+        );
+        result.metrics_updated += 1;
+      }
+      await pool.query(
+        `UPDATE creator_instagram_connections SET status = 'connected', last_error = NULL, updated_at = now()
+         WHERE contact_id = $1`, [contactId],
+      );
+      result.instagram = 'ok (insights)';
+      connectedOk = true;
+    } catch (err) {
+      const expired = /\(#190\)|access token|session has expired|Error validating/i.test(err.message);
+      await pool.query(
+        `UPDATE creator_instagram_connections SET status = $2, last_error = $3, updated_at = now()
+         WHERE contact_id = $1`,
+        [contactId, expired ? 'expired' : 'error', err.message],
+      );
+      result.instagram = `insights unavailable (${err.message}); using public data`;
+    }
+  }
+
+  // Everyone else (or a connection that failed): public data only.
   const handle = instagramHandle(contact.instagram_url);
-  if (handle) {
+  if (!connectedOk && handle) {
     if (!enabled.instagram) {
       result.instagram = 'not_configured';
     } else {

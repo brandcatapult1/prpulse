@@ -104,6 +104,11 @@ export const contactsApi = {
   get: (id) => api(`/contacts/${id}`),
   engagements: (id) => api(`/contacts/${id}/engagements`),
   creatorStats: (id) => api(`/contacts/${id}/creator-stats`),
+  recordInstagramRequest: (id, channel) =>
+    api(`/contacts/${id}/instagram-request`, { method: 'POST', body: JSON.stringify({ channel }) }),
+  disconnectInstagram: (id) => api(`/contacts/${id}/instagram-connection`, { method: 'DELETE' }),
+  instagramLinks: (contactIds) =>
+    api('/contacts/batch/instagram-links', { method: 'POST', body: JSON.stringify({ contact_ids: contactIds }) }),
   syncCreatorStats: (id) => api(`/contacts/${id}/creator-stats/sync`, { method: 'POST' }),
   batchSetStatus: (contactIds, status) =>
     api('/contacts/batch/set-status', {

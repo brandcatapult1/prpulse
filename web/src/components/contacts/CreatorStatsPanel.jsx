@@ -4,6 +4,7 @@ import { DataTable } from '../ui/DataKit.jsx';
 import { EmptyState, Toast } from '../ui/Primitives.jsx';
 import { Pill, formatDate, formatStatus } from '../../lib/format.jsx';
 import { formatCount } from './SystemLabelPills.jsx';
+import { InstagramAccessCard } from './InstagramAccessCard.jsx';
 
 // Only what Instagram exposes publicly. Reach, saves, shares and reposts are private
 // to the account owner, so they are not shown.
@@ -11,6 +12,10 @@ const METRICS = [
   ['likes', 'Likes'],
   ['comments', 'Comments'],
   ['views', 'Views'],
+  ['reach', 'Reach'],
+  ['saves', 'Saves'],
+  ['shares', 'Shares'],
+  ['reposts', 'Reposts'],
 ];
 const TYPE_LABEL = { reel: 'Reel', story: 'Story', other: 'Post', static_carousel_post: 'Carousel' };
 const PLATFORMS = [['instagram', 'Instagram', 'Followers']];
@@ -64,6 +69,8 @@ export function CreatorStatsPanel({ contactId }) {
 
   return (
     <div className="space-y-4">
+      <InstagramAccessCard data={data} contactId={contactId} onChange={setData} onToast={setToast} />
+
       <div className="panel p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-medium text-ink">Audience</h3>
@@ -145,8 +152,8 @@ export function CreatorStatsPanel({ contactId }) {
             </table>
           </div>
           <p className="text-2xs text-ink-tertiary">
-            Numbers are fetched automatically from each creator's public Instagram data (Business or
-            Creator accounts). Stories can't be fetched. “—” means the platform doesn't expose it publicly.
+            Likes, comments and views come from public Instagram data. Reach, saves, shares and reposts appear only
+            for creators who approved access (see Instagram access above); “—” means not available. Stories can't be fetched.
           </p>
         </>
       )}

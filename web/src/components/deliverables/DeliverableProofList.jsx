@@ -4,6 +4,10 @@ const METRIC_LABELS = [
   ['likes', 'Likes'],
   ['comments', 'Comments'],
   ['views', 'Views'],
+  ['reach', 'Reach'],
+  ['saves', 'Saves'],
+  ['shares', 'Shares'],
+  ['reposts', 'Reposts'],
 ];
 
 /** Engagement counts (only those recorded) — shown when the report supplies them. */

@@ -17,6 +17,7 @@
     "db:test:permissions": "node db/tests/permissions.test.mjs",
     "db:test:contacts": "node db/tests/contact-patch.test.mjs",
     "db:test:batch": "node db/tests/contact-batch.test.mjs",
+    "test:instagram-connect": "node db/tests/instagram-connect.test.mjs",
     "db:test:system-tags": "node db/tests/system-tags.test.mjs",
     "db:test:campaign-tags": "node db/tests/campaign-tags.test.mjs",
     "db:test:campaign-cycles": "node db/tests/campaign-cycles.test.mjs",

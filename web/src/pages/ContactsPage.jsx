@@ -174,6 +174,15 @@ export function ContactsPage() {
         </span>
       ),
     },
+    {
+      key: 'instagram_access',
+      label: 'Insights',
+      render: (r) => {
+        const map = { connected: ['success', 'Connected'], requested: ['warning', 'Requested'], expired: ['danger', 'Renew'], error: ['danger', 'Renew'] };
+        const hit = map[r.instagram_access];
+        return hit ? <Pill tone={hit[0]}>{hit[1]}</Pill> : <span className="text-ink-tertiary">—</span>;
+      },
+    },
     { key: 'primary_category_name', label: 'Category', render: (r) => r.primary_category_name ?? '—' },
     { key: 'classification', label: 'Class', render: (r) => r.classification?.replace('_', ' ') ?? '—' },
     {

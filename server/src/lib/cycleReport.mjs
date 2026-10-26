@@ -227,6 +227,18 @@ export async function loadCycleReport(client, cycleId) {
     }));
   }
 
+  // How many of this cycle's creators have approved Instagram insights (reach/saves/shares/reposts).
+  const contactIds = [...new Set(collaborations.map((x) => x.contact_id))];
+  let insightsConnected = 0;
+  if (contactIds.length) {
+    const { rows } = await client.query(
+      `SELECT COUNT(*)::int AS n FROM creator_instagram_connections
+       WHERE contact_id = ANY($1::uuid[]) AND status = 'connected'`,
+      [contactIds],
+    );
+    insightsConnected = rows[0]?.n ?? 0;
+  }
+
   const target = Number(cycle.target);
   const storedCompleted = Number(cycle.completed_collaborations);
   const achievementPct =
@@ -259,6 +271,7 @@ export async function loadCycleReport(client, cycleId) {
     },
     metrics: metricsTotals,
     metrics_synced_at: metricsSyncedAt,
+    insights_coverage: { connected: insightsConnected, total: contactIds.length },
     collaborations,
   };
 }

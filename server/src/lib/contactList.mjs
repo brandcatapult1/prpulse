@@ -13,6 +13,11 @@ const CONTACT_LIST_SELECT = `
            ),
            ARRAY[]::text[]
          ) AS system_labels,
+         COALESCE(
+           (SELECT k.status FROM creator_instagram_connections k WHERE k.contact_id = c.id),
+           CASE WHEN EXISTS (SELECT 1 FROM creator_instagram_requests r WHERE r.contact_id = c.id)
+                THEN 'requested' ELSE 'none' END
+         ) AS instagram_access,
          (SELECT followers FROM creator_social_stats s WHERE s.contact_id = c.id AND s.platform = 'instagram') AS instagram_followers,
          COALESCE(
            (
@@ -148,6 +153,11 @@ const POPULATION_LIST_SELECT = `
            ),
            ARRAY[]::text[]
          ) AS system_labels,
+         COALESCE(
+           (SELECT k.status FROM creator_instagram_connections k WHERE k.contact_id = c.id),
+           CASE WHEN EXISTS (SELECT 1 FROM creator_instagram_requests r WHERE r.contact_id = c.id)
+                THEN 'requested' ELSE 'none' END
+         ) AS instagram_access,
          (SELECT followers FROM creator_social_stats s WHERE s.contact_id = c.id AND s.platform = 'instagram') AS instagram_followers,
          COALESCE(
            (

@@ -8,6 +8,15 @@ import { createContactDeduped } from '../lib/contactCreate.mjs';
 import { batchAddTagToContacts, batchSetContactStatus, batchSetPrimaryCategory } from '../lib/contactBatch.mjs';
 import { syncContactTags } from '../lib/contactTags.mjs';
 import { loadCreatorStats } from '../lib/creatorStats.mjs';
+import {
+  buildRequestMessage,
+  connectConfigured,
+  connectLink,
+  loadConnection,
+  mailtoUrl,
+  publicConnection,
+  whatsappUrl,
+} from '../lib/instagramConnect.mjs';
 import { fetchLatestInstagramMedia, syncContactSocial, syncProviders } from '../lib/socialSync.mjs';
 import { listContactsPaginated, listPopulationContactsPaginated } from '../lib/contactList.mjs';
 
@@ -53,20 +62,99 @@ contactsRouter.get('/instagram-latest/:handle', requireAuth, async (req, res) =>
   }
 });
 
+async function requestInfo(contactId) {
+  const { rows: [c] } = await pool.query(
+    'SELECT id, full_name, mobile_number, email FROM contacts WHERE id = $1', [contactId]);
+  if (!c) throw Object.assign(new Error('Contact not found'), { status: 404 });
+  if (!connectConfigured()) return { configured: false, link: null, message: null, whatsapp_url: null, mailto_url: null };
+  const link = connectLink(contactId);
+  const message = buildRequestMessage({ name: c.full_name, link });
+  return {
+    configured: true,
+    link,
+    message,
+    whatsapp_url: whatsappUrl(c.mobile_number, message),
+    mailto_url: mailtoUrl(c.email, message),
+  };
+}
+
+async function creatorStatsPayload(contactId) {
+  const stats = await loadCreatorStats(pool, contactId);
+  const connection = publicConnection(await loadConnection(pool, contactId));
+  const { rows: requests } = await pool.query(
+    `SELECT r.channel, r.requested_at, u.full_name AS requested_by_name
+     FROM creator_instagram_requests r LEFT JOIN users u ON u.id = r.requested_by
+     WHERE r.contact_id = $1 ORDER BY r.requested_at DESC LIMIT 5`, [contactId]);
+  return {
+    ...stats,
+    instagram_connection: connection,
+    instagram_requests: requests,
+    instagram_request: await requestInfo(contactId),
+    sync_available: syncProviders(),
+  };
+}
+
 contactsRouter.get('/:id/creator-stats', requireAuth, async (req, res) => {
   try {
-    const stats = await loadCreatorStats(pool, req.params.id);
-    res.json({ ...stats, sync_available: syncProviders() });
+    res.json(await creatorStatsPayload(req.params.id));
   } catch (err) {
     res.status(err.status ?? 500).json({ error: err.message ?? 'Could not load creator stats' });
+  }
+});
+
+/** Record that a request was sent (WhatsApp / email / copied link). */
+contactsRouter.post('/:id/instagram-request', requireAuth, async (req, res) => {
+  const channel = ['whatsapp', 'email', 'link'].includes(req.body?.channel) ? req.body.channel : null;
+  if (!channel) return res.status(400).json({ error: 'channel must be whatsapp, email or link' });
+  try {
+    await pool.query(
+      `INSERT INTO creator_instagram_requests (contact_id, channel, requested_by) VALUES ($1,$2,$3)`,
+      [req.params.id, channel, req.user.id]);
+    res.json(await creatorStatsPayload(req.params.id));
+  } catch (err) {
+    res.status(err.status ?? 503).json({ error: err.message ?? 'Could not record request' });
+  }
+});
+
+/** Links for a selection of creators (nothing is recorded until a request is actually sent). */
+contactsRouter.post('/batch/instagram-links', requireAuth, async (req, res) => {
+  const ids = Array.isArray(req.body?.contact_ids) ? req.body.contact_ids.slice(0, 200) : [];
+  if (!ids.length) return res.status(400).json({ error: 'contact_ids required' });
+  if (!connectConfigured()) return res.status(503).json({ error: 'Instagram connect is not set up on the server' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT c.id, c.full_name, c.mobile_number, c.email,
+              (SELECT status FROM creator_instagram_connections k WHERE k.contact_id = c.id) AS connection_status
+       FROM contacts c WHERE c.id = ANY($1::uuid[]) ORDER BY c.full_name`, [ids]);
+    res.json(rows.map((c) => {
+      const message = buildRequestMessage({ name: c.full_name, link: connectLink(c.id) });
+      return {
+        id: c.id,
+        full_name: c.full_name,
+        connection_status: c.connection_status,
+        whatsapp_url: whatsappUrl(c.mobile_number, message),
+        mailto_url: mailtoUrl(c.email, message),
+        message,
+      };
+    }));
+  } catch (err) {
+    res.status(err.status ?? 503).json({ error: err.message ?? 'Could not build links' });
+  }
+});
+
+contactsRouter.delete('/:id/instagram-connection', requireAuth, async (req, res) => {
+  try {
+    await pool.query('DELETE FROM creator_instagram_connections WHERE contact_id = $1', [req.params.id]);
+    res.json(await creatorStatsPayload(req.params.id));
+  } catch (err) {
+    res.status(err.status ?? 503).json({ error: err.message ?? 'Could not disconnect' });
   }
 });
 
 contactsRouter.post('/:id/creator-stats/sync', requireAuth, async (req, res) => {
   try {
     const result = await syncContactSocial(pool, req.params.id);
-    const stats = await loadCreatorStats(pool, req.params.id);
-    res.json({ result, ...stats, sync_available: syncProviders() });
+    res.json({ result, ...(await creatorStatsPayload(req.params.id)) });
   } catch (err) {
     res.status(err.status ?? 503).json({ error: err.message ?? 'Sync failed' });
   }

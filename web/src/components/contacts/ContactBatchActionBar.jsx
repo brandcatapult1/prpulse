@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Toast } from '../ui/Primitives.jsx';
 import { contactsApi, campaignsApi, lookupApi } from '../../lib/api.js';
 import { filterTagsByType } from '../tags/TagSelectChips.jsx';
+import { InstagramRequestModal } from './InstagramRequestModal.jsx';
 
 const EMPTY_DRAFT = {
   campaignId: '',
@@ -25,6 +26,7 @@ export function ContactBatchActionBar({
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);
+  const [requestOpen, setRequestOpen] = useState(false);
 
   useEffect(() => {
     if (selectedIds.length === 0) {
@@ -149,9 +151,14 @@ export function ContactBatchActionBar({
                 </span>
               )}
             </div>
-            <button type="button" className="btn-ghost text-2xs" disabled={busy} onClick={handleClearSelection}>
-              Clear selection
-            </button>
+            <div className="flex items-center gap-2">
+              <button type="button" className="btn-secondary text-2xs" disabled={busy} onClick={() => setRequestOpen(true)}>
+                Request Instagram access
+              </button>
+              <button type="button" className="btn-ghost text-2xs" disabled={busy} onClick={handleClearSelection}>
+                Clear selection
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
@@ -234,6 +241,7 @@ export function ContactBatchActionBar({
         </div>
       </div>
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+      {requestOpen && <InstagramRequestModal contactIds={selectedIds} onClose={() => setRequestOpen(false)} />}
     </>
   );
 }

@@ -110,6 +110,9 @@ export const contactsApi = {
   instagramLinks: (contactIds) =>
     api('/contacts/batch/instagram-links', { method: 'POST', body: JSON.stringify({ contact_ids: contactIds }) }),
   syncCreatorStats: (id) => api(`/contacts/${id}/creator-stats/sync`, { method: 'POST' }),
+  update: (id, body) => api(`/contacts/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  create: (body) => api('/contacts/quick-add', { method: 'POST', body: JSON.stringify(body) }),
+  quickAdd: (body) => api('/contacts/quick-add', { method: 'POST', body: JSON.stringify(body) }),
   batchSetStatus: (contactIds, status) =>
     api('/contacts/batch/set-status', {
       method: 'POST',

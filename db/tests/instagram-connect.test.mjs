@@ -24,3 +24,11 @@ assert.equal(m.whatsappUrl('', 'hi'), null);
 assert.equal(m.mailtoUrl(null, 'hi'), null);
 assert.match(m.mailtoUrl('a@b.co', 'hi'), /^mailto:a@b\.co\?subject=/);
 console.log('instagram-connect tests passed.');
+
+assert.equal(m.handleFromUrl('https://www.instagram.com/Mrigank8149/'), 'mrigank8149');
+assert.equal(m.handleFromUrl('instagram.com/p/abc/'), null);
+assert.equal(m.accountMatchesContact('mrigank8149', 'https://www.instagram.com/mrigank8149/'), true);
+assert.equal(m.accountMatchesContact('MRIGANK8149', 'https://instagram.com/mrigank8149'), true);
+assert.equal(m.accountMatchesContact('cafedefloraindia', 'https://www.instagram.com/mrigank8149/'), false, 'other account rejected');
+assert.equal(m.accountMatchesContact('anyone', null), true, 'no link on contact: cannot verify');
+console.log('account match tests passed.');

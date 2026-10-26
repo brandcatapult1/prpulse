@@ -160,6 +160,23 @@ export function publicConnection(row) {
   return safe;
 }
 
+/** Handle from an Instagram profile URL (https://instagram.com/name/ → name), or null. */
+export function handleFromUrl(url) {
+  const m = String(url ?? '').trim().match(/instagram\.com\/([A-Za-z0-9._]+)/i);
+  const h = m?.[1]?.toLowerCase();
+  return h && !['p', 'reel', 'reels', 'stories', 'explore', 'tv'].includes(h) ? h : null;
+}
+
+/**
+ * The approving account must be the creator's own. If the contact has no Instagram link we can't
+ * tell, so it's allowed; otherwise the handles have to match (case-insensitive).
+ */
+export function accountMatchesContact(connectedUsername, contactInstagramUrl) {
+  const expected = handleFromUrl(contactInstagramUrl);
+  if (!expected || !connectedUsername) return true;
+  return expected === String(connectedUsername).toLowerCase();
+}
+
 /* ── request message (WhatsApp / email) ── */
 export function buildRequestMessage({ name, link }) {
   const first = String(name ?? '').trim().split(/\s+/)[0] || 'there';

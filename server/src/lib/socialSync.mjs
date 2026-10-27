@@ -142,6 +142,25 @@ export async function fetchMediaInsights(mediaId, token, base = IG_GRAPH) {
   }
 }
 
+/**
+ * Fallback for counts the insights call did not return: reads shares/reposts/saves straight from the
+ * media object. Failures are recorded as notes (Instagram may reject these fields for some tokens).
+ */
+export async function fillFromMediaFields(mediaId, token, ins, base = IG_GRAPH) {
+  const missing = [['shares', 'shares_count'], ['reposts', 'reposts_count'], ['saves', 'saved_count']]
+    .filter(([k]) => ins[k] == null);
+  if (!missing.length) return ins;
+  try {
+    const body = await getJson(
+      `${base}/${mediaId}?${new URLSearchParams({ fields: missing.map(([, f]) => f).join(','), access_token: token })}`,
+    );
+    for (const [k, f] of missing) if (body[f] != null) ins[k] = Number(body[f]);
+  } catch (e) {
+    ins.notes?.push(`media fields: ${String(e.message).slice(0, 160)}`);
+  }
+  return ins;
+}
+
 /** Recent posts of the approving account (Instagram host), paged until every wanted shortcode is found. */
 async function fetchConnectedMedia(token, wantedCodes) {
   const media = new Map();
@@ -287,7 +306,7 @@ export async function syncContactSocial(pool, contactId) {
       for (const l of links) {
         const m = media.get(l.code);
         if (!m) continue;
-        const ins = await fetchMediaInsights(m.id, token);
+        const ins = await fillFromMediaFields(m.id, token, await fetchMediaInsights(m.id, token));
         await pool.query(
           `INSERT INTO deliverable_metrics
              (deliverable_id, content_url, platform, likes, comments, views, reach, shares, reposts, saves,

@@ -63,7 +63,7 @@ export function InstagramAccessCard({ data, contactId, onChange, onToast }) {
           </div>
           <p className="mt-1 text-2xs text-ink-secondary">
             {status === 'connected'
-              ? <>Connected{conn?.ig_username ? <> as <b>@{conn.ig_username}</b></> : null}. Reach, saves, shares and reposts are read for the posts in this creator’s deliverables only. Audience numbers are not changed.</>
+              ? <>Connected{conn?.ig_username ? <> as <b>@{conn.ig_username}</b></> : null}. Reach, saves and shares are read for the posts in this creator’s deliverables only. Audience numbers are not changed.</>
               : status === 'expired' || status === 'error'
                 ? <span className="text-health-red">Access needs renewing{conn?.last_error ? ` (${conn.last_error})` : ''}. Send a new request. Public data is used meanwhile.</span>
                 : 'Optional. Until the creator approves, only public likes, comments and views are shown.'}

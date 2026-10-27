@@ -13,8 +13,7 @@ const METRICS = [
   ['comments', 'Comments'],
   ['views', 'Views'],
   ['reach', 'Reach'],
-  ['saves', 'Saves'],
-  ['shares', 'Shares'],
+  // Saves and Shares are hidden for now: ['saves', 'Saves'], ['shares', 'Shares'],
 ];
 const TYPE_LABEL = { reel: 'Reel', story: 'Story', other: 'Post', static_carousel_post: 'Carousel' };
 // Temporarily hidden cards — flip to true to bring them back.

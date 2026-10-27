@@ -181,12 +181,28 @@ async function fetchConnectedMedia(token, wantedCodes) {
   return media;
 }
 
+/**
+ * Average views and engagement rate over the account's latest `n` posts/reels (newest first).
+ * avg_views = mean views of those posts that report views; engagement_rate = mean (likes + comments)
+ * per post / followers, as a percentage rounded to 2 decimals.
+ */
+export function latestPostStats(media, followers, n = 5) {
+  const latest = (media ?? []).slice(0, n);
+  if (!latest.length) return { avg_views: null, engagement_rate: null };
+  const viewed = latest.filter((m) => m.views != null);
+  const avgViews = viewed.length ? viewed.reduce((a, m) => a + m.views, 0) / viewed.length : null;
+  const inter = latest.reduce((a, m) => a + (m.likes ?? 0) + (m.comments ?? 0), 0) / latest.length;
+  const rate = followers > 0 ? Math.round((inter / followers) * 10000) / 100 : null;
+  return { avg_views: avgViews == null ? null : Math.round(avgViews), engagement_rate: rate };
+}
+
 export async function fetchInstagramProfile(handle, { wantedCodes = [], mediaLimit = 50, maxPages = 30 } = {}) {
   const { META_ACCESS_TOKEN: token, META_IG_USER_ID: igId } = process.env;
   if (!token || !igId) throw new Error('Instagram sync not configured (META_ACCESS_TOKEN / META_IG_USER_ID)');
   const wanted = new Set(wantedCodes);
   const posts = new Map();
   let profile = null;
+  let latest = [];
   let after = null;
 
   for (let page = 0; page < maxPages; page += 1) {
@@ -197,7 +213,10 @@ export async function fetchInstagramProfile(handle, { wantedCodes = [], mediaLim
       `${GRAPH}/${igId}?fields=${encodeURIComponent(fields)}&access_token=${encodeURIComponent(token)}`,
     );
     const bd = body.business_discovery ?? {};
-    profile ??= bd;
+    if (!profile) {
+      profile = bd;
+      latest = (bd.media?.data ?? []).map((m) => ({ likes: num(m.like_count), comments: num(m.comments_count), views: num(m.view_count) }));
+    }
     for (const m of bd.media?.data ?? []) {
       const code = instagramShortcode(m.permalink);
       if (code) posts.set(code, { likes: num(m.like_count), comments: num(m.comments_count), views: num(m.view_count) });
@@ -211,6 +230,7 @@ export async function fetchInstagramProfile(handle, { wantedCodes = [], mediaLim
     followers: num(profile?.followers_count),
     following: num(profile?.follows_count),
     posts_count: num(profile?.media_count),
+    ...latestPostStats(latest, num(profile?.followers_count)),
     posts,
   };
 }
@@ -229,12 +249,13 @@ export function deliverableContentUrls(d) {
 
 const STATS_UPSERT = `
   INSERT INTO creator_social_stats
-    (contact_id, platform, handle, followers, following, posts_count, total_views, source, synced_at, sync_error)
-  VALUES ($1,$2,$3,$4,$5,$6,$7,'api',now(),NULL)
+    (contact_id, platform, handle, followers, following, posts_count, total_views, avg_views, engagement_rate, source, synced_at, sync_error)
+  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'api',now(),NULL)
   ON CONFLICT (contact_id, platform) DO UPDATE SET
     handle = EXCLUDED.handle,
     followers = EXCLUDED.followers, following = EXCLUDED.following,
     posts_count = EXCLUDED.posts_count, total_views = EXCLUDED.total_views,
+    avg_views = EXCLUDED.avg_views, engagement_rate = EXCLUDED.engagement_rate,
     source = 'api', synced_at = now(), sync_error = NULL, updated_at = now()`;
 
 const STATS_ERROR = `
@@ -352,7 +373,7 @@ export async function syncContactSocial(pool, contactId) {
           .map((u) => instagramShortcode(u))
           .filter(Boolean);
         const p = await fetchInstagramProfile(handle, { wantedCodes });
-        await pool.query(STATS_UPSERT, [contactId, 'instagram', handle, p.followers, p.following, p.posts_count, null]);
+        await pool.query(STATS_UPSERT, [contactId, 'instagram', handle, p.followers, p.following, p.posts_count, null, p.avg_views, p.engagement_rate]);
         for (const d of deliverables) {
           for (const url of deliverableContentUrls(d)) {
             const hit = p.posts.get(instagramShortcode(url));

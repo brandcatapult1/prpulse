@@ -19,12 +19,12 @@ const METRICS = [
 const TYPE_LABEL = { reel: 'Reel', story: 'Story', other: 'Post', static_carousel_post: 'Carousel' };
 const PLATFORMS = [['instagram', 'Instagram', 'Followers']];
 
-function Stat({ label, value }) {
+function Stat({ label, value, display }) {
   return (
     <div className="rounded-lg border border-line bg-white/60 px-3 py-2">
       <div className="text-2xs text-ink-tertiary">{label}</div>
       <div className="text-sm font-semibold text-ink" title={value == null ? '' : String(value)}>
-        {formatCount(value)}
+        {display ?? formatCount(value)}
       </div>
     </div>
   );
@@ -89,8 +89,9 @@ export function CreatorStatsPanel({ contactId }) {
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <Stat label={followLabel} value={s?.followers} />
-                  <Stat label="Following" value={s?.following} />
-                  <Stat label="Posts" value={s?.posts_count} />
+                  <Stat label="Engagement rate" value={s?.engagement_rate}
+                    display={s?.engagement_rate == null ? '—' : `${Number(s.engagement_rate)}%`} />
+                  <Stat label="Avg views (latest 5)" value={s?.avg_views} />
                 </div>
                 {s?.sync_error && <p className="mt-1 text-2xs text-health-red">{s.sync_error}</p>}
                 {s?.synced_at && <p className="mt-1 text-2xs text-ink-tertiary">Updated {formatDate(s.synced_at)}</p>}

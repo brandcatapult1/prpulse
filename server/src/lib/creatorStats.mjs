@@ -5,7 +5,7 @@ const METRIC_FIELDS = ['likes', 'comments', 'views', 'reach', 'shares', 'reposts
 
 export async function loadCreatorStats(client, contactId) {
   const { rows: social } = await client.query(
-    `SELECT platform, handle, followers, following, posts_count, total_views,
+    `SELECT platform, handle, followers, following, posts_count, total_views, avg_views, engagement_rate,
             source, synced_at, sync_error
      FROM creator_social_stats WHERE contact_id = $1 ORDER BY platform`,
     [contactId],

@@ -117,11 +117,13 @@ function insightsToMetrics(data) {
 
 /** One call for all metrics; if a post type rejects one, retry metric by metric. */
 export async function fetchMediaInsights(mediaId, token, base = IG_GRAPH) {
+  const notes = [];
+  const attach = (out) => Object.defineProperty(out, 'notes', { value: notes, enumerable: false });
   try {
     const body = await getJson(
       `${base}/${mediaId}/insights?${new URLSearchParams({ metric: INSIGHT_METRICS.join(','), access_token: token })}`,
     );
-    return insightsToMetrics(body.data);
+    return attach(insightsToMetrics(body.data));
   } catch (err) {
     if (/\(#190\)|access token|OAuthException/i.test(err.message)) throw err;
     const merged = {};
@@ -131,11 +133,12 @@ export async function fetchMediaInsights(mediaId, token, base = IG_GRAPH) {
           `${base}/${mediaId}/insights?${new URLSearchParams({ metric, access_token: token })}`,
         );
         Object.assign(merged, insightsToMetrics(body.data));
-      } catch {
-        // metric not supported for this media type — leave it unset
+      } catch (e) {
+        // metric not supported for this media type — leave it unset, but keep the reason for diagnosis
+        notes.push(`${metric}: ${String(e.message).slice(0, 160)}`);
       }
     }
-    return merged;
+    return attach(merged);
   }
 }
 
@@ -289,14 +292,15 @@ export async function syncContactSocial(pool, contactId) {
           `INSERT INTO deliverable_metrics
              (deliverable_id, content_url, platform, likes, comments, views, reach, shares, reposts, saves,
               source, synced_at, sync_error)
-           VALUES ($1,$2,'instagram',$3,$4,$5,$6,$7,$8,$9,'insights',now(),NULL)
+           VALUES ($1,$2,'instagram',$3,$4,$5,$6,$7,$8,$9,'insights',now(),$10)
            ON CONFLICT (deliverable_id, content_url) DO UPDATE SET
              likes = EXCLUDED.likes, comments = EXCLUDED.comments, views = EXCLUDED.views,
              reach = EXCLUDED.reach, shares = EXCLUDED.shares, reposts = EXCLUDED.reposts,
              saves = EXCLUDED.saves, platform = 'instagram', source = 'insights',
-             synced_at = now(), sync_error = NULL, updated_at = now()`,
+             synced_at = now(), sync_error = EXCLUDED.sync_error, updated_at = now()`,
           [l.d.id, l.url, ins.likes ?? num(m.like_count), ins.comments ?? num(m.comments_count),
-            ins.views ?? null, ins.reach ?? null, ins.shares ?? null, ins.reposts ?? null, ins.saves ?? null],
+            ins.views ?? null, ins.reach ?? null, ins.shares ?? null, ins.reposts ?? null, ins.saves ?? null,
+            ins.notes?.length ? `Instagram did not return: ${ins.notes.join('; ')}`.slice(0, 500) : null],
         );
         result.metrics_updated += 1;
       }

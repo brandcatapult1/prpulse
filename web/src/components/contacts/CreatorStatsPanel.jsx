@@ -156,7 +156,7 @@ export function CreatorStatsPanel({ contactId }) {
                       const est = k === 'reach' ? estimateReach(l) : null;
                       return (
                         <td key={k} className="px-2 py-2">
-                          {est != null ? `~${formatCount(est)}`
+                          {est != null ? formatCount(est)
                             : formatCount(l[k])}
                         </td>
                       );

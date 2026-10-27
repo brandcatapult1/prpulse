@@ -247,6 +247,17 @@ export function deliverableContentUrls(d) {
   return urls;
 }
 
+/** Follower-based classification tier (matches the Classification dropdown bands). */
+export function classificationForFollowers(followers) {
+  const n = Number(followers);
+  if (followers == null || !Number.isFinite(n) || n < 0) return null;
+  if (n < 10_000) return 'nano';
+  if (n < 25_000) return 'micro';
+  if (n < 100_000) return 'mid';
+  if (n < 1_000_000) return 'category_a';
+  return 'macro';
+}
+
 const STATS_UPSERT = `
   INSERT INTO creator_social_stats
     (contact_id, platform, handle, followers, following, posts_count, total_views, avg_views, engagement_rate, source, synced_at, sync_error)
@@ -374,6 +385,16 @@ export async function syncContactSocial(pool, contactId) {
           .filter(Boolean);
         const p = await fetchInstagramProfile(handle, { wantedCodes });
         await pool.query(STATS_UPSERT, [contactId, 'instagram', handle, p.followers, p.following, p.posts_count, null, p.avg_views, p.engagement_rate]);
+        // Follower tiers only; HNI / F&B Specialist are set by people and left alone.
+        const tier = classificationForFollowers(p.followers);
+        if (tier) {
+          await pool.query(
+            `UPDATE contacts SET classification = $2::classification
+             WHERE id = $1 AND (classification IS NULL OR classification IN ('nano','micro','mid','category_a','macro'))
+               AND classification IS DISTINCT FROM $2::classification`,
+            [contactId, tier],
+          );
+        }
         for (const d of deliverables) {
           for (const url of deliverableContentUrls(d)) {
             const hit = p.posts.get(instagramShortcode(url));

@@ -103,7 +103,7 @@ export async function fetchLatestInstagramMedia(handle, limit = 12) {
  * Pages back through the account's posts (50 per page) until every wanted shortcode is found
  * or `maxPages` is reached, so older deliverables are still matched.
  */
-const INSIGHT_METRICS = ['reach', 'saved', 'shares', 'views', 'likes', 'comments', 'reposts'];
+const INSIGHT_METRICS = ['reach', 'saved', 'shares', 'views', 'likes', 'comments'];
 
 function insightsToMetrics(data) {
   const out = {};
@@ -278,7 +278,7 @@ export async function syncContactSocial(pool, contactId) {
     result.metrics_updated += 1;
   };
 
-  // Creators who approved our app: read their own insights (reach, saves, shares, reposts…).
+  // Creators who approved our app: read their own insights (reach, saves, shares…).
   let connectedOk = false;
   const conn = await loadConnection(pool, contactId);
   if (conn && enabled.connect) {

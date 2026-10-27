@@ -26,7 +26,6 @@ const INSIGHT_METRICS = [
   ['reach', 'Reach'],
   ['saves', 'Saves'],
   ['shares', 'Shares'],
-  ['reposts', 'Reposts'],
 ];
 const ALL_METRICS = [...ENGAGEMENT_METRICS, ...INSIGHT_METRICS];
 

@@ -7,6 +7,7 @@ const METRIC_LABELS = [
   ['reach', 'Reach'],
   ['saves', 'Saves'],
   ['shares', 'Shares'],
+  ['reposts', 'Reposts'],
 ];
 
 /** Engagement counts (only those recorded) — shown when the report supplies them. */

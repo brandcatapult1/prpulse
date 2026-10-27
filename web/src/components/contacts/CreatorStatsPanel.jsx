@@ -6,7 +6,7 @@ import { Pill, formatDate, formatStatus } from '../../lib/format.jsx';
 import { formatCount } from './SystemLabelPills.jsx';
 import { InstagramAccessCard } from './InstagramAccessCard.jsx';
 
-// Only what Instagram exposes publicly. Reach, saves and shares are private
+// Only what Instagram exposes publicly. Reach, saves, shares and reposts are private
 // to the account owner, so they are not shown.
 const METRICS = [
   ['likes', 'Likes'],
@@ -15,6 +15,7 @@ const METRICS = [
   ['reach', 'Reach'],
   ['saves', 'Saves'],
   ['shares', 'Shares'],
+  ['reposts', 'Reposts'],
 ];
 const TYPE_LABEL = { reel: 'Reel', story: 'Story', other: 'Post', static_carousel_post: 'Carousel' };
 const PLATFORMS = [['instagram', 'Instagram', 'Followers']];
@@ -151,7 +152,7 @@ export function CreatorStatsPanel({ contactId }) {
             </table>
           </div>
           <p className="text-2xs text-ink-tertiary">
-            Likes, comments and views come from public Instagram data. Reach, saves and shares appear only
+            Likes, comments and views come from public Instagram data. Reach, saves, shares and reposts appear only
             for creators who approved access (see Instagram access above); “—” means not available. Stories can't be fetched.
           </p>
         </>

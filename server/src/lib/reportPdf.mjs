@@ -184,7 +184,7 @@ export async function buildCycleReportPdf({ report, logoUrl }) {
     .filter(([, k]) => Number(m[k]) > 0)
     .map(([label, k]) => `${label} ${Number(m[k]).toLocaleString('en-IN')}`)
     .join('  ·  ');
-  const insightsLine = [['Reach', 'reach'], ['Saves', 'saves'], ['Shares', 'shares']]
+  const insightsLine = [['Reach', 'reach'], ['Saves', 'saves'], ['Shares', 'shares'], ['Reposts', 'reposts']]
     .filter(([, k]) => Number(m[k]) > 0)
     .map(([label, k]) => `${label} ${Number(m[k]).toLocaleString('en-IN')}`)
     .join('  ·  ');
@@ -197,7 +197,7 @@ export async function buildCycleReportPdf({ report, logoUrl }) {
     if (insightsLine) {
       doc.font('Helvetica').fontSize(10).fillColor('#475467').text(insightsLine, left, doc.y + 2, { width: right - left });
       doc.font('Helvetica').fontSize(8).fillColor('#667085')
-        .text(`Reach, saves and shares are from creator insights (${cov.connected ?? 0} of ${cov.total ?? 0} creators approved access).`, left, doc.y + 2, { width: right - left });
+        .text(`Reach, saves, shares and reposts are from creator insights (${cov.connected ?? 0} of ${cov.total ?? 0} creators approved access).`, left, doc.y + 2, { width: right - left });
     }
     doc.y += 14;
   }

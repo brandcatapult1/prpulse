@@ -11,6 +11,7 @@ export function filterTagsByType(tags, allowedTypes) {
 function outOfScopeReason(tag, allowedTypes) {
   if (tag.is_active === false) return 'Archived';
   if (!allowedTypes?.length) return null;
+  if (tag.type === 'system') return 'From Label';
   if (tag.type === 'campaign' && !allowedTypes.includes('campaign')) return 'From campaign';
   if (tag.type === 'influencer' && !allowedTypes.includes('influencer')) return 'Influencer';
   return null;

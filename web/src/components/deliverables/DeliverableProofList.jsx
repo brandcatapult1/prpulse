@@ -1,5 +1,4 @@
 import { formatPostedDateIst } from '../../lib/format.jsx';
-import { estimateReach } from '../../lib/reachEstimate.js';
 
 const METRIC_LABELS = [
   ['likes', 'Likes'],
@@ -13,7 +12,6 @@ const METRIC_LABELS = [
 /** Engagement counts (only those recorded) — shown when the report supplies them. */
 function MetricsLine({ metrics }) {
   const shown = METRIC_LABELS.filter(([k]) => Number(metrics?.[k]) > 0);
-  const estReach = estimateReach(metrics);
   if (shown.length === 0) return null;
   return (
     <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-2xs text-ink-secondary">
@@ -22,11 +20,6 @@ function MetricsLine({ metrics }) {
           {label} <b className="tabular-nums text-ink">{Number(metrics[k]).toLocaleString('en-IN')}</b>
         </span>
       ))}
-      {estReach != null && (
-        <span>
-          Reach <b className="tabular-nums text-ink">{estReach.toLocaleString('en-IN')}</b>
-        </span>
-      )}
     </p>
   );
 }

@@ -17,6 +17,10 @@ const METRICS = [
   ['shares', 'Shares'],
 ];
 const TYPE_LABEL = { reel: 'Reel', story: 'Story', other: 'Post', static_carousel_post: 'Carousel' };
+// Temporarily hidden cards — flip to true to bring them back.
+const SHOW_ACCESS_CARD = false;
+const SHOW_PERFORMANCE_CARD = false;
+
 const PLATFORMS = [['instagram', 'Instagram', 'Followers']];
 
 function Stat({ label, value, display }) {
@@ -68,7 +72,7 @@ export function CreatorStatsPanel({ contactId }) {
 
   return (
     <div className="space-y-4">
-      <InstagramAccessCard data={data} contactId={contactId} onChange={setData} onToast={setToast} />
+      {SHOW_ACCESS_CARD && <InstagramAccessCard data={data} contactId={contactId} onChange={setData} onToast={setToast} />}
 
       <div className="panel p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -88,7 +92,8 @@ export function CreatorStatsPanel({ contactId }) {
                   {s?.handle && <span>@{s.handle}</span>}
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <Stat label={followLabel} value={s?.followers} />
+                  <Stat label={followLabel} value={s?.followers}
+                    display={s?.followers == null ? '—' : Number(s.followers).toLocaleString('en-IN')} />
                   <Stat label="Engagement rate" value={s?.engagement_rate}
                     display={s?.engagement_rate == null ? '—' : `${Number(s.engagement_rate)}%`} />
                   <Stat label="Avg views (latest 5)" value={s?.avg_views} />
@@ -101,6 +106,7 @@ export function CreatorStatsPanel({ contactId }) {
         </div>
       </div>
 
+      {SHOW_PERFORMANCE_CARD && (
       <div className="panel p-4">
         <h3 className="text-sm font-medium text-ink">
           Completed-deliverable performance
@@ -112,6 +118,7 @@ export function CreatorStatsPanel({ contactId }) {
           {METRICS.map(([k, label]) => <Stat key={k} label={label} value={data.totals[k]} />)}
         </div>
       </div>
+      )}
 
       {data.campaigns.length === 0 ? (
         <EmptyState title="No completed deliverables yet" description="Metrics appear once deliverables are marked posted." />

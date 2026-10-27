@@ -143,11 +143,11 @@ export async function fetchMediaInsights(mediaId, token, base = IG_GRAPH) {
 }
 
 /**
- * Fallback for counts the insights call did not return: reads shares/reposts/saves straight from the
+ * Fallback for counts the insights call did not return: reads shares/saves straight from the
  * media object. Failures are recorded as notes (Instagram may reject these fields for some tokens).
  */
 export async function fillFromMediaFields(mediaId, token, ins, base = IG_GRAPH) {
-  const missing = [['shares', 'shares_count'], ['reposts', 'reposts_count'], ['saves', 'saved_count']]
+  const missing = [['shares', 'shares_count'], ['saves', 'saved_count']]
     .filter(([k]) => ins[k] == null);
   if (!missing.length) return ins;
   try {

@@ -156,8 +156,7 @@ export function CreatorStatsPanel({ contactId }) {
                       const est = k === 'reach' ? estimateReach(l) : null;
                       return (
                         <td key={k} className="px-2 py-2">
-                          {est != null
-                            ? <span className="text-ink-secondary" title="Estimated from views — not measured by Instagram">~{formatCount(est)} <span className="text-ink-tertiary">est.</span></span>
+                          {est != null ? `~${formatCount(est)}`
                             : formatCount(l[k])}
                         </td>
                       );

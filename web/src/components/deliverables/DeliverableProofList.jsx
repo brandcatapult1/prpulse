@@ -1,5 +1,5 @@
 import { formatPostedDateIst } from '../../lib/format.jsx';
-import { estimateReach, REACH_PER_VIEW } from '../../lib/reachEstimate.js';
+import { estimateReach } from '../../lib/reachEstimate.js';
 
 const METRIC_LABELS = [
   ['likes', 'Likes'],
@@ -23,9 +23,8 @@ function MetricsLine({ metrics }) {
         </span>
       ))}
       {estReach != null && (
-        <span title={`Estimated from views (about ${REACH_PER_VIEW * 100}% of views) — not measured by Instagram`}>
-          Reach <b className="tabular-nums text-ink">~{estReach.toLocaleString('en-IN')}</b>{' '}
-          <span className="text-ink-tertiary">(est.)</span>
+        <span>
+          Reach <b className="tabular-nums text-ink">~{estReach.toLocaleString('en-IN')}</b>
         </span>
       )}
     </p>

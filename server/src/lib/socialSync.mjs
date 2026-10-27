@@ -12,10 +12,11 @@
 
 import {
   GRAPH_VERSION,
+  IG_GRAPH,
   connectConfigured,
   decryptToken,
-  extendToken,
   loadConnection,
+  refreshToken,
   saveConnection,
 } from './instagramConnect.mjs';
 
@@ -115,10 +116,10 @@ function insightsToMetrics(data) {
 }
 
 /** One call for all metrics; if a post type rejects one, retry metric by metric. */
-export async function fetchMediaInsights(mediaId, token) {
+export async function fetchMediaInsights(mediaId, token, base = IG_GRAPH) {
   try {
     const body = await getJson(
-      `${GRAPH}/${mediaId}/insights?${new URLSearchParams({ metric: INSIGHT_METRICS.join(','), access_token: token })}`,
+      `${base}/${mediaId}/insights?${new URLSearchParams({ metric: INSIGHT_METRICS.join(','), access_token: token })}`,
     );
     return insightsToMetrics(body.data);
   } catch (err) {
@@ -127,7 +128,7 @@ export async function fetchMediaInsights(mediaId, token) {
     for (const metric of INSIGHT_METRICS) {
       try {
         const body = await getJson(
-          `${GRAPH}/${mediaId}/insights?${new URLSearchParams({ metric, access_token: token })}`,
+          `${base}/${mediaId}/insights?${new URLSearchParams({ metric, access_token: token })}`,
         );
         Object.assign(merged, insightsToMetrics(body.data));
       } catch {
@@ -138,15 +139,10 @@ export async function fetchMediaInsights(mediaId, token) {
   }
 }
 
-async function fetchConnectedProfile(igUserId, token, wantedCodes) {
-  const profile = await getJson(
-    `${GRAPH}/${igUserId}?${new URLSearchParams({
-      fields: 'username,followers_count,follows_count,media_count',
-      access_token: token,
-    })}`,
-  );
+/** Recent posts of the approving account (Instagram host), paged until every wanted shortcode is found. */
+async function fetchConnectedMedia(token, wantedCodes) {
   const media = new Map();
-  let next = `${GRAPH}/${igUserId}/media?${new URLSearchParams({
+  let next = `${IG_GRAPH}/me/media?${new URLSearchParams({
     fields: 'id,permalink,like_count,comments_count',
     limit: '50',
     access_token: token,
@@ -160,7 +156,7 @@ async function fetchConnectedProfile(igUserId, token, wantedCodes) {
     if ([...wantedCodes].every((c) => media.has(c))) break;
     next = body.paging?.next ?? null;
   }
-  return { profile, media };
+  return media;
 }
 
 export async function fetchInstagramProfile(handle, { wantedCodes = [], mediaLimit = 50, maxPages = 30 } = {}) {
@@ -270,7 +266,7 @@ export async function syncContactSocial(pool, contactId) {
         ? (new Date(conn.token_expires_at).getTime() - Date.now()) / 86_400_000
         : null;
       if (daysLeft != null && daysLeft < 15) {
-        const fresh = await extendToken(token);
+        const fresh = await refreshToken(token);
         token = fresh.token;
         await saveConnection(pool, contactId, {
           igUserId: conn.ig_user_id, username: conn.ig_username, token, expiresAt: fresh.expiresAt,
@@ -284,9 +280,7 @@ export async function syncContactSocial(pool, contactId) {
         }
       }
       // Only the posts are read here. The creator's audience always comes from their own public profile.
-      const { media } = await fetchConnectedProfile(
-        conn.ig_user_id, token, new Set(links.map((l) => l.code)),
-      );
+      const media = await fetchConnectedMedia(token, new Set(links.map((l) => l.code)));
       for (const l of links) {
         const m = media.get(l.code);
         if (!m) continue;

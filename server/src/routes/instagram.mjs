@@ -3,8 +3,8 @@ import { pool } from '../db.mjs';
 import {
   connectConfigured,
   exchangeCodeForLongLivedToken,
-  facebookAuthUrl,
-  findInstagramAccount,
+  fetchInstagramIdentity,
+  instagramAuthUrl,
   saveConnection,
   verifyState,
 } from '../lib/instagramConnect.mjs';
@@ -30,7 +30,7 @@ instagramRouter.get('/connect', (req, res) => {
   if (!verifyState(req.query.state)) {
     return page(res, 'Link expired', 'This link is invalid or has expired. Ask Brand Catapult for a new one.', 400);
   }
-  res.redirect(facebookAuthUrl(String(req.query.state)));
+  res.redirect(instagramAuthUrl(String(req.query.state)));
 });
 
 instagramRouter.get('/callback', async (req, res) => {
@@ -43,7 +43,7 @@ instagramRouter.get('/callback', async (req, res) => {
   }
   try {
     const { token, expiresAt } = await exchangeCodeForLongLivedToken(String(req.query.code));
-    const { igUserId, username } = await findInstagramAccount(token);
+    const { igUserId, username } = await fetchInstagramIdentity(token);
     await saveConnection(pool, contactId, { igUserId, username, token, expiresAt });
     // Pull numbers right away; a failure is recorded on the connection, not shown to the creator.
     syncContactSocial(pool, contactId).catch((err) => console.warn('Initial IG sync failed:', err.message));

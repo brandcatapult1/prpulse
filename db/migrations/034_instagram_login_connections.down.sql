@@ -1,0 +1,1 @@
+-- Nothing to restore: cleared connections cannot be rebuilt.

@@ -1,20 +1,25 @@
 /**
- * Optional Instagram "Connect" (Facebook Login) so a creator can let us read their own insights.
- * Env: META_APP_ID, META_APP_SECRET, APP_URL (public base URL), optional META_TOKEN_KEY,
+ * Optional Instagram "Connect" using Instagram API with Instagram Login (no Facebook Page needed).
+ * The creator signs in with their Instagram account and approves read access once; the stored
+ * long-lived token lets us read insights (reach, saves, shares, reposts…) for their own posts.
+ *
+ * Env: INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET (the *Instagram* app id/secret shown under
+ *      Use case → API setup with Instagram login), APP_URL (public base URL),
+ *      optional META_TOKEN_KEY (token encryption key; defaults to SESSION_SECRET),
  *      META_GRAPH_VERSION (default v23.0).
- * Scopes: instagram_basic, instagram_manage_insights, pages_show_list, pages_read_engagement.
- * The creator's IG account must be Business/Creator and linked to a Facebook Page.
- * Register  {APP_URL}/api/instagram/callback  as a Valid OAuth Redirect URI in the Meta app.
+ * Scopes: instagram_business_basic, instagram_business_manage_insights.
+ * Register  {APP_URL}/api/instagram/callback  under "Business login settings" → OAuth redirect URIs.
+ * Until the app is Live with advanced access, each creator must be an Instagram Tester of the app.
  */
 import crypto from 'node:crypto';
 
 export const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v23.0';
-const GRAPH = `https://graph.facebook.com/${GRAPH_VERSION}`;
-const SCOPES = 'instagram_basic,instagram_manage_insights,pages_show_list,pages_read_engagement';
+export const IG_GRAPH = `https://graph.instagram.com/${GRAPH_VERSION}`;
+const SCOPES = 'instagram_business_basic,instagram_business_manage_insights';
 const STATE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export function connectConfigured() {
-  return Boolean(process.env.META_APP_ID && process.env.META_APP_SECRET);
+  return Boolean(process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET);
 }
 
 function secret() {
@@ -55,15 +60,15 @@ export function connectLink(contactId) {
   return `${appBase()}/api/instagram/connect?state=${encodeURIComponent(signState(contactId))}`;
 }
 
-export function facebookAuthUrl(state) {
+export function instagramAuthUrl(state) {
   const q = new URLSearchParams({
-    client_id: process.env.META_APP_ID,
+    client_id: process.env.INSTAGRAM_APP_ID,
     redirect_uri: redirectUri(),
-    state,
-    scope: SCOPES,
     response_type: 'code',
+    scope: SCOPES,
+    state,
   });
-  return `https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth?${q}`;
+  return `https://www.instagram.com/oauth/authorize?${q}`;
 }
 
 /* ── token encryption (AES-256-GCM) ── */
@@ -85,51 +90,67 @@ export function decryptToken(stored) {
   return Buffer.concat([decipher.update(enc), decipher.final()]).toString('utf8');
 }
 
-/* ── Graph calls ── */
-async function graph(path, params) {
-  const res = await fetch(`${GRAPH}${path}?${new URLSearchParams(params)}`);
+/* ── Instagram API calls ── */
+async function igJson(url, init) {
+  const res = await fetch(url, init);
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
+  if (!res.ok || body?.error || body?.error_message) {
+    throw new Error(body?.error?.message ?? body?.error_message ?? `HTTP ${res.status}`);
+  }
   return body;
 }
 
-export async function extendToken(token) {
-  const long = await graph('/oauth/access_token', {
-    grant_type: 'fb_exchange_token',
-    client_id: process.env.META_APP_ID,
-    client_secret: process.env.META_APP_SECRET,
-    fb_exchange_token: token,
-  });
-  const expiresAt = long.expires_in ? new Date(Date.now() + Number(long.expires_in) * 1000) : null;
-  return { token: long.access_token, expiresAt };
+/** The short-lived token response comes back either flat or wrapped in a `data` array. */
+export function parseTokenResponse(body) {
+  const row = Array.isArray(body?.data) ? body.data[0] : body;
+  if (!row?.access_token) throw new Error('Instagram did not return an access token');
+  return { accessToken: row.access_token, userId: row.user_id != null ? String(row.user_id) : null };
 }
 
+/** Code (valid 1 hour, single use) → short-lived token → long-lived token (~60 days). */
 export async function exchangeCodeForLongLivedToken(code) {
-  const short = await graph('/oauth/access_token', {
-    client_id: process.env.META_APP_ID,
-    client_secret: process.env.META_APP_SECRET,
+  const form = new URLSearchParams({
+    client_id: process.env.INSTAGRAM_APP_ID,
+    client_secret: process.env.INSTAGRAM_APP_SECRET,
+    grant_type: 'authorization_code',
     redirect_uri: redirectUri(),
-    code,
+    code: String(code).replace(/#_$/, ''),
   });
-  return extendToken(short.access_token);
+  const short = parseTokenResponse(await igJson('https://api.instagram.com/oauth/access_token', {
+    method: 'POST',
+    body: form,
+  }));
+  const long = await igJson(`https://graph.instagram.com/access_token?${new URLSearchParams({
+    grant_type: 'ig_exchange_token',
+    client_secret: process.env.INSTAGRAM_APP_SECRET,
+    access_token: short.accessToken,
+  })}`);
+  return {
+    token: long.access_token,
+    expiresAt: long.expires_in ? new Date(Date.now() + Number(long.expires_in) * 1000) : null,
+    userId: short.userId,
+  };
 }
 
-/** First Facebook Page of the user that has an Instagram professional account. */
-export async function findInstagramAccount(userToken) {
-  const pages = await graph('/me/accounts', {
-    fields: 'instagram_business_account{id,username}',
-    access_token: userToken,
-  });
-  const hit = (pages.data ?? []).find((p) => p.instagram_business_account?.id);
-  if (!hit) {
-    throw new Error(
-      'No Instagram Business/Creator account found. It must be linked to a Facebook Page you manage.',
-    );
-  }
+/** Long-lived tokens refresh for another ~60 days (token must be 24h+ old and not expired). */
+export async function refreshToken(token) {
+  const r = await igJson(`https://graph.instagram.com/refresh_access_token?${new URLSearchParams({
+    grant_type: 'ig_refresh_token',
+    access_token: token,
+  })}`);
   return {
-    igUserId: hit.instagram_business_account.id,
-    username: hit.instagram_business_account.username ?? null,
+    token: r.access_token,
+    expiresAt: r.expires_in ? new Date(Date.now() + Number(r.expires_in) * 1000) : null,
   };
+}
+
+/** Who approved: the Instagram account id and username behind the token. */
+export async function fetchInstagramIdentity(token) {
+  const me = await igJson(`${IG_GRAPH}/me?${new URLSearchParams({
+    fields: 'user_id,username,account_type',
+    access_token: token,
+  })}`);
+  return { igUserId: String(me.user_id ?? me.id), username: me.username ?? null, accountType: me.account_type ?? null };
 }
 
 export async function saveConnection(pool, contactId, { igUserId, username, token, expiresAt }) {
@@ -184,7 +205,7 @@ export function buildRequestMessage({ name, link }) {
     `Hi ${first}, this is Brand Catapult. To show your post performance (reach, saves, shares) `
     + `in the campaign report, we need read-only access to your Instagram insights.\n\n`
     + `Please tap this link and approve (takes 30 seconds, you can remove access any time):\n${link}\n\n`
-    + `Your Instagram must be a Business or Creator account linked to a Facebook Page. Thank you!`
+    + `You'll sign in with your Instagram (it must be a Business or Creator account). Thank you!`
   );
 }
 

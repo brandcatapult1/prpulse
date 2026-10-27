@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 process.env.SESSION_SECRET = 'test-secret';
 process.env.APP_URL = 'https://example.test';
+process.env.INSTAGRAM_APP_ID = '12345';
+process.env.INSTAGRAM_APP_SECRET = 'shh';
 const m = await import('../../server/src/lib/instagramConnect.mjs');
 
 const id = '07a8f2af-5504-4227-bba2-990cc268cbba';
@@ -32,3 +34,20 @@ assert.equal(m.accountMatchesContact('MRIGANK8149', 'https://instagram.com/mriga
 assert.equal(m.accountMatchesContact('cafedefloraindia', 'https://www.instagram.com/mrigank8149/'), false, 'other account rejected');
 assert.equal(m.accountMatchesContact('anyone', null), true, 'no link on contact: cannot verify');
 console.log('account match tests passed.');
+
+// Instagram Login authorize URL
+const url = new URL(m.instagramAuthUrl('abc'));
+assert.equal(url.origin + url.pathname, 'https://www.instagram.com/oauth/authorize');
+assert.equal(url.searchParams.get('client_id'), '12345');
+assert.equal(url.searchParams.get('redirect_uri'), 'https://example.test/api/instagram/callback');
+assert.equal(url.searchParams.get('response_type'), 'code');
+assert.equal(url.searchParams.get('scope'), 'instagram_business_basic,instagram_business_manage_insights');
+assert.equal(url.searchParams.get('state'), 'abc');
+assert.equal(m.connectConfigured(), true);
+
+// Token response comes back flat or wrapped in a data array
+assert.deepEqual(m.parseTokenResponse({ access_token: 'T', user_id: 7 }), { accessToken: 'T', userId: '7' });
+assert.deepEqual(m.parseTokenResponse({ data: [{ access_token: 'T2', user_id: '8', permissions: 'x' }] }), { accessToken: 'T2', userId: '8' });
+assert.throws(() => m.parseTokenResponse({}), /access token/);
+assert.doesNotMatch(msg, /Facebook/, 'message no longer mentions a Facebook Page');
+console.log('instagram-login tests passed.');

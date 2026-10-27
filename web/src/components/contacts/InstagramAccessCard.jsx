@@ -89,7 +89,7 @@ export function InstagramAccessCard({ data, contactId, onChange, onToast }) {
           </div>
         ) : (
           <p className="mt-2 text-2xs text-ink-tertiary">
-            Instagram access requests aren’t set up on the server yet (META_APP_ID / META_APP_SECRET).
+            Instagram access requests aren’t set up on the server yet (INSTAGRAM_APP_ID / INSTAGRAM_APP_SECRET).
           </p>
         )
       )}

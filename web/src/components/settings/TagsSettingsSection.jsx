@@ -10,8 +10,8 @@ const TAG_TYPES = [
 
 const SYSTEM_RULES = {
   new: 'Registered in the last 45 days',
-  recent: 'Completed a collaboration in the last 15 days',
-  frequent: '3+ completed collaborations in the last 60 days',
+  recent: 'A deliverable was completed in the last 15 days',
+  frequent: '3+ campaigns with all deliverables completed, last one within 60 days',
 };
 
 function typeLabel(type) {

@@ -130,6 +130,10 @@ async function main() {
           `UPDATE engagements SET completed_at = now() - ($2 || ' days')::interval WHERE id = $1`,
           [eng.id, String(daysAgo)],
         );
+        await client.query(
+          `UPDATE deliverables SET completed_at = now() - ($2 || ' days')::interval WHERE engagement_id = $1`,
+          [eng.id, String(daysAgo)],
+        );
       }
     }
 

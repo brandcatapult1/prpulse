@@ -24,7 +24,7 @@ function MetricsLine({ metrics, classification, followers }) {
       ))}
       {estReach != null && (
         <span>
-          Reach <b className="tabular-nums text-ink">{estReach.toLocaleString('en-IN')}</b>
+          Reach <b className="tabular-nums text-ink">~{estReach.toLocaleString('en-IN')}</b>
         </span>
       )}
     </p>

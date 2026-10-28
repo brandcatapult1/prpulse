@@ -68,6 +68,21 @@ export function CreatorStatsPanel({ contactId }) {
   if (!data) return <div className="panel p-6 text-center text-2xs text-ink-secondary">Loading stats…</div>;
 
   const byPlatform = Object.fromEntries(data.social.map((s) => [s.platform, s]));
+  const followers = byPlatform.instagram?.followers;
+  // Per campaign: Instagram's reach where we have it, otherwise the worked-out figure for each link.
+  const campaignReach = (campaignId) => {
+    let total = 0;
+    let estimated = false;
+    for (const d of data.deliverables.filter((x) => x.campaign_id === campaignId)) {
+      for (const l of d.links) {
+        const real = Number(l.reach);
+        if (Number.isFinite(real) && real > 0) { total += real; continue; }
+        const est = estimateReach(l, data.classification, followers);
+        if (est != null) { total += est; estimated = true; }
+      }
+    }
+    return { total, estimated };
+  };
   const configured = data.sync_available?.instagram;
 
   return (
@@ -129,7 +144,15 @@ export function CreatorStatsPanel({ contactId }) {
               { key: 'campaign_name', label: 'Campaign', render: (r) => <span className="font-medium">{r.campaign_name}</span> },
               { key: 'brand_name', label: 'Brand' },
               { key: 'completed_deliverables', label: 'Deliverables' },
-              ...METRICS.map(([k, label]) => ({ key: k, label, render: (r) => formatCount(r[k]) })),
+              ...METRICS.map(([k, label]) => ({
+                key: k,
+                label,
+                render: (r) => {
+                  if (k !== 'reach') return formatCount(r[k]);
+                  const { total, estimated } = campaignReach(r.campaign_id);
+                  return total > 0 ? `${estimated ? '~' : ''}${formatCount(total)}` : formatCount(r[k]);
+                },
+              })),
             ]}
             rows={data.campaigns.map((c) => ({ ...c, id: c.campaign_id }))}
           />
@@ -153,10 +176,10 @@ export function CreatorStatsPanel({ contactId }) {
                       </div>
                     </td>
                     {METRICS.map(([k]) => {
-                      const est = k === 'reach' ? estimateReach(l, data.classification, byPlatform.instagram?.followers) : null;
+                      const est = k === 'reach' ? estimateReach(l, data.classification, followers) : null;
                       return (
                         <td key={k} className="px-2 py-2">
-                          {est != null ? formatCount(est)
+                          {est != null ? `~${formatCount(est)}`
                             : formatCount(l[k])}
                         </td>
                       );

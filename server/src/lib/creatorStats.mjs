@@ -76,7 +76,10 @@ export async function loadCreatorStats(client, contactId) {
   const totals = Object.fromEntries(METRIC_FIELDS.map((f) => [f, 0]));
   items.forEach((it) => METRIC_FIELDS.forEach((f) => { totals[f] += it.totals[f]; }));
 
+  const { rows: [c] } = await client.query('SELECT classification::text AS classification FROM contacts WHERE id = $1', [contactId]);
+
   return {
+    classification: c?.classification ?? null,
     social,
     totals: { completed_deliverables: items.length, ...totals },
     campaigns: [...byCampaign.values()],

@@ -231,6 +231,12 @@ export async function loadCycleReport(client, cycleId) {
   const contactIds = [...new Set(collaborations.map((x) => x.contact_id))];
   let insightsConnected = 0;
   if (contactIds.length) {
+    const { rows: cls } = await client.query(
+      `SELECT id, classification::text AS classification FROM contacts WHERE id = ANY($1::uuid[])`,
+      [contactIds],
+    );
+    const clsById = new Map(cls.map((r) => [r.id, r.classification]));
+    collaborations.forEach((c) => { c.classification = clsById.get(c.contact_id) ?? null; });
     const { rows } = await client.query(
       `SELECT COUNT(*)::int AS n FROM creator_instagram_connections
        WHERE contact_id = ANY($1::uuid[]) AND status = 'connected'`,

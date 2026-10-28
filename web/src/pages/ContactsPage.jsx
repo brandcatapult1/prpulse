@@ -6,7 +6,7 @@ import { AddContactDrawer } from '../components/contacts/AddContactDrawer.jsx';
 import { ContactBatchActionBar } from '../components/contacts/ContactBatchActionBar.jsx';
 import { ContactFilters } from '../components/contacts/ContactFilters.jsx';
 import { Pill, statusTone } from '../lib/format.jsx';
-import { SystemLabelPills, formatCount } from '../components/contacts/SystemLabelPills.jsx';
+import { SystemLabelPills } from '../components/contacts/SystemLabelPills.jsx';
 import { MODULES } from '../lib/modules.js';
 import { contactsApi, lookupApi } from '../lib/api.js';
 import { setContactsCache } from '../lib/contactsCache.js';
@@ -40,6 +40,16 @@ function saveListState(state) {
   } catch {
     // storage unavailable — list just opens on page 1 next time
   }
+}
+
+/** Followers in K with up to two decimals from 1,000 (1K, 1.01K, 101.66K); the exact count below that. */
+function formatFollowers(n) {
+  if (n == null) return '—';
+  const v = Number(n);
+  if (!Number.isFinite(v)) return '—';
+  const trim = (x) => String(Number(x.toFixed(2)));
+  if (v >= 1_000) return `${trim(v / 1_000)}K`;
+  return String(v);
 }
 
 export function ContactsPage() {
@@ -170,7 +180,7 @@ export function ContactsPage() {
       label: 'Followers',
       render: (r) => (
         <span title={r.instagram_followers == null ? '' : String(r.instagram_followers)}>
-          {formatCount(r.instagram_followers)}
+          {formatFollowers(r.instagram_followers)}
         </span>
       ),
     },

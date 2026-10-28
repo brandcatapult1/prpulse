@@ -43,6 +43,10 @@ assert.equal(url.searchParams.get('redirect_uri'), 'https://example.test/api/ins
 assert.equal(url.searchParams.get('response_type'), 'code');
 assert.equal(url.searchParams.get('scope'), 'instagram_business_basic,instagram_business_manage_insights');
 assert.equal(url.searchParams.get('state'), 'abc');
+// Approval is paused unless INSTAGRAM_APPROVAL=on
+delete process.env.INSTAGRAM_APPROVAL;
+assert.equal(m.connectConfigured(), false);
+process.env.INSTAGRAM_APPROVAL = 'on';
 assert.equal(m.connectConfigured(), true);
 
 // Token response comes back flat or wrapped in a data array

@@ -1,4 +1,5 @@
 /** Read/write helpers for creator social stats and per-deliverable metrics. */
+import { maskApprovalMetrics } from './approvalFlag.mjs';
 import { deliverableContentUrls } from './socialSync.mjs';
 
 const METRIC_FIELDS = ['likes', 'comments', 'views', 'reach', 'shares', 'reposts', 'saves'];
@@ -24,13 +25,14 @@ export async function loadCreatorStats(client, contactId) {
     [contactId],
   );
 
-  const { rows: metrics } = await client.query(
+  const { rows: metricRows } = await client.query(
     `SELECT m.* FROM deliverable_metrics m
      JOIN deliverables d ON d.id = m.deliverable_id
      JOIN engagements e ON e.id = d.engagement_id
      WHERE e.contact_id = $1`,
     [contactId],
   );
+  const metrics = metricRows.map(maskApprovalMetrics);
   const byDeliverable = new Map();
   for (const m of metrics) {
     if (!byDeliverable.has(m.deliverable_id)) byDeliverable.set(m.deliverable_id, []);

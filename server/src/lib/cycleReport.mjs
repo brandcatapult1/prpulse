@@ -1,3 +1,4 @@
+import { maskApprovalMetrics } from './approvalFlag.mjs';
 import { deliverableTypeFromDb } from './deliverableTypes.mjs';
 import {
   buildDeliverableProofItems,
@@ -193,13 +194,14 @@ export async function loadCycleReport(client, cycleId) {
     if (deliverableIds.length) {
       const { rows: mrows } = await client.query(
         `SELECT m.deliverable_id, d.engagement_id, m.content_url,
-                m.likes, m.comments, m.views, m.reach, m.shares, m.reposts, m.saves, m.synced_at
+                m.likes, m.comments, m.views, m.reach, m.shares, m.reposts, m.saves, m.source, m.synced_at
          FROM deliverable_metrics m
          JOIN deliverables d ON d.id = m.deliverable_id AND d.status = 'posted'
          WHERE d.id = ANY($1::uuid[])`,
         [deliverableIds],
       );
-      for (const r of mrows) {
+      for (const row of mrows) {
+        const r = maskApprovalMetrics(row);
         const m = Object.fromEntries(Object.keys(ZERO_METRICS).map((k) => [k, Number(r[k] ?? 0)]));
         if (r.synced_at && (!metricsSyncedAt || r.synced_at > metricsSyncedAt)) metricsSyncedAt = r.synced_at;
         const list = metricRowsByDeliverable.get(r.deliverable_id) ?? [];

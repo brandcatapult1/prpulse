@@ -10,6 +10,7 @@
  * Without credentials, sync reports "not configured" and manual entry still works.
  */
 
+import { approvalEnabled } from './approvalFlag.mjs';
 import {
   GRAPH_VERSION,
   IG_GRAPH,
@@ -313,7 +314,7 @@ export async function syncContactSocial(pool, contactId) {
   // Creators who approved our app: read their own insights (reach, saves, shares…).
   let connectedOk = false;
   const conn = await loadConnection(pool, contactId);
-  if (conn && enabled.connect) {
+  if (conn && enabled.connect && approvalEnabled()) {
     try {
       let token = decryptToken(conn.access_token_enc);
       const daysLeft = conn.token_expires_at

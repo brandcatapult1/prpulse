@@ -11,6 +11,7 @@
  * Register  {APP_URL}/api/instagram/callback  under "Business login settings" → OAuth redirect URIs.
  * Until the app is Live with advanced access, each creator must be an Instagram Tester of the app.
  */
+import { approvalEnabled } from './approvalFlag.mjs';
 import crypto from 'node:crypto';
 
 export const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v23.0';
@@ -19,7 +20,7 @@ const SCOPES = 'instagram_business_basic,instagram_business_manage_insights';
 const STATE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 export function connectConfigured() {
-  return Boolean(process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET);
+  return approvalEnabled() && Boolean(process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET);
 }
 
 function secret() {

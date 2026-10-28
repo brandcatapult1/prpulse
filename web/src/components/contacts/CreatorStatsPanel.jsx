@@ -167,8 +167,9 @@ export function CreatorStatsPanel({ contactId }) {
             </table>
           </div>
           <p className="text-2xs text-ink-tertiary">
-            Likes, comments and views come from public Instagram data. Reach, saves and shares appear only
-            for creators who approved access (see Instagram access above); “—” means not available. Stories can't be fetched.
+            Likes, comments and views come from public Instagram data. Reach is Instagram's own figure when the creator
+            approved access; otherwise it is worked out from views (reels) or likes and comments (posts, by classification).
+            “—” means not available. Stories can't be fetched.
           </p>
         </>
       )}

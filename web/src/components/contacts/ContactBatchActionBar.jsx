@@ -4,6 +4,9 @@ import { contactsApi, campaignsApi, lookupApi } from '../../lib/api.js';
 import { filterTagsByType } from '../tags/TagSelectChips.jsx';
 import { InstagramRequestModal } from './InstagramRequestModal.jsx';
 
+// Creator approval flow is paused for now — set to true to bring the button back.
+const SHOW_INSTAGRAM_REQUEST = false;
+
 const EMPTY_DRAFT = {
   campaignId: '',
   statusTarget: '',
@@ -152,9 +155,11 @@ export function ContactBatchActionBar({
               )}
             </div>
             <div className="flex items-center gap-2">
-              <button type="button" className="btn-secondary text-2xs" disabled={busy} onClick={() => setRequestOpen(true)}>
-                Request Instagram access
-              </button>
+              {SHOW_INSTAGRAM_REQUEST && (
+                <button type="button" className="btn-secondary text-2xs" disabled={busy} onClick={() => setRequestOpen(true)}>
+                  Request Instagram access
+                </button>
+              )}
               <button type="button" className="btn-ghost text-2xs" disabled={busy} onClick={handleClearSelection}>
                 Clear selection
               </button>

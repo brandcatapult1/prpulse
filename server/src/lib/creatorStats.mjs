@@ -59,7 +59,11 @@ export async function loadCreatorStats(client, contactId) {
     };
   });
 
+  // The same post link can sit on more than one deliverable (e.g. a story and a post); count it once.
+  const seenByCampaign = new Map();
+  const seenAll = new Set();
   const byCampaign = new Map();
+  const totals = Object.fromEntries(METRIC_FIELDS.map((f) => [f, 0]));
   for (const it of items) {
     const cur = byCampaign.get(it.campaign_id) ?? {
       campaign_id: it.campaign_id,
@@ -68,13 +72,23 @@ export async function loadCreatorStats(client, contactId) {
       completed_deliverables: 0,
       ...Object.fromEntries(METRIC_FIELDS.map((f) => [f, 0])),
     };
+    const seen = seenByCampaign.get(it.campaign_id) ?? new Set();
+    seenByCampaign.set(it.campaign_id, seen);
     cur.completed_deliverables += 1;
-    METRIC_FIELDS.forEach((f) => { cur[f] += it.totals[f]; });
+    for (const l of it.links) {
+      const key = l.content_url ?? null;
+      if (key == null) continue;
+      if (!seen.has(key)) {
+        seen.add(key);
+        METRIC_FIELDS.forEach((f) => { cur[f] += Number(l[f] ?? 0); });
+      }
+      if (!seenAll.has(key)) {
+        seenAll.add(key);
+        METRIC_FIELDS.forEach((f) => { totals[f] += Number(l[f] ?? 0); });
+      }
+    }
     byCampaign.set(it.campaign_id, cur);
   }
-
-  const totals = Object.fromEntries(METRIC_FIELDS.map((f) => [f, 0]));
-  items.forEach((it) => METRIC_FIELDS.forEach((f) => { totals[f] += it.totals[f]; }));
 
   const { rows: [c] } = await client.query('SELECT classification::text AS classification FROM contacts WHERE id = $1', [contactId]);
 

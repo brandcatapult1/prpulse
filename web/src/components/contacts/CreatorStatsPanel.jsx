@@ -73,8 +73,13 @@ export function CreatorStatsPanel({ contactId }) {
   const campaignReach = (campaignId) => {
     let total = 0;
     let estimated = false;
+    const seen = new Set();
     for (const d of data.deliverables.filter((x) => x.campaign_id === campaignId)) {
       for (const l of d.links) {
+        if (l.content_url) {
+          if (seen.has(l.content_url)) continue; // same link on two deliverables counts once
+          seen.add(l.content_url);
+        }
         const real = Number(l.reach);
         if (Number.isFinite(real) && real > 0) { total += real; continue; }
         const est = estimateReach(l, data.classification, followers);

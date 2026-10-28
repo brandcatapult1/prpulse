@@ -10,9 +10,9 @@ export const REACH_PER_VIEW = 0.7;
 
 /** Share of people reached who like or comment, by creator classification. */
 export const INTERACTION_RATE_BY_CLASS = {
-  nano: 0.07,
-  micro: 0.05,
-  mid: 0.04,
+  nano: 0.045,
+  micro: 0.04,
+  mid: 0.035,
   category_a: 0.03,
   macro: 0.025,
 };

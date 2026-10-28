@@ -355,7 +355,7 @@ export function ReportsPage() {
                         </p>
                       )}
                     </div>
-                    <DeliverableProofList proofItems={collab.proof} classification={collab.classification} />
+                    <DeliverableProofList proofItems={collab.proof} classification={collab.classification} followers={collab.followers} />
                   </li>
                   );
                 })}

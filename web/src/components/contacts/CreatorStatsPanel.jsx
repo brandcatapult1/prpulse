@@ -153,7 +153,7 @@ export function CreatorStatsPanel({ contactId }) {
                       </div>
                     </td>
                     {METRICS.map(([k]) => {
-                      const est = k === 'reach' ? estimateReach(l, data.classification) : null;
+                      const est = k === 'reach' ? estimateReach(l, data.classification, byPlatform.instagram?.followers) : null;
                       return (
                         <td key={k} className="px-2 py-2">
                           {est != null ? formatCount(est)

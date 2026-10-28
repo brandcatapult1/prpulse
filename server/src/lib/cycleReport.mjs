@@ -236,7 +236,16 @@ export async function loadCycleReport(client, cycleId) {
       [contactIds],
     );
     const clsById = new Map(cls.map((r) => [r.id, r.classification]));
-    collaborations.forEach((c) => { c.classification = clsById.get(c.contact_id) ?? null; });
+    const { rows: fol } = await client.query(
+      `SELECT contact_id, followers FROM creator_social_stats
+       WHERE platform = 'instagram' AND contact_id = ANY($1::uuid[])`,
+      [contactIds],
+    );
+    const folById = new Map(fol.map((r) => [r.contact_id, r.followers == null ? null : Number(r.followers)]));
+    collaborations.forEach((c) => {
+      c.classification = clsById.get(c.contact_id) ?? null;
+      c.followers = folById.get(c.contact_id) ?? null;
+    });
     const { rows } = await client.query(
       `SELECT COUNT(*)::int AS n FROM creator_instagram_connections
        WHERE contact_id = ANY($1::uuid[]) AND status = 'connected'`,

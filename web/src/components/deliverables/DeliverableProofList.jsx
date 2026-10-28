@@ -11,9 +11,9 @@ const METRIC_LABELS = [
 ];
 
 /** Engagement counts (only those recorded) — shown when the report supplies them. */
-function MetricsLine({ metrics, classification }) {
+function MetricsLine({ metrics, classification, followers }) {
   const shown = METRIC_LABELS.filter(([k]) => Number(metrics?.[k]) > 0);
-  const estReach = estimateReach(metrics, classification);
+  const estReach = estimateReach(metrics, classification, followers);
   if (shown.length === 0) return null;
   return (
     <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-2xs text-ink-secondary">
@@ -41,7 +41,7 @@ function postedLabel(date) {
 }
 
 /** Read-only deliverable proof list — shared by proof drawer and Reports. */
-export function DeliverableProofList({ proofItems, classification = null }) {
+export function DeliverableProofList({ proofItems, classification = null, followers = null }) {
   const items = Array.isArray(proofItems) ? proofItems : [];
 
   if (items.length === 0) {
@@ -77,11 +77,11 @@ export function DeliverableProofList({ proofItems, classification = null }) {
                   >
                     {link}
                   </a>
-                  <MetricsLine metrics={lm} classification={classification} />
+                  <MetricsLine metrics={lm} classification={classification} followers={followers} />
                 </div>
               );
             })}
-            {(item.links ?? []).length === 0 && <MetricsLine metrics={item.metrics} classification={classification} />}
+            {(item.links ?? []).length === 0 && <MetricsLine metrics={item.metrics} classification={classification} followers={followers} />}
 
             {(item.screenshots?.length ?? 0) > 0 && (
               <div

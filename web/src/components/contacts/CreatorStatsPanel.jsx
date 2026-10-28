@@ -4,6 +4,7 @@ import { DataTable } from '../ui/DataKit.jsx';
 import { EmptyState, Toast } from '../ui/Primitives.jsx';
 import { Pill, formatDate, formatStatus } from '../../lib/format.jsx';
 import { formatCount } from './SystemLabelPills.jsx';
+import { estimateReach } from '../../lib/reachEstimate.js';
 import { InstagramAccessCard } from './InstagramAccessCard.jsx';
 
 // Only what Instagram exposes publicly. Reach, saves and shares are private
@@ -151,7 +152,15 @@ export function CreatorStatsPanel({ contactId }) {
                           : 'No link (screenshot proof)'}
                       </div>
                     </td>
-                    {METRICS.map(([k]) => <td key={k} className="px-2 py-2">{formatCount(l[k])}</td>)}
+                    {METRICS.map(([k]) => {
+                      const est = k === 'reach' ? estimateReach(l) : null;
+                      return (
+                        <td key={k} className="px-2 py-2">
+                          {est != null ? formatCount(est)
+                            : formatCount(l[k])}
+                        </td>
+                      );
+                    })}
                   </tr>
                 )))}
               </tbody>

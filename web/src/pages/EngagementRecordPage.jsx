@@ -212,6 +212,7 @@ export function EngagementRecordPage() {
   const [contactEngagements, setContactEngagements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [triedSubmit, setTriedSubmit] = useState(false);
   const [notesEditing, setNotesEditing] = useState(false);
   const [notesDraft, setNotesDraft] = useState('');
   const [statusPrompt, setStatusPrompt] = useState(null);
@@ -948,10 +949,13 @@ export function EngagementRecordPage() {
                     <p className="text-2xs font-medium text-ink">Next follow-up date</p>
                     <input
                       type="date"
-                      className="input-field mt-2 w-full"
+                      className={`input-field mt-2 w-full ${triedSubmit && !statusFollowUpDraft ? 'input-error' : ''}`}
                       value={statusFollowUpDraft}
                       onChange={(e) => setStatusFollowUpDraft(e.target.value)}
                     />
+                    {triedSubmit && !statusFollowUpDraft && (
+                      <p className="mt-1 text-2xs text-red-700">Follow-up date is required</p>
+                    )}
                     <div className="mt-3 flex gap-2">
                       <button type="button" className="btn-secondary flex-1" onClick={clearStatusPrompt}>
                         Cancel
@@ -959,8 +963,10 @@ export function EngagementRecordPage() {
                       <button
                         type="button"
                         className="btn-primary flex-1"
-                        disabled={!statusFollowUpDraft}
-                        onClick={handleStatusFollowUpSave}
+                        onClick={() => {
+                          setTriedSubmit(true);
+                          if (statusFollowUpDraft) handleStatusFollowUpSave();
+                        }}
                       >
                         Save
                       </button>
@@ -1067,14 +1073,18 @@ export function EngagementRecordPage() {
                     outletName={visitOutletName}
                     value={visitFields}
                     onChange={setVisitFields}
+                    showErrors={triedSubmit}
                   />
                   <div className="mt-4 flex flex-wrap gap-2">
                     {visitDirty && (
                       <button
                         type="button"
                         className="btn-primary"
-                        disabled={!visitFields.visitDate || saving}
-                        onClick={handleSaveVisit}
+                        disabled={saving}
+                        onClick={() => {
+                          setTriedSubmit(true);
+                          if (visitFields.visitDate) handleSaveVisit();
+                        }}
                       >
                         {saving ? 'Saving…' : 'Save visit'}
                       </button>

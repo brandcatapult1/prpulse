@@ -13,13 +13,16 @@ import {
 export function NotContactedCardLogging({ engagement, onApply, onError }) {
   const [step, setStep] = useState('idle');
   const [followUpDate, setFollowUpDate] = useState('');
+  const [tried, setTried] = useState(false);
 
   function reset() {
     setStep('idle');
     setFollowUpDate('');
+    setTried(false);
   }
 
   function handleOutreachConfirm() {
+    setTried(true);
     if (!followUpDate) return;
     const result = transitionStage(engagement, STAGE.IN_CONVERSATION, {
       nextFollowUpDate: followUpDate,
@@ -54,11 +57,12 @@ export function NotContactedCardLogging({ engagement, onApply, onError }) {
           Follow-up date
           <input
             type="date"
-            className="input-field mt-1 w-full text-2xs"
+            className={`input-field mt-1 w-full text-2xs ${tried && !followUpDate ? 'input-error' : ''}`}
             value={followUpDate}
             onChange={(e) => setFollowUpDate(e.target.value)}
             autoFocus
           />
+          {tried && !followUpDate && <p className="mt-1 text-2xs text-red-700">Follow-up date is required</p>}
         </label>
         <div className="flex gap-1">
           <button type="button" className="btn-secondary flex-1 !py-1 text-[11px]" onClick={reset}>
@@ -67,7 +71,6 @@ export function NotContactedCardLogging({ engagement, onApply, onError }) {
           <button
             type="button"
             className="btn-primary flex-1 !py-1 text-[11px]"
-            disabled={!followUpDate}
             onClick={handleOutreachConfirm}
           >
             Log outreach

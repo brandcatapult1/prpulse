@@ -27,6 +27,7 @@ export function InConversationCardLogging({
   const [step, setStep] = useState('idle');
   const [retryDate, setRetryDate] = useState('');
   const [followUpDate, setFollowUpDate] = useState('');
+  const [tried, setTried] = useState(false);
 
   const noReplyCount = engagement.no_reply_count ?? 0;
 
@@ -34,6 +35,7 @@ export function InConversationCardLogging({
     setStep('idle');
     setRetryDate('');
     setFollowUpDate('');
+    setTried(false);
   }
 
   function apply(patch, message) {
@@ -43,6 +45,7 @@ export function InConversationCardLogging({
   }
 
   function handleNoReplyConfirm() {
+    setTried(true);
     if (!retryDate) return;
     const { patch, toastMessage } = logNoReplyAttempt(engagement, retryDate);
     onApply(patch, toastMessage, Object.keys(patch));
@@ -56,6 +59,7 @@ export function InConversationCardLogging({
   }
 
   function handleStillConfirm() {
+    setTried(true);
     if (!followUpDate) return;
     const result = transitionStage(engagement, STAGE.IN_CONVERSATION, {
       nextFollowUpDate: followUpDate,
@@ -94,11 +98,12 @@ export function InConversationCardLogging({
           Retry on
           <input
             type="date"
-            className="input-field mt-1 w-full text-2xs"
+            className={`input-field mt-1 w-full text-2xs ${tried && !retryDate ? 'input-error' : ''}`}
             value={retryDate}
             onChange={(e) => setRetryDate(e.target.value)}
             autoFocus
           />
+          {tried && !retryDate && <p className="mt-1 text-2xs text-red-700">Retry date is required</p>}
         </label>
         <div className="flex gap-1">
           <button type="button" className="btn-secondary flex-1 !py-1 text-[11px]" onClick={reset}>
@@ -107,7 +112,6 @@ export function InConversationCardLogging({
           <button
             type="button"
             className="btn-primary flex-1 !py-1 text-[11px]"
-            disabled={!retryDate}
             onClick={handleNoReplyConfirm}
           >
             Log attempt
@@ -169,11 +173,12 @@ export function InConversationCardLogging({
           Next follow-up
           <input
             type="date"
-            className="input-field mt-1 w-full text-2xs"
+            className={`input-field mt-1 w-full text-2xs ${tried && !followUpDate ? 'input-error' : ''}`}
             value={followUpDate}
             onChange={(e) => setFollowUpDate(e.target.value)}
             autoFocus
           />
+          {tried && !followUpDate && <p className="mt-1 text-2xs text-red-700">Follow-up date is required</p>}
         </label>
         <div className="flex gap-1">
           <button type="button" className="btn-secondary flex-1 !py-1 text-[11px]" onClick={() => setStep('replied_where')}>
@@ -182,7 +187,6 @@ export function InConversationCardLogging({
           <button
             type="button"
             className="btn-primary flex-1 !py-1 text-[11px]"
-            disabled={!followUpDate}
             onClick={handleStillConfirm}
           >
             Save

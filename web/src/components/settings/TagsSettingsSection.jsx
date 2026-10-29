@@ -37,6 +37,7 @@ export function TagsSettingsSection() {
   const [toast, setToast] = useState(null);
 
   const [newName, setNewName] = useState('');
+  const [nameTried, setNameTried] = useState(false);
   const [newType, setNewType] = useState('influencer');
   const [createError, setCreateError] = useState(null);
   const [creating, setCreating] = useState(false);
@@ -79,7 +80,9 @@ export function TagsSettingsSection() {
   async function handleCreate(e) {
     e.preventDefault();
     const name = newName.trim();
-    if (!name || creating) return;
+    if (creating) return;
+    setNameTried(true);
+    if (!name) return;
 
     setCreating(true);
     setCreateError(null);
@@ -275,7 +278,7 @@ export function TagsSettingsSection() {
           <label className="min-w-[12rem] flex-1 text-2xs text-ink-secondary">
             Name
             <input
-              className="input-field mt-1"
+              className={`input-field mt-1 ${nameTried && !newName.trim() ? 'input-error' : ''}`}
               value={newName}
               onChange={(e) => {
                 setNewName(e.target.value);
@@ -297,11 +300,12 @@ export function TagsSettingsSection() {
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
               ))}
             </select>
+            {nameTried && !newName.trim() && <p className="mt-1 text-2xs text-red-700">Tag name is required</p>}
           </label>
           <button
             type="submit"
             className="btn-primary"
-            disabled={creating || !newName.trim()}
+            disabled={creating}
           >
             {creating ? 'Adding…' : 'Add tag'}
           </button>

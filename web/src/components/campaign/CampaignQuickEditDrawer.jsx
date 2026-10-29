@@ -376,6 +376,7 @@ export function CampaignQuickEditDrawer({
   const [scheduleFlow, setScheduleFlow] = useState(false);
   const [followUpOpen, setFollowUpOpen] = useState(false);
   const [followUpDraft, setFollowUpDraft] = useState('');
+  const [triedSubmit, setTriedSubmit] = useState(false);
   const [dropOpen, setDropOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(null);
   const [pendingMove, setPendingMove] = useState(null);
@@ -693,6 +694,7 @@ export function CampaignQuickEditDrawer({
       setPendingMove(target);
       setFollowUpDraft('');
       setFollowUpOpen(true);
+      setTriedSubmit(false);
       return;
     }
     if (target.needsPrompt === 'visit_date') {
@@ -931,8 +933,11 @@ export function CampaignQuickEditDrawer({
               <button
                 type="button"
                 className="btn-primary"
-                disabled={!visitDraft?.visitDate || scheduleSubmitting}
-                onClick={handleScheduleVisitSubmit}
+                disabled={scheduleSubmitting}
+                onClick={() => {
+                  setTriedSubmit(true);
+                  handleScheduleVisitSubmit();
+                }}
               >
                 {scheduleSubmitting ? 'Scheduling…' : 'Schedule visit'}
               </button>
@@ -973,11 +978,14 @@ export function CampaignQuickEditDrawer({
                   Follow-up date
                   <input
                     type="date"
-                    className="input-field mt-1 h-8 w-full"
+                    className={`input-field mt-1 h-8 w-full ${triedSubmit && !followUpDraft ? 'input-error' : ''}`}
                     value={followUpDraft}
                     onChange={(e) => setFollowUpDraft(e.target.value)}
                     autoFocus
                   />
+                  {triedSubmit && !followUpDraft && (
+                    <p className="mt-1 text-2xs text-red-700">Follow-up date is required</p>
+                  )}
                 </label>
                 <div className="mt-2 flex gap-2">
                   <button
@@ -994,8 +1002,10 @@ export function CampaignQuickEditDrawer({
                   <button
                     type="button"
                     className="btn-primary flex-1"
-                    disabled={!followUpDraft}
-                    onClick={() => handleFollowUpSave(followUpDraft)}
+                    onClick={() => {
+                      setTriedSubmit(true);
+                      if (followUpDraft) handleFollowUpSave(followUpDraft);
+                    }}
                   >
                     Save
                   </button>
@@ -1093,6 +1103,7 @@ export function CampaignQuickEditDrawer({
                   outletName={resolveEngagementOutletName(engagement)}
                   value={visitDraft ?? visitFieldsFromEngagement(engagement)}
                   onChange={setVisitDraft}
+                  showErrors={triedSubmit}
                 />
               </SectionBlock>
             </section>
@@ -1188,12 +1199,15 @@ export function CampaignQuickEditDrawer({
                   outletName={resolveEngagementOutletName(engagement)}
                   value={visitDraft ?? visitFieldsFromEngagement(engagement)}
                   onChange={setVisitDraft}
+                  showErrors={triedSubmit}
                 />
                 <button
                   type="button"
                   className="btn-secondary mt-2 !h-7 text-2xs"
-                  disabled={!visitDraft?.visitDate}
-                  onClick={handleScheduledVisitSave}
+                  onClick={() => {
+                    setTriedSubmit(true);
+                    handleScheduledVisitSave();
+                  }}
                 >
                   Save visit
                 </button>

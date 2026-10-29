@@ -16,9 +16,13 @@ export function VisitDrawer({
   onSave,
 }) {
   const [fields, setFields] = useState(initialValues ?? emptyVisitFields());
+  const [tried, setTried] = useState(false);
 
   useEffect(() => {
-    if (open) setFields(initialValues ?? emptyVisitFields());
+    if (open) {
+      setFields(initialValues ?? emptyVisitFields());
+      setTried(false);
+    }
   }, [open, initialValues]);
 
   const drawerTitle = title ?? `Plan visit · ${contactName}`;
@@ -34,8 +38,10 @@ export function VisitDrawer({
           <button
             type="button"
             className="btn-primary"
-            disabled={!fields.visitDate}
-            onClick={() => onSave(fields)}
+            onClick={() => {
+              setTried(true);
+              if (fields.visitDate) onSave(fields);
+            }}
           >
             {saveLabel}
           </button>
@@ -49,6 +55,7 @@ export function VisitDrawer({
         outletName={outletName}
         value={fields}
         onChange={setFields}
+        showErrors={tried}
       />
     </Drawer>
   );

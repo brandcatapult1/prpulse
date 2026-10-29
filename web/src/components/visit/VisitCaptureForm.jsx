@@ -10,6 +10,7 @@ export function VisitCaptureForm({
   initialValues,
   compact = false,
   onChange,
+  showErrors = false,
 }) {
   const [internal, setInternal] = useState(value ?? initialValues ?? emptyVisitFields());
   const fields = value ?? internal;
@@ -39,11 +40,12 @@ export function VisitCaptureForm({
           Visit date *
           <input
             type="date"
-            className={inputClass}
+            className={`${inputClass} ${showErrors && !fields.visitDate ? 'input-error' : ''}`}
             required
             value={fields.visitDate}
             onChange={(e) => update({ visitDate: e.target.value })}
           />
+          {showErrors && !fields.visitDate && <p className="mt-1 text-2xs text-red-700">Visit date is required</p>}
         </label>
       </div>
       <div>

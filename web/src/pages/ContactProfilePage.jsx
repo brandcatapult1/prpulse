@@ -43,6 +43,7 @@ export function ContactProfilePage() {
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [cityOptions, setCityOptions] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
@@ -120,6 +121,7 @@ export function ContactProfilePage() {
   function startEdit() {
     setDraft(buildDraftFromContact(contact, { cities: cityOptions }));
     setDuplicate(null);
+    setSubmitted(false);
     setEditing(true);
   }
 
@@ -139,6 +141,7 @@ export function ContactProfilePage() {
 
   async function saveEdit() {
     if (saving) return;
+    setSubmitted(true);
     const validationError = getDraftValidationError(draft, {
       duplicateId: duplicate?.id,
       contactId: contact.id,
@@ -190,7 +193,7 @@ export function ContactProfilePage() {
                 <button type="button" className="btn-secondary" onClick={() => { setEditing(false); setDuplicate(null); }}>
                   Cancel
                 </button>
-                <button type="button" className="btn-primary" disabled={!canSave || saving} onClick={saveEdit}>
+                <button type="button" className="btn-primary" disabled={saving} onClick={saveEdit}>
                   {saving ? 'Saving…' : 'Save'}
                 </button>
               </>
@@ -259,6 +262,7 @@ export function ContactProfilePage() {
           duplicate={duplicate}
           onCheckMobile={checkDuplicateMobile}
           contactId={contact.id}
+          submitted={submitted}
         />
       )}
 

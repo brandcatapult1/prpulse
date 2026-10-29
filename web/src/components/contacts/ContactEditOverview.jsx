@@ -28,6 +28,7 @@ export function ContactEditOverview({
   duplicate,
   onCheckMobile,
   contactId,
+  submitted = false,
 }) {
   const setField = (field, value) => onDraftChange((d) => ({ ...d, [field]: value }));
 
@@ -69,11 +70,16 @@ export function ContactEditOverview({
             editing={editing}
             value={contact.full_name}
             input={
+              <div>
               <input
-                className="input-field mt-1 w-full"
+                className={`input-field mt-1 w-full ${submitted && !draft.full_name?.trim() ? 'input-error' : ''}`}
                 value={draft.full_name ?? ''}
                 onChange={(e) => setField('full_name', e.target.value)}
               />
+              {submitted && !draft.full_name?.trim() && (
+                <p className="mt-1 text-2xs text-red-700">Full name is required</p>
+              )}
+              </div>
             }
           />
           <ProfileField
@@ -81,7 +87,7 @@ export function ContactEditOverview({
             editing={editing}
             value={contact.mobile_number ?? '—'}
             input={
-              <div>
+              <div className={submitted && !isMobileValid(draft.mobile_number, draft.mobile_country_code ?? 'IN') ? 'rounded-md ring-1 ring-red-500' : ''}>
                 <MobileNumberField
                   countryCode={draft.mobile_country_code ?? 'IN'}
                   nationalNumber={draft.mobile_number ?? ''}
@@ -89,8 +95,10 @@ export function ContactEditOverview({
                   onNumberChange={(value) => setField('mobile_number', value)}
                   onBlur={() => onCheckMobile?.()}
                 />
-                {draft.mobile_number && !isMobileValid(draft.mobile_number, draft.mobile_country_code) && (
-                  <p className="mt-1 text-2xs text-red-700">Enter a valid mobile number for the selected country.</p>
+                {!isMobileValid(draft.mobile_number, draft.mobile_country_code ?? 'IN') && (draft.mobile_number || submitted) && (
+                  <p className="mt-1 text-2xs text-red-700">
+                    {draft.mobile_number ? 'Enter a valid mobile number for the selected country.' : 'Mobile number is required'}
+                  </p>
                 )}
                 {duplicate && duplicate.id !== contactId && (
                   <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-2xs text-amber-900">

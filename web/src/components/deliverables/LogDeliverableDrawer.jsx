@@ -30,6 +30,7 @@ export function LogDeliverableForm({
   publishedDate,
   setPublishedDate,
   onUploadingChange,
+  showErrors = false,
 }) {
   const fileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
@@ -77,7 +78,7 @@ export function LogDeliverableForm({
         </span>
         <input
           type="url"
-          className="input-field mt-1 w-full text-sm"
+          className={`input-field mt-1 w-full text-sm ${showErrors && !contentLink?.trim() && !(screenshots ?? []).length ? 'input-error' : ''}`}
           placeholder="https://instagram.com/…"
           value={contentLink}
           onChange={(e) => setContentLink(e.target.value)}
@@ -156,6 +157,7 @@ export function LogDeliverableDrawer({ deliverable, open, onClose, onConfirm }) 
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  const [attempted, setAttempted] = useState(false);
 
   const engagementId = deliverable?.engagement_id ?? deliverable?.engagementId ?? null;
 
@@ -170,6 +172,10 @@ export function LogDeliverableDrawer({ deliverable, open, onClose, onConfirm }) 
   useEffect(() => {
     setSubmitError(null);
   }, [contentLink, screenshots, publishedDate]);
+
+  useEffect(() => {
+    if (!open) setAttempted(false);
+  }, [open]);
 
   if (!deliverable) return null;
 
@@ -188,7 +194,9 @@ export function LogDeliverableDrawer({ deliverable, open, onClose, onConfirm }) 
   }
 
   async function handleConfirm() {
-    if (!canSubmit || submitting) return;
+    if (submitting) return;
+    setAttempted(true);
+    if (!canSubmit) return;
     const next = buildMarkPostedDeliverableForSave(deliverable, {
       content_link: contentLink?.trim() || null,
       screenshots,
@@ -215,7 +223,7 @@ export function LogDeliverableDrawer({ deliverable, open, onClose, onConfirm }) 
       onClose={resetAndClose}
       footer={
         <div className="space-y-2">
-          {(submitError || (!canSubmit && !uploading && !submitting)) && (
+          {(submitError || (attempted && !canSubmit && !uploading && !submitting)) && (
             <p className="text-right text-2xs text-health-red">
               {submitError || proofRequirementMessage}
             </p>
@@ -227,7 +235,7 @@ export function LogDeliverableDrawer({ deliverable, open, onClose, onConfirm }) 
             <button
               type="button"
               className="btn-primary"
-              disabled={!canSubmit || uploading || submitting}
+              disabled={uploading || submitting}
               onClick={handleConfirm}
             >
               {uploading ? 'Uploading…' : submitting ? 'Saving…' : 'Mark posted'}
@@ -246,6 +254,7 @@ export function LogDeliverableDrawer({ deliverable, open, onClose, onConfirm }) 
         publishedDate={publishedDate}
         setPublishedDate={setPublishedDate}
         onUploadingChange={setUploading}
+        showErrors={attempted && !canSubmit}
       />
     </Drawer>
   );

@@ -22,6 +22,7 @@ export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
   const [managerOptions, setManagerOptions] = useState([]);
   const [managersLoading, setManagersLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [toast, setToast] = useState(null);
 
   const isMonthly = campaign?.campaign_type === 'monthly';
@@ -44,6 +45,7 @@ export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
   }, [open]);
 
   useEffect(() => {
+    setSubmitted(false);
     if (campaign) {
       setDraft({
         campaign_name: campaign.campaign_name ?? '',
@@ -79,17 +81,12 @@ export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
   const managersError = canEditManagers && draft.manager_ids.length === 0
     ? 'Select at least one account manager'
     : null;
-  const canSave = draft.campaign_name.trim() && !targetError && !termMonthsError && !managersError && !saving;
+  const nameError = draft.campaign_name.trim() ? null : 'Campaign name is required';
 
   async function save() {
-    if (!draft.campaign_name.trim()) {
-      setToast('Campaign name is required');
-      return;
-    }
-    if (targetError || termMonthsError || managersError) {
-      setToast(targetError ?? termMonthsError ?? managersError);
-      return;
-    }
+    if (saving) return;
+    setSubmitted(true);
+    if (nameError || targetError || termMonthsError || managersError) return;
     setSaving(true);
     try {
       const body = {
@@ -128,7 +125,7 @@ export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
         footer={
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
-            <button type="button" className="btn-primary" onClick={save} disabled={!canSave}>
+            <button type="button" className="btn-primary" onClick={save} disabled={saving}>
               {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
@@ -140,10 +137,11 @@ export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
           <label className="block">
             <span className="text-2xs font-medium text-ink-secondary">Campaign name</span>
             <input
-              className="input-field mt-1 w-full"
+              className={`input-field mt-1 w-full ${submitted && nameError ? 'input-error' : ''}`}
               value={draft.campaign_name}
               onChange={(e) => setDraft((d) => ({ ...d, campaign_name: e.target.value }))}
             />
+            {submitted && nameError && <p className="mt-1 text-2xs text-red-700">{nameError}</p>}
           </label>
 
           <label className="block">
@@ -171,12 +169,12 @@ export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
                     type="number"
                     min={1}
                     step={1}
-                    className="input-field mt-1 w-full"
+                    className={`input-field mt-1 w-full ${submitted && termMonthsError ? 'input-error' : ''}`}
                     value={draft.term_months}
                     onChange={(e) => setDraft((d) => ({ ...d, term_months: e.target.value }))}
                     placeholder="Required"
                   />
-                  {termMonthsError && (
+                  {submitted && termMonthsError && (
                     <p className="mt-1 text-2xs text-red-700">{termMonthsError}</p>
                   )}
                 </>
@@ -193,12 +191,12 @@ export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
             <input
               type="number"
               min={0}
-              className="input-field mt-1 w-full"
+              className={`input-field mt-1 w-full ${submitted && targetError ? 'input-error' : ''}`}
               value={draft.target_collaborations}
               onChange={(e) => setDraft((d) => ({ ...d, target_collaborations: e.target.value }))}
               placeholder="Required"
             />
-            {targetError && (
+            {submitted && targetError && (
               <p className="mt-1 text-2xs text-red-700">{targetError}</p>
             )}
           </label>
@@ -230,7 +228,7 @@ export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
               ) : managerOptions.length === 0 ? (
                 <p className="mt-1 text-2xs text-ink-tertiary">No managers available</p>
               ) : (
-                <div className="mt-1.5 max-h-32 space-y-1 overflow-y-auto rounded-md border border-line/80 p-2">
+                <div className={`mt-1.5 max-h-32 space-y-1 overflow-y-auto rounded-md border p-2 ${submitted && managersError ? 'border-red-500' : 'border-line/80'}`}>
                   {managerOptions.map((m) => {
                     const checked = draft.manager_ids.includes(String(m.id));
                     const isSelf = String(m.id) === String(user?.id);
@@ -253,7 +251,7 @@ export function CampaignEditDrawer({ campaign, open, onClose, onSaved }) {
                   })}
                 </div>
               )}
-              {managersError && (
+              {submitted && managersError && (
                 <p className="mt-1 text-2xs text-red-700">{managersError}</p>
               )}
             </div>

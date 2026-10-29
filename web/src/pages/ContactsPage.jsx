@@ -42,12 +42,13 @@ function saveListState(state) {
   }
 }
 
-/** Followers in K with up to two decimals from 1,000 (1K, 1.01K, 101.66K); the exact count below that. */
+/** Followers in K with up to two decimals from 1,000 (1K, 101.66K), in L (lakh) from 10,00,000 (10.34L); exact below 1,000. */
 function formatFollowers(n) {
   if (n == null) return '—';
   const v = Number(n);
   if (!Number.isFinite(v)) return '—';
   const trim = (x) => String(Number(x.toFixed(2)));
+  if (v >= 1_000_000) return `${trim(v / 100_000)}L`;
   if (v >= 1_000) return `${trim(v / 1_000)}K`;
   return String(v);
 }

@@ -91,6 +91,7 @@ export function AddUserDrawer({ open, onClose, users, onSaved }) {
               onChange={(e) => updateField('full_name', e.target.value)}
               autoComplete="name"
             />
+            {submitted && !form.full_name.trim() && <p className="mt-1 text-2xs text-red-700">Full name is required</p>}
           </label>
 
           <label className="block text-2xs text-ink-secondary">
@@ -102,6 +103,7 @@ export function AddUserDrawer({ open, onClose, users, onSaved }) {
               onChange={(e) => updateField('email', e.target.value)}
               autoComplete="email"
             />
+            {submitted && !form.email.trim() && <p className="mt-1 text-2xs text-red-700">Email is required</p>}
           </label>
 
           <label className="block text-2xs text-ink-secondary">

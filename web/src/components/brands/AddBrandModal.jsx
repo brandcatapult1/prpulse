@@ -83,6 +83,7 @@ export function AddBrandModal({ open, onClose, onCreated, managers = [] }) {
             placeholder="e.g. BrandX"
             autoFocus
           />
+          {submitted && !valid && <p className="mt-1 text-2xs text-red-700">Brand name is required</p>}
         </label>
 
         <label className="block">

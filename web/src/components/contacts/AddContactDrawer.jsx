@@ -180,6 +180,7 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
               value={form.full_name}
               onChange={(e) => updateField('full_name', e.target.value)}
             />
+            {submitted && !form.full_name.trim() && <p className="mt-1 text-2xs text-red-700">Full name is required</p>}
           </label>
 
           <label className="block text-2xs text-ink-secondary">
@@ -193,6 +194,11 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
                 onBlur={checkDuplicate}
               />
             </div>
+            {submitted && !mobileValid && (
+              <p className="mt-1 text-2xs text-red-700">
+                {form.mobile_number.trim() ? 'Enter a valid mobile number' : 'Mobile number is required'}
+              </p>
+            )}
           </label>
 
           {duplicate && (

@@ -42,6 +42,7 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [submitted, setSubmitted] = useState(false);
   const [tagOptions, setTagOptions] = useState([]);
 
   const isMonthly = form.campaign_type === 'monthly';
@@ -54,14 +55,14 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
     && form.manager_ids.length > 0
     && !scheduleError
     && !targetError
-    && !termMonthsError
-    && !saving;
+    && !termMonthsError;
 
   useEffect(() => {
     if (!open) return;
     const defaultManagerIds = user?.id ? [user.id] : [];
     setForm(emptyForm(defaultManagerIds));
     setError(null);
+    setSubmitted(false);
     setLoading(true);
 
     Promise.all([
@@ -109,6 +110,8 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
   }
 
   async function handleSave() {
+    if (saving) return;
+    setSubmitted(true);
     if (!canSave) return;
     setSaving(true);
     setError(null);
@@ -143,7 +146,7 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
           <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>
             Cancel
           </button>
-          <button type="button" className="btn-primary" onClick={handleSave} disabled={!canSave}>
+          <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? 'Creating…' : 'Create campaign'}
           </button>
         </div>
@@ -159,7 +162,7 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
         <label className="block">
           <FieldLabel>Campaign name</FieldLabel>
           <input
-            className="input-field mt-1"
+            className={`input-field mt-1 ${submitted && !form.campaign_name.trim() ? 'input-error' : ''}`}
             value={form.campaign_name}
             onChange={(e) => setForm((f) => ({ ...f, campaign_name: e.target.value }))}
             placeholder="e.g. Summer Menu Push"
@@ -181,7 +184,7 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
             </p>
           ) : (
             <select
-              className="input-field mt-1"
+              className={`input-field mt-1 ${submitted && !form.brand_id ? 'input-error' : ''}`}
               value={form.brand_id}
               onChange={(e) => setForm((f) => ({ ...f, brand_id: e.target.value }))}
             >
@@ -220,7 +223,7 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
             <FieldLabel>Start date</FieldLabel>
             <input
               type="date"
-              className="input-field mt-1"
+              className={`input-field mt-1 ${submitted && scheduleError ? 'input-error' : ''}`}
               value={form.start_date}
               onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
             />
@@ -249,7 +252,7 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
           ) : managers.length === 0 ? (
             <p className="mt-1 text-2xs text-ink-tertiary">No managers available</p>
           ) : (
-            <div className="mt-1.5 max-h-32 space-y-1 overflow-y-auto rounded-md border border-line/80 p-2">
+            <div className={`mt-1.5 max-h-32 space-y-1 overflow-y-auto rounded-md border p-2 ${submitted && form.manager_ids.length === 0 ? 'border-red-500' : 'border-line/80'}`}>
               {managers.map((m) => {
                 const checked = form.manager_ids.some((id) => String(id) === String(m.id));
                 return (
@@ -281,7 +284,7 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
               type="number"
               min="1"
               step="1"
-              className="input-field mt-1"
+              className={`input-field mt-1 ${submitted && termMonthsError ? 'input-error' : ''}`}
               value={form.term_months}
               onChange={(e) => setForm((f) => ({ ...f, term_months: e.target.value }))}
               placeholder="e.g. 6"
@@ -297,7 +300,7 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
           <input
             type="number"
             min="0"
-            className="input-field mt-1"
+            className={`input-field mt-1 ${submitted && targetError ? 'input-error' : ''}`}
             value={form.target_collaborations}
             onChange={(e) => setForm((f) => ({ ...f, target_collaborations: e.target.value }))}
             placeholder="Required"

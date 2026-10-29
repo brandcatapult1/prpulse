@@ -15,17 +15,22 @@ export function AddBrandModal({ open, onClose, onCreated, managers = [] }) {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setForm(EMPTY);
     setError(null);
+    setSubmitted(false);
   }, [open]);
 
-  const canSave = form.brand_name.trim() && !saving;
+  const valid = Boolean(form.brand_name.trim());
+  const canSave = valid && !saving;
 
   async function handleSave() {
-    if (!canSave) return;
+    if (saving) return;
+    setSubmitted(true);
+    if (!valid) return;
     setSaving(true);
     setError(null);
     try {
@@ -56,7 +61,7 @@ export function AddBrandModal({ open, onClose, onCreated, managers = [] }) {
           <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>
             Cancel
           </button>
-          <button type="button" className="btn-primary" onClick={handleSave} disabled={!canSave}>
+          <button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>
             {saving ? 'Creating…' : 'Create brand'}
           </button>
         </div>
@@ -72,7 +77,7 @@ export function AddBrandModal({ open, onClose, onCreated, managers = [] }) {
         <label className="block">
           <span className="text-2xs font-medium text-ink-secondary">Brand name</span>
           <input
-            className="input-field mt-1"
+            className={`input-field mt-1 ${submitted && !valid ? 'input-error' : ''}`}
             value={form.brand_name}
             onChange={(e) => setForm((f) => ({ ...f, brand_name: e.target.value }))}
             placeholder="e.g. BrandX"

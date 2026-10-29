@@ -49,6 +49,7 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
   const [form, setForm] = useState(EMPTY);
   const [duplicate, setDuplicate] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [toast, setToast] = useState(null);
   const [tagOptions, setTagOptions] = useState([]);
   const [cityOptions, setCityOptions] = useState([]);
@@ -57,6 +58,7 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
   useEffect(() => {
     if (!open) return;
     setForm(EMPTY);
+    setSubmitted(false);
     setDuplicate(null);
     Promise.all([
       lookupApi.tags().catch(() => []),
@@ -112,9 +114,9 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
 
   async function handleSave() {
     if (saving) return;
-    if (!form.full_name.trim() || !mobileValid || duplicate) return;
-    if (!preferenceValid) {
-      setToast(COLLABORATION_PREFERENCE_ERROR);
+    setSubmitted(true);
+    if (!canSave) {
+      if (!preferenceValid) setToast(COLLABORATION_PREFERENCE_ERROR);
       return;
     }
 
@@ -164,7 +166,7 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
         footer={
           <div className="flex flex-wrap justify-end gap-2">
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="button" className="btn-primary" disabled={!canSave || saving} onClick={handleSave}>
+            <button type="button" className="btn-primary" disabled={saving} onClick={handleSave}>
               Add contact
             </button>
           </div>
@@ -174,7 +176,7 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
           <label className="block text-2xs text-ink-secondary">
             Full name
             <input
-              className="input-field mt-1"
+              className={`input-field mt-1 ${submitted && !form.full_name.trim() ? 'input-error' : ''}`}
               value={form.full_name}
               onChange={(e) => updateField('full_name', e.target.value)}
             />
@@ -182,7 +184,7 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
 
           <label className="block text-2xs text-ink-secondary">
             Mobile
-            <div className="mt-1">
+            <div className={`mt-1 ${submitted && !mobileValid ? 'rounded-md ring-1 ring-red-500' : ''}`}>
               <MobileNumberField
                 countryCode={form.mobile_country_code}
                 nationalNumber={form.mobile_number}
@@ -255,7 +257,7 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
             </select>
           </label>
 
-          <div className="flex flex-wrap gap-4">
+          <div className={`flex flex-wrap gap-4 ${submitted && !preferenceValid ? 'rounded-md ring-1 ring-red-500 p-1.5' : ''}`}>
             <label className="flex items-center gap-2 text-2xs text-ink-secondary">
               <input
                 type="checkbox"
@@ -273,7 +275,7 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
               Open to paid
             </label>
           </div>
-          {!preferenceValid && (
+          {submitted && !preferenceValid && (
             <p className="text-2xs text-red-700">{COLLABORATION_PREFERENCE_ERROR}</p>
           )}
 

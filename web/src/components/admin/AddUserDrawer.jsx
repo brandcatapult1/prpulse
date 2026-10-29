@@ -14,11 +14,13 @@ const EMPTY = {
 export function AddUserDrawer({ open, onClose, users, onSaved }) {
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
     if (!open) return;
     setForm(EMPTY);
+    setSubmitted(false);
     setToast(null);
   }, [open]);
 
@@ -37,7 +39,9 @@ export function AddUserDrawer({ open, onClose, users, onSaved }) {
   const canSave = form.full_name.trim() && form.email.trim();
 
   async function handleSave() {
-    if (saving || !canSave) return;
+    if (saving) return;
+    setSubmitted(true);
+    if (!canSave) return;
 
     setSaving(true);
     try {
@@ -68,7 +72,7 @@ export function AddUserDrawer({ open, onClose, users, onSaved }) {
         footer={
           <div className="flex flex-wrap justify-end gap-2">
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="button" className="btn-primary" disabled={!canSave || saving} onClick={handleSave}>
+            <button type="button" className="btn-primary" disabled={saving} onClick={handleSave}>
               {saving ? 'Adding…' : 'Add user'}
             </button>
           </div>
@@ -82,7 +86,7 @@ export function AddUserDrawer({ open, onClose, users, onSaved }) {
           <label className="block text-2xs text-ink-secondary">
             Full name
             <input
-              className="input-field mt-1"
+              className={`input-field mt-1 ${submitted && !form.full_name.trim() ? 'input-error' : ''}`}
               value={form.full_name}
               onChange={(e) => updateField('full_name', e.target.value)}
               autoComplete="name"
@@ -92,7 +96,7 @@ export function AddUserDrawer({ open, onClose, users, onSaved }) {
           <label className="block text-2xs text-ink-secondary">
             Email
             <input
-              className="input-field mt-1"
+              className={`input-field mt-1 ${submitted && !form.email.trim() ? 'input-error' : ''}`}
               type="email"
               value={form.email}
               onChange={(e) => updateField('email', e.target.value)}

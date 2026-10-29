@@ -195,6 +195,14 @@ contactsRouter.post('/batch/set-primary-category', requireAuth, async (req, res)
   }
 });
 
+/** Best-effort Instagram profile sync (followers, engagement rate, avg views); waits briefly, never fails the save. */
+async function syncInstagramQuietly(contactId, waitMs = 10000) {
+  const run = syncContactSocial(pool, contactId).catch((err) => {
+    console.warn('Instagram sync after save failed:', err.message);
+  });
+  await Promise.race([run, new Promise((resolve) => setTimeout(resolve, waitMs))]);
+}
+
 contactsRouter.post('/quick-add', requireAuth, async (req, res) => {
   const {
     full_name,
@@ -249,6 +257,7 @@ contactsRouter.post('/quick-add', requireAuth, async (req, res) => {
       return loadContactDetail(client, created.id);
     });
 
+    if (contact.instagram_url) await syncInstagramQuietly(contact.id);
     res.status(201).json({ contact });
   } catch (err) {
     if (err.code === 'duplicate_contact') {
@@ -273,6 +282,9 @@ contactsRouter.patch('/:id', requireAuth, async (req, res) => {
     const contact = await withUserTransaction(req.user.id, async (client) =>
       applyContactPatch(client, req.params.id, req.body, { userId: req.user.id }),
     );
+    if (req.body?.instagram_url !== undefined && contact?.instagram_url) {
+      await syncInstagramQuietly(contact.id);
+    }
     res.json(contact);
   } catch (err) {
     if (err.duplicate) {

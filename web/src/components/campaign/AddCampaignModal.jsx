@@ -47,6 +47,13 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
 
   const isMonthly = form.campaign_type === 'monthly';
   const scheduleError = validateCampaignSchedule(form);
+  const startError = form.start_date ? null : 'Start date is required';
+  let endError = null;
+  if (!isMonthly) {
+    if (!form.end_date) endError = 'End date is required for one-time projects';
+    else if (form.start_date && form.end_date < form.start_date) endError = 'End date must be on or after the start date';
+  }
+  const showErr = (msg) => (submitted && msg ? <p className="mt-1 text-2xs text-red-700">{msg}</p> : null);
   const targetError = validateCampaignTarget(form);
   const termMonthsError = validateTermMonths(form);
   const canSave =
@@ -168,6 +175,7 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
             placeholder="e.g. Summer Menu Push"
             autoFocus
           />
+          {showErr(form.campaign_name.trim() ? null : 'Campaign name is required')}
         </label>
 
         <label className="block">
@@ -196,6 +204,7 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
               ))}
             </select>
           )}
+          {showErr(form.brand_id ? null : 'Select a brand')}
         </label>
 
         <div>
@@ -223,21 +232,23 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
             <FieldLabel>Start date</FieldLabel>
             <input
               type="date"
-              className={`input-field mt-1 ${submitted && scheduleError ? 'input-error' : ''}`}
+              className={`input-field mt-1 ${submitted && startError ? 'input-error' : ''}`}
               value={form.start_date}
               onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
             />
+            {showErr(startError)}
           </label>
           {!isMonthly && (
             <label className="block">
               <FieldLabel>End date</FieldLabel>
               <input
                 type="date"
-                className="input-field mt-1"
+                className={`input-field mt-1 ${submitted && endError ? 'input-error' : ''}`}
                 min={form.start_date || undefined}
                 value={form.end_date}
                 onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))}
               />
+              {showErr(endError)}
             </label>
           )}
         </div>
@@ -272,6 +283,7 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
               })}
             </div>
           )}
+          {showErr(form.manager_ids.length ? null : 'Select at least one account manager')}
         </div>
 
         {isMonthly && (
@@ -289,7 +301,7 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
               onChange={(e) => setForm((f) => ({ ...f, term_months: e.target.value }))}
               placeholder="e.g. 6"
             />
-            {termMonthsError && (
+            {(submitted || false) && termMonthsError && (
               <p className="mt-1 text-2xs text-red-700">{termMonthsError}</p>
             )}
           </label>
@@ -305,7 +317,7 @@ export function AddCampaignModal({ open, onClose, onCreated }) {
             onChange={(e) => setForm((f) => ({ ...f, target_collaborations: e.target.value }))}
             placeholder="Required"
           />
-          {targetError && (
+          {submitted && targetError && (
             <p className="mt-1 text-2xs text-red-700">{targetError}</p>
           )}
         </label>

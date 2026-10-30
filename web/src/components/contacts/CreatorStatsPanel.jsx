@@ -139,10 +139,10 @@ export function CreatorStatsPanel({ contactId }) {
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <Stat label={followLabel} value={s?.followers}
                     display={s?.followers == null ? '—' : Number(s.followers).toLocaleString('en-IN')} />
-                  <Stat label="Engagement rate" value={s?.engagement_rate}
+                  <Stat label="Engagement rate (latest 5 posts)" value={s?.engagement_rate}
                     display={s?.engagement_rate == null ? '—' : `${Number(s.engagement_rate)}%`} />
                   <Stat label="Engagement rate (on reach)" display={reachRate(allLinks) ?? '—'} />
-                  <Stat label="Avg views (latest 5)" value={s?.avg_views} />
+                  <Stat label="Avg views (latest 5 reels)" value={s?.avg_views} />
                 </div>
                 {s?.sync_error && <p className="mt-1 text-2xs text-health-red">{s.sync_error}</p>}
                 {s?.synced_at && <p className="mt-1 text-2xs text-ink-tertiary">Updated {formatDate(s.synced_at)}</p>}

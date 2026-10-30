@@ -88,6 +88,31 @@ export function CreatorStatsPanel({ contactId }) {
     }
     return { total, estimated };
   };
+  // Engagement rate on reach = (likes + comments) / reach x 100, using Instagram's reach where we have it,
+  // otherwise the worked-out reach. A link shared by two deliverables counts once.
+  const reachRate = (links) => {
+    let interactions = 0;
+    let reach = 0;
+    let estimated = false;
+    const seen = new Set();
+    for (const l of links) {
+      if (l.content_url) {
+        if (seen.has(l.content_url)) continue;
+        seen.add(l.content_url);
+      }
+      let r = Number(l.reach);
+      if (!(Number.isFinite(r) && r > 0)) {
+        r = estimateReach(l, data.classification, followers);
+        if (r != null) estimated = true;
+      }
+      if (!(r > 0)) continue;
+      reach += r;
+      interactions += (Number(l.likes) || 0) + (Number(l.comments) || 0);
+    }
+    if (reach <= 0) return null;
+    return `${estimated ? '~' : ''}${(Math.round((interactions / reach) * 10000) / 100)}%`;
+  };
+  const allLinks = data.deliverables.flatMap((d) => d.links);
   const configured = data.sync_available?.instagram;
 
   return (
@@ -111,11 +136,12 @@ export function CreatorStatsPanel({ contactId }) {
                   <span className="font-medium text-ink">{name}</span>
                   {s?.handle && <span>@{s.handle}</span>}
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <Stat label={followLabel} value={s?.followers}
                     display={s?.followers == null ? '—' : Number(s.followers).toLocaleString('en-IN')} />
                   <Stat label="Engagement rate" value={s?.engagement_rate}
                     display={s?.engagement_rate == null ? '—' : `${Number(s.engagement_rate)}%`} />
+                  <Stat label="Engagement rate (on reach)" display={reachRate(allLinks) ?? '—'} />
                   <Stat label="Avg views (latest 5)" value={s?.avg_views} />
                 </div>
                 {s?.sync_error && <p className="mt-1 text-2xs text-health-red">{s.sync_error}</p>}
@@ -158,6 +184,11 @@ export function CreatorStatsPanel({ contactId }) {
                   return total > 0 ? `${estimated ? '~' : ''}${formatCount(total)}` : formatCount(r[k]);
                 },
               })),
+              {
+                key: 'eng_reach',
+                label: 'Eng. rate (on reach)',
+                render: (r) => reachRate(data.deliverables.filter((x) => x.campaign_id === r.campaign_id).flatMap((x) => x.links)) ?? '—',
+              },
             ]}
             rows={data.campaigns.map((c) => ({ ...c, id: c.campaign_id }))}
           />
@@ -167,6 +198,7 @@ export function CreatorStatsPanel({ contactId }) {
                 <tr className="border-b border-line text-left text-ink-tertiary">
                   <th className="px-3 py-2">Deliverable</th>
                   {METRICS.map(([k, label]) => <th key={k} className="px-2 py-2">{label}</th>)}
+                  <th className="px-2 py-2">Eng. rate (on reach)</th>
                 </tr>
               </thead>
               <tbody>
@@ -189,6 +221,7 @@ export function CreatorStatsPanel({ contactId }) {
                         </td>
                       );
                     })}
+                    <td className="px-2 py-2">{reachRate([l]) ?? '—'}</td>
                   </tr>
                 )))}
               </tbody>

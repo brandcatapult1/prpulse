@@ -1,3 +1,4 @@
+import { estimateReach } from './reachEstimate.mjs';
 import PDFDocument from 'pdfkit';
 
 const IST = 'Asia/Kolkata';
@@ -264,6 +265,19 @@ export async function buildCycleReportPdf({ report, logoUrl }) {
             width: contentWidth,
             link,
             underline: true,
+          });
+        }
+
+        const itemMetrics = item.metrics ?? {};
+        const metricParts = [['Likes', 'likes'], ['Comments', 'comments'], ['Views', 'views'], ['Reach', 'reach']]
+          .filter(([, k]) => Number(itemMetrics[k]) > 0)
+          .map(([label, k]) => `${label} ${Number(itemMetrics[k]).toLocaleString('en-IN')}`);
+        const estReach = estimateReach(itemMetrics, collab.classification, collab.followers);
+        if (estReach != null) metricParts.push(`Reach ~${estReach.toLocaleString('en-IN')}`);
+        if (metricParts.length) {
+          ensurePageSpace(doc, 16);
+          doc.font('Helvetica').fontSize(9).fillColor('#475467').text(metricParts.join('   ·   '), left, doc.y + 2, {
+            width: contentWidth,
           });
         }
 

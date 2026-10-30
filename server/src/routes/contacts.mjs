@@ -153,7 +153,7 @@ contactsRouter.delete('/:id/instagram-connection', requireAuth, async (req, res)
 
 contactsRouter.post('/:id/creator-stats/sync', requireAuth, async (req, res) => {
   try {
-    const result = await syncContactSocial(pool, req.params.id);
+    const result = await syncContactSocial(pool, req.params.id, { minIntervalMs: 5 * 60_000 });
     res.json({ result, ...(await creatorStatsPayload(req.params.id)) });
   } catch (err) {
     res.status(err.status ?? 503).json({ error: err.message ?? 'Sync failed' });

@@ -201,7 +201,7 @@ export function latestPostStats(media, followers, n = 5) {
   return { avg_views: avgViews == null ? null : Math.round(avgViews), engagement_rate: rate };
 }
 
-export async function fetchInstagramProfile(handle, { wantedCodes = [], mediaLimit = 50, maxPages = 30 } = {}) {
+export async function fetchInstagramProfile(handle, { wantedCodes = [], mediaLimit = 50, maxPages = 4 } = {}) {
   const { META_ACCESS_TOKEN: token, META_IG_USER_ID: igId } = process.env;
   if (!token || !igId) throw new Error('Instagram sync not configured (META_ACCESS_TOKEN / META_IG_USER_ID)');
   const wanted = new Set(wantedCodes);
@@ -284,13 +284,29 @@ const STATS_ERROR = `
  * completed (posted) deliverable links on that platform. Never overwrites a metric
  * a person entered manually (reach/shares/reposts/saves are only filled when null).
  */
-export async function syncContactSocial(pool, contactId) {
+const RATE_LIMIT_RE = /\(#4\)|\(#17\)|\(#32\)|\(#613\)|request limit|rate limit|too many calls/i;
+const RATE_LIMIT_MESSAGE = 'Instagram is rate-limiting our app right now. Please try again in about an hour.';
+
+export async function syncContactSocial(pool, contactId, { minIntervalMs = 0 } = {}) {
   const enabled = syncProviders();
   const { rows: [contact] } = await pool.query(
     'SELECT id, instagram_url FROM contacts WHERE id = $1',
     [contactId],
   );
   if (!contact) throw Object.assign(new Error('Contact not found'), { status: 404 });
+
+  if (minIntervalMs > 0) {
+    const { rows: [last] } = await pool.query(
+      `SELECT synced_at FROM creator_social_stats
+       WHERE contact_id = $1 AND platform = 'instagram' AND sync_error IS NULL`,
+      [contactId],
+    );
+    const age = last?.synced_at ? Date.now() - new Date(last.synced_at).getTime() : null;
+    if (age != null && age < minIntervalMs) {
+      const mins = Math.max(1, Math.round(age / 60_000));
+      return { instagram: `recently refreshed (${mins} min ago), showing saved numbers`, metrics_updated: 0 };
+    }
+  }
 
   const { rows: deliverables } = await pool.query(
     `SELECT d.id, d.content_link, d.unit_proofs
@@ -408,8 +424,9 @@ export async function syncContactSocial(pool, contactId) {
         }
         if (!connectedOk) result.instagram = 'ok';
       } catch (err) {
-        await pool.query(STATS_ERROR, [contactId, 'instagram', handle, err.message]);
-        result.instagram = `error: ${err.message}`;
+        const message = RATE_LIMIT_RE.test(err.message) ? RATE_LIMIT_MESSAGE : err.message;
+        await pool.query(STATS_ERROR, [contactId, 'instagram', handle, message]);
+        result.instagram = `error: ${message}`;
       }
     }
   }

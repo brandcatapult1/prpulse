@@ -184,11 +184,6 @@ export function CreatorStatsPanel({ contactId }) {
                   return total > 0 ? `${estimated ? '~' : ''}${formatCount(total)}` : formatCount(r[k]);
                 },
               })),
-              {
-                key: 'eng_reach',
-                label: 'Eng. rate (on reach)',
-                render: (r) => reachRate(data.deliverables.filter((x) => x.campaign_id === r.campaign_id).flatMap((x) => x.links)) ?? '—',
-              },
             ]}
             rows={data.campaigns.map((c) => ({ ...c, id: c.campaign_id }))}
           />
@@ -198,7 +193,6 @@ export function CreatorStatsPanel({ contactId }) {
                 <tr className="border-b border-line text-left text-ink-tertiary">
                   <th className="px-3 py-2">Deliverable</th>
                   {METRICS.map(([k, label]) => <th key={k} className="px-2 py-2">{label}</th>)}
-                  <th className="px-2 py-2">Eng. rate (on reach)</th>
                 </tr>
               </thead>
               <tbody>
@@ -221,7 +215,6 @@ export function CreatorStatsPanel({ contactId }) {
                         </td>
                       );
                     })}
-                    <td className="px-2 py-2">{reachRate([l]) ?? '—'}</td>
                   </tr>
                 )))}
               </tbody>

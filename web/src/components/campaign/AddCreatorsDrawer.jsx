@@ -37,16 +37,24 @@ function InstagramHandle({ contact }) {
  * Campaign discovery drawer — find active, addable creators and batch-add them
  * via the same populate endpoint as contacts-page batch "Add to campaign".
  */
-/** The creator's own tags (system labels are shown separately): first three, then +N. */
+/** The creator's own tags (system labels are shown separately): first three, then a +N that opens the rest. */
 function CreatorTagPills({ row }) {
+  const [expanded, setExpanded] = useState(false);
   const system = new Set(row.system_labels ?? []);
   const own = (row.tags ?? []).filter((t) => !system.has(t));
   if (own.length === 0) return null;
+  const shown = expanded ? own : own.slice(0, 3);
   return (
     <span className="mt-1 flex flex-wrap items-center gap-1">
-      {own.slice(0, 3).map((t) => <Pill key={t} tone="default">{t}</Pill>)}
+      {shown.map((t) => <Pill key={t} tone="default">{t}</Pill>)}
       {own.length > 3 && (
-        <span className="text-2xs text-ink-tertiary" title={own.slice(3).join(', ')}>+{own.length - 3}</span>
+        <button
+          type="button"
+          className="text-2xs font-medium text-brand hover:underline"
+          onClick={(e) => { e.stopPropagation(); setExpanded((x) => !x); }}
+        >
+          {expanded ? 'Show less' : `+${own.length - 3}`}
+        </button>
       )}
     </span>
   );

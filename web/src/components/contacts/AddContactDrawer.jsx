@@ -111,7 +111,13 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
 
   const mobileValid = isMobileValid(form.mobile_number, form.mobile_country_code);
   const preferenceValid = hasCollaborationPreference(form.open_to_paid, form.open_to_barter);
-  const canSave = form.full_name.trim() && mobileValid && !duplicate && preferenceValid;
+  const cityValid = Boolean(form.city);
+  const instagramValid = Boolean(form.instagram_url.trim());
+  const categoryValid = Boolean(form.primary_category_id);
+  const tagsValid = form.tag_ids.length > 0;
+  const canSave = form.full_name.trim() && mobileValid && !duplicate && preferenceValid
+    && cityValid && instagramValid && categoryValid && tagsValid;
+  const errText = (msg) => <p className="mt-1 text-2xs text-red-700">{msg}</p>;
 
   async function handleSave() {
     if (saving) return;
@@ -215,8 +221,8 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
           )}
 
           <label className="block text-2xs text-ink-secondary">
-            City
-            <div className="mt-1">
+            City *
+            <div className={`mt-1 ${submitted && !cityValid ? 'rounded-md ring-1 ring-red-500' : ''}`}>
               <CityCountryField
                 countryCode={form.mobile_country_code}
                 city={form.city}
@@ -226,29 +232,32 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
                 onCityChange={(value) => updateField('city', value)}
               />
             </div>
+            {submitted && !cityValid && errText('City is required')}
           </label>
 
           <label className="block text-2xs text-ink-secondary">
-            Instagram URL
+            Instagram URL *
             <input
-              className="input-field mt-1"
+              className={`input-field mt-1 ${submitted && !instagramValid ? 'input-error' : ''}`}
               value={form.instagram_url}
               onChange={(e) => updateField('instagram_url', e.target.value)}
             />
+            {submitted && !instagramValid && errText('Instagram URL is required')}
           </label>
 
           <label className="block text-2xs text-ink-secondary">
-            Primary category
+            Primary category *
             <select
-              className="input-field mt-1"
+              className={`input-field mt-1 ${submitted && !categoryValid ? 'input-error' : ''}`}
               value={form.primary_category_id}
               onChange={(e) => updateField('primary_category_id', e.target.value)}
             >
-              <option value="">— Not set —</option>
+              <option value="">— Select category —</option>
               {categoryOptions.map((cat) => (
                 <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </select>
+            {submitted && !categoryValid && errText('Primary category is required')}
           </label>
 
           <div className={`flex flex-wrap gap-4 ${submitted && !preferenceValid ? 'rounded-md ring-1 ring-red-500 p-1.5' : ''}`}>
@@ -297,8 +306,8 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
           )}
 
           <div>
-            <div className="text-2xs text-ink-secondary">Tags</div>
-            <div className="mt-1">
+            <div className="text-2xs text-ink-secondary">Tags *</div>
+            <div className={`mt-1 ${submitted && !tagsValid ? 'rounded-md ring-1 ring-red-500 p-1' : ''}`}>
               <TagSelectChips
                 tags={tagOptions}
                 allowedTypes={['influencer']}
@@ -306,6 +315,7 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
                 onChange={(ids) => updateField('tag_ids', ids)}
               />
             </div>
+            {submitted && !tagsValid && errText('Select at least one tag')}
           </div>
         </div>
       </Drawer>

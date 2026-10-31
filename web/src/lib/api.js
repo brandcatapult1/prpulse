@@ -207,6 +207,7 @@ export const registrationsApi = {
   branding: () => api('/registrations/branding'),
   cities: (country) =>
     api(`/registrations/cities${country ? `?country=${encodeURIComponent(country)}` : ''}`),
+  countries: () => api('/registrations/countries'),
   categories: () => api('/registrations/categories'),
   submit: (body) => api('/registrations', { method: 'POST', body: JSON.stringify(body) }),
   update: (id, body) => api(`/registrations/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),

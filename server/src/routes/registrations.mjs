@@ -4,7 +4,7 @@ import { requireAuth } from '../middleware/auth.mjs';
 import { requireSeniorOrAdmin } from '../middleware/permissions.mjs';
 import { normalizeMobileToE164 } from '../lib/mobileNumber.mjs';
 import { createContactDeduped } from '../lib/contactCreate.mjs';
-import { assertValidCity, loadCities } from '../lib/cities.mjs';
+import { assertValidCity, loadCities, loadCountries } from '../lib/cities.mjs';
 import { assertValidCategoryId, loadCategories } from '../lib/categories.mjs';
 import { collaborationPreferenceError } from '../lib/collaborationPrefs.mjs';
 import { profileLinkError } from '../lib/registrationValidation.mjs';
@@ -44,6 +44,15 @@ registrationsRouter.get('/cities', async (req, res) => {
     res.json(cities);
   } catch (err) {
     res.status(503).json({ error: err.message ?? 'Could not load cities' });
+  }
+});
+
+/** Public — admin-managed countries (with phone extensions) for the signup form. */
+registrationsRouter.get('/countries', async (_req, res) => {
+  try {
+    res.json(await loadCountries(pool));
+  } catch (err) {
+    res.status(503).json({ error: err.message ?? 'Could not load countries' });
   }
 });
 

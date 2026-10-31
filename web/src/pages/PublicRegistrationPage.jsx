@@ -14,7 +14,7 @@ import { loadPublicOrgLogoUrl } from '../lib/orgBranding.js';
 import { MobileNumberField } from '../components/contacts/MobileNumberField.jsx';
 import { CityCountryField } from '../components/contacts/CityCountryField.jsx';
 import { normalizeMobileToE164, isMobileValid } from '../lib/phone.js';
-import { citiesForCountry } from '../lib/locations.js';
+import { citiesForCountry, applyCountries } from '../lib/locations.js';
 
 const EMPTY = {
   full_name: '',
@@ -53,7 +53,9 @@ export function PublicRegistrationPage() {
       loadPublicOrgLogoUrl(),
       registrationsApi.cities().catch(() => []),
       registrationsApi.categories().catch(() => []),
-    ]).then(([logo, cities, categories]) => {
+      registrationsApi.countries().catch(() => []),
+    ]).then(([logo, cities, categories, countries]) => {
+      if (Array.isArray(countries) && countries.length) applyCountries(countries);
       setLogoUrl(logo);
       setCityOptions(Array.isArray(cities) ? cities : []);
       setCategoryOptions(Array.isArray(categories) ? categories : []);
@@ -73,6 +75,12 @@ export function PublicRegistrationPage() {
       }
       return next;
     });
+    if (field === 'full_name' || field === 'primary_category_id') {
+      setFieldErrors((prev) => ({ ...prev, [field]: null }));
+    }
+    if (field === 'barter_preference' || field === 'paid_preference') {
+      setFieldErrors((prev) => ({ ...prev, preference: null }));
+    }
     if (field === 'mobile_number' || field === 'email' || field === 'country_code') {
       setFieldErrors((prev) => ({ ...prev, [field]: null, mobile_number: null }));
     }
@@ -93,10 +101,7 @@ export function PublicRegistrationPage() {
     const instagram = form.instagram_link.trim();
     const youtube = form.youtube_link.trim();
 
-    if (!fullName) {
-      setError('Full name is required.');
-      return;
-    }
+    if (!fullName) nextFieldErrors.full_name = 'Full name is required.';
 
     if (!mobileRaw) {
       nextFieldErrors.mobile_number = 'Mobile number is required.';
@@ -120,6 +125,14 @@ export function PublicRegistrationPage() {
       nextFieldErrors.email = 'Enter a valid email address.';
     }
 
+    if (!form.primary_category_id) {
+      nextFieldErrors.primary_category_id = 'Primary category is required.';
+    }
+
+    if (!hasCollaborationPreference(form.paid_preference, form.barter_preference)) {
+      nextFieldErrors.preference = COLLABORATION_PREFERENCE_ERROR;
+    }
+
     if (Object.values(nextFieldErrors).some(Boolean)) {
       setFieldErrors(nextFieldErrors);
       setError(null);
@@ -127,15 +140,6 @@ export function PublicRegistrationPage() {
     }
 
     setFieldErrors({});
-    if (!form.primary_category_id) {
-      setError('Pick a primary category.');
-      return;
-    }
-
-    if (!hasCollaborationPreference(form.paid_preference, form.barter_preference)) {
-      setError(COLLABORATION_PREFERENCE_ERROR);
-      return;
-    }
 
     setSubmitting(true);
     setError(null);
@@ -217,9 +221,15 @@ export function PublicRegistrationPage() {
           </div>
         )}
 
-        <form onSubmit={submit} className="campaign-glass-tile space-y-5 p-6 sm:rounded-2xl sm:p-8">
+        <form onSubmit={submit} noValidate className="campaign-glass-tile space-y-5 p-6 sm:rounded-2xl sm:p-8">
           <Field label="Full name *">
-            <input className="input-field" value={form.full_name} onChange={set('full_name')} placeholder="Your name" />
+            <input
+              className={`input-field ${errCls(fieldErrors.full_name)}`}
+              value={form.full_name}
+              onChange={set('full_name')}
+              placeholder="Your name"
+            />
+            {errText(fieldErrors.full_name)}
           </Field>
 
           <Field label="Mobile *">
@@ -227,47 +237,53 @@ export function PublicRegistrationPage() {
               countryCode={form.country_code}
               nationalNumber={form.mobile_number}
               onCountryChange={(code) => set('country_code')({ target: { value: code } })}
-              onNumberChange={(value) => setForm((f) => ({ ...f, mobile_number: value }))}
+              onNumberChange={(value) => {
+                setForm((f) => ({ ...f, mobile_number: value }));
+                setFieldErrors((prev) => ({ ...prev, mobile_number: null }));
+              }}
+              error={fieldErrors.mobile_number}
             />
-            {fieldErrors.mobile_number && (
-              <p className="mt-1 text-2xs text-red-700">{fieldErrors.mobile_number}</p>
-            )}
           </Field>
 
           <Field label="Email">
-            <input className="input-field" type="email" value={form.email} onChange={set('email')} placeholder="you@example.com" />
-            {fieldErrors.email && (
-              <p className="mt-1 text-2xs text-red-700">{fieldErrors.email}</p>
-            )}
+            <input
+              className={`input-field ${errCls(fieldErrors.email)}`}
+              type="email"
+              value={form.email}
+              onChange={set('email')}
+              placeholder="you@example.com"
+            />
+            {errText(fieldErrors.email)}
           </Field>
 
-          <Field label="Country & city *">
-            <CityCountryField
-              countryCode={form.country_code}
-              city={form.city}
-              cities={cityOptions}
-              required
-              onCountryChange={(code) => set('country_code')({ target: { value: code } })}
-              onCityChange={(value) => setForm((f) => ({ ...f, city: value }))}
-            />
-            {(fieldErrors.city || fieldErrors.country_code) && (
-              <p className="mt-1 text-2xs text-red-700">
-                {fieldErrors.city ?? fieldErrors.country_code}
-              </p>
-            )}
+          <Field label="City *">
+            <div className={fieldErrors.city ? 'rounded-lg ring-1 ring-red-500' : ''}>
+              <CityCountryField
+                countryCode={form.country_code}
+                city={form.city}
+                cities={cityOptions}
+                hideCountry
+                onCountryChange={(code) => set('country_code')({ target: { value: code } })}
+                onCityChange={(value) => {
+                  setForm((f) => ({ ...f, city: value }));
+                  setFieldErrors((prev) => ({ ...prev, city: null }));
+                }}
+              />
+            </div>
+            {errText(fieldErrors.city)}
           </Field>
 
           <div className="space-y-3">
             <span className="block text-2xs font-medium text-ink-secondary">Profile links *</span>
             <input
-              className="input-field"
+              className={`input-field ${errCls(fieldErrors.profile_link)}`}
               type="url"
               value={form.instagram_link}
               onChange={set('instagram_link')}
               placeholder="Instagram — https://instagram.com/…"
             />
             <input
-              className="input-field"
+              className={`input-field ${errCls(fieldErrors.profile_link)}`}
               type="url"
               value={form.youtube_link}
               onChange={set('youtube_link')}
@@ -284,7 +300,7 @@ export function PublicRegistrationPage() {
 
           <Field label="Primary category *">
             <select
-              className="input-field"
+              className={`input-field ${errCls(fieldErrors.primary_category_id)}`}
               value={form.primary_category_id}
               onChange={set('primary_category_id')}
             >
@@ -293,6 +309,7 @@ export function PublicRegistrationPage() {
                 <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </select>
+            {errText(fieldErrors.primary_category_id)}
           </Field>
 
           <CollaborationPreferences
@@ -301,6 +318,7 @@ export function PublicRegistrationPage() {
             onBarterChange={set('barter_preference')}
             onEnablePaid={() => setForm((f) => formWithPaidPreference(f, true))}
             onPaidChange={set('paid_preference')}
+            showError={Boolean(fieldErrors.preference)}
           />
 
           {showIndicativeRates(form.paid_preference) && (
@@ -342,11 +360,12 @@ function CollaborationPreferences({
   onBarterChange,
   onEnablePaid,
   onPaidChange,
+  showError,
 }) {
-  const missingPreference = !hasCollaborationPreference(paidPreference, barterPreference);
+  const missingPreference = showError && !hasCollaborationPreference(paidPreference, barterPreference);
 
   return (
-    <div className="campaign-glass-lane space-y-3 p-4">
+    <div className={`campaign-glass-lane space-y-3 p-4 ${missingPreference ? 'ring-1 ring-red-500' : ''}`}>
       <p className="text-2xs font-medium text-ink-secondary">Collaboration preferences *</p>
 
       <label className="flex items-center gap-2 text-sm font-medium text-ink">
@@ -416,6 +435,9 @@ function SignupAuroraBackground() {
     </div>
   );
 }
+
+const errCls = (msg) => (msg ? 'input-error' : '');
+const errText = (msg) => (msg ? <p className="mt-1 text-2xs text-red-700">{msg}</p> : null);
 
 function Field({ label, children }) {
   return (

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DataTable, ListPagination } from '../ui/DataKit.jsx';
 import { Drawer, Toast } from '../ui/Primitives.jsx';
 import { AddContactDrawer } from '../contacts/AddContactDrawer.jsx';
+import { SystemLabelPills } from '../contacts/SystemLabelPills.jsx';
+import { Pill } from '../../lib/format.jsx';
 import { ContactFilters } from '../contacts/ContactFilters.jsx';
 import { campaignsApi, lookupApi } from '../../lib/api.js';
 import { fetchPopulationContacts } from '../../lib/persistence.js';
@@ -35,6 +37,21 @@ function InstagramHandle({ contact }) {
  * Campaign discovery drawer — find active, addable creators and batch-add them
  * via the same populate endpoint as contacts-page batch "Add to campaign".
  */
+/** The creator's own tags (system labels are shown separately): first three, then +N. */
+function CreatorTagPills({ row }) {
+  const system = new Set(row.system_labels ?? []);
+  const own = (row.tags ?? []).filter((t) => !system.has(t));
+  if (own.length === 0) return null;
+  return (
+    <span className="mt-1 flex flex-wrap items-center gap-1">
+      {own.slice(0, 3).map((t) => <Pill key={t} tone="default">{t}</Pill>)}
+      {own.length > 3 && (
+        <span className="text-2xs text-ink-tertiary" title={own.slice(3).join(', ')}>+{own.length - 3}</span>
+      )}
+    </span>
+  );
+}
+
 export function AddCreatorsDrawer({
   open,
   onClose,
@@ -255,9 +272,13 @@ export function AddCreatorsDrawer({
                     label: 'Name',
                     render: (r, { disabled }) => (
                       <div>
-                        <span className={disabled ? 'text-ink-tertiary' : 'font-medium text-ink'}>
-                          {r.full_name}
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          <span className={disabled ? 'text-ink-tertiary' : 'font-medium text-ink'}>
+                            {r.full_name}
+                          </span>
+                          <SystemLabelPills labels={r.system_labels} />
                         </span>
+                        <CreatorTagPills row={r} />
                         {disabled && (
                           <span className="mt-0.5 block text-2xs text-ink-tertiary">Already on campaign</span>
                         )}

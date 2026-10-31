@@ -9,6 +9,7 @@ export function CityCountryField({
   onCityChange,
   required = false,
   readValue,
+  hideCountry = false,
 }) {
   if (readValue != null) {
     const label = [city, countryLabel(countryCode)].filter(Boolean).join(', ');
@@ -18,16 +19,18 @@ export function CityCountryField({
   const options = citiesForCountry(cities, countryCode);
 
   return (
-    <div className="grid gap-2 sm:grid-cols-2">
-      <select
-        className="input-field"
-        value={countryCode}
-        onChange={(e) => onCountryChange(e.target.value)}
-      >
-        {SUPPORTED_COUNTRIES.map((country) => (
-          <option key={country.code} value={country.code}>{country.label}</option>
-        ))}
-      </select>
+    <div className={hideCountry ? '' : 'grid gap-2 sm:grid-cols-2'}>
+      {!hideCountry && (
+        <select
+          className="input-field"
+          value={countryCode}
+          onChange={(e) => onCountryChange(e.target.value)}
+        >
+          {SUPPORTED_COUNTRIES.map((country) => (
+            <option key={country.code} value={country.code}>{country.label}</option>
+          ))}
+        </select>
+      )}
       <select
         className="input-field"
         value={city}

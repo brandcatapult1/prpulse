@@ -74,6 +74,8 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
   function updateField(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
     if (key === 'mobile_number' || key === 'mobile_country_code') setDuplicate(null);
+    // The city list follows the country picked in the mobile field.
+    if (key === 'mobile_country_code') updateCountry(value);
   }
 
   function updateCountry(countryCode) {
@@ -217,9 +219,10 @@ export function AddContactDrawer({ open, onClose, onSaved }) {
             City
             <div className="mt-1">
               <CityCountryField
-                countryCode={form.country}
+                countryCode={form.mobile_country_code}
                 city={form.city}
                 cities={cityOptions}
+                hideCountry
                 onCountryChange={updateCountry}
                 onCityChange={(value) => updateField('city', value)}
               />

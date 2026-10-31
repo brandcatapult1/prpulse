@@ -183,10 +183,10 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
         tabIndex={0}
         onClick={() => onOpenEngagement(row.id)}
         onKeyDown={(e) => { if (e.key === 'Enter') onOpenEngagement(row.id); }}
-        className="cursor-pointer overflow-x-auto px-2 py-3 hover:bg-zinc-50"
+        className="cursor-pointer px-2 py-3 hover:bg-zinc-50"
         title="Open engagement"
       >
-        <div className="flex min-w-max items-center gap-7 text-left">
+        <div className="flex flex-wrap items-center gap-x-7 gap-y-3 text-left">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}

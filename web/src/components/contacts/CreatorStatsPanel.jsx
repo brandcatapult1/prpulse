@@ -160,6 +160,16 @@ function Field({ label, children }) {
   );
 }
 
+/** A header column: small label above, value below. */
+function Col({ label, children, className = '' }) {
+  return (
+    <div className={`shrink-0 ${className}`}>
+      <div className="text-[10px] font-medium uppercase tracking-wider text-ink-tertiary">{label}</div>
+      <div className="mt-0.5 text-2xs font-semibold tabular-nums text-ink">{children}</div>
+    </div>
+  );
+}
+
 /** One collaboration: click to open its details and deliverable metrics. */
 function CollaborationAccordion({ row, stats, deliverables, reach, classification, followers, onOpenEngagement, onRefresh, refreshing }) {
   const [open, setOpen] = useState(false);
@@ -173,39 +183,36 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
         tabIndex={0}
         onClick={() => onOpenEngagement(row.id)}
         onKeyDown={(e) => { if (e.key === 'Enter') onOpenEngagement(row.id); }}
-        className="flex w-full cursor-pointer flex-wrap items-center gap-x-6 gap-y-1 px-2 py-3 text-left hover:bg-zinc-50"
+        className="cursor-pointer overflow-x-auto px-2 py-3 hover:bg-zinc-50"
         title="Open engagement"
       >
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
-          aria-expanded={open}
-          aria-label={open ? 'Hide deliverables' : 'Show deliverables'}
-          className="flex h-8 w-8 items-center justify-center rounded-md text-ink-tertiary hover:bg-zinc-100 hover:text-ink"
-        >
-          <span className={`transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden>▸</span>
-        </button>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
-            <span className="min-w-[10rem] flex-1">
-              <span className="block text-sm font-medium text-ink">{row.campaign_name}</span>
-              <span className="block text-2xs text-ink-tertiary">{row.brand_name} · {formatDate(row.last_contact_date)}</span>
-            </span>
-            <Field label="Deliverables">{row.deliverables_completed}</Field>
-            {METRICS.map(([k, label]) => (
-              <Field key={k} label={label}>{k === 'reach' ? reachText : formatCount(stats?.[k])}</Field>
-            ))}
-          </div>
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-5 gap-y-1">
-            <Field label="Manager">{row.owner_name ?? '—'}</Field>
-            <Field label="Primary reason">{formatCollaborationReason(row.primary_collaboration_reason) ?? '—'}</Field>
-            <Field label="Fee">{formatFee(row.agreed_fee)}</Field>
-            <Field label="Rating">{row.avg_rating != null ? `★${row.avg_rating.toFixed(1)}` : '—'}</Field>
-            <Field label="Would work again">{row.would_work_again == null ? '—' : row.would_work_again ? 'Yes' : 'No'}</Field>
-            <button type="button" className="btn-secondary ml-auto" onClick={(e) => { e.stopPropagation(); onOpenEngagement(row.id); }}>
-              Open engagement →
-            </button>
-          </div>
+        <div className="flex min-w-max items-center gap-5 text-left">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+            aria-expanded={open}
+            aria-label={open ? 'Hide deliverables' : 'Show deliverables'}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-tertiary hover:bg-zinc-100 hover:text-ink"
+          >
+            <span className={`transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden>▸</span>
+          </button>
+          <Col label="Campaign" className="w-44">
+            <span className="block truncate text-sm font-medium text-ink">{row.campaign_name}</span>
+            <span className="block truncate text-2xs font-normal text-ink-tertiary">{row.brand_name}</span>
+          </Col>
+          <Col label="Date">{formatDate(row.last_contact_date)}</Col>
+          <Col label="Deliverables">{row.deliverables_completed}</Col>
+          {METRICS.map(([k, label]) => (
+            <Col key={k} label={label}>{k === 'reach' ? reachText : formatCount(stats?.[k])}</Col>
+          ))}
+          <Col label="Manager">{row.owner_name ?? '—'}</Col>
+          <Col label="Primary reason">{formatCollaborationReason(row.primary_collaboration_reason) ?? '—'}</Col>
+          <Col label="Fee">{formatFee(row.agreed_fee)}</Col>
+          <Col label="Rating">{row.avg_rating != null ? `★${row.avg_rating.toFixed(1)}` : '—'}</Col>
+          <Col label="Would work again">{row.would_work_again == null ? '—' : row.would_work_again ? 'Yes' : 'No'}</Col>
+          <button type="button" className="btn-secondary ml-auto shrink-0" onClick={(e) => { e.stopPropagation(); onOpenEngagement(row.id); }}>
+            Open engagement →
+          </button>
         </div>
       </div>
       {open && (

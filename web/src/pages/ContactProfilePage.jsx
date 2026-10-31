@@ -179,7 +179,7 @@ export function ContactProfilePage() {
   return (
     <div className="relative -mx-4 min-h-[calc(100vh-8rem)] px-4 pb-6">
       <ContactAuroraBackground />
-      <div className="relative z-10 mx-auto max-w-4xl space-y-4">
+      <div className={`relative z-10 mx-auto space-y-4 ${activeTab === 'Collaboration History' ? 'max-w-7xl' : 'max-w-4xl'}`}>
       <PageHeader
         title={contact.full_name}
         subtitle={`${MODULES.contactProfile.pageTitle} · ${MODULES.contactProfile.subtitle}`}

@@ -186,15 +186,26 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
         className="cursor-pointer px-2 py-3 hover:bg-zinc-50"
         title="Open engagement"
       >
-        <div className="flex flex-wrap items-center gap-x-7 gap-y-3 text-left lg:grid lg:grid-cols-[32px_minmax(150px,1.8fr)_repeat(11,minmax(0,1fr))] lg:gap-x-4">
+        <div className="flex flex-wrap items-center gap-x-7 gap-y-3 text-left lg:grid lg:grid-cols-[36px_minmax(150px,1.8fr)_repeat(11,minmax(0,1fr))] lg:gap-x-4">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
             aria-expanded={open}
             aria-label={open ? 'Hide deliverables' : 'Show deliverables'}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand text-white hover:bg-brand/90"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-white shadow-md ring-2 ring-brand/30 hover:bg-brand/90"
           >
-            <span className={`transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden>▸</span>
+            <svg
+              className={`h-5 w-5 transition-transform ${open ? 'rotate-90' : ''}`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M9 5l7 7-7 7" />
+            </svg>
           </button>
           <Col className="w-44 lg:w-auto">
             <span className="block truncate text-sm font-medium text-ink">{row.campaign_name}</span>

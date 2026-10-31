@@ -42,10 +42,11 @@ function CreatorTagPills({ row }) {
   const [expanded, setExpanded] = useState(false);
   const system = new Set(row.system_labels ?? []);
   const own = (row.tags ?? []).filter((t) => !system.has(t));
-  if (own.length === 0) return null;
+  if (own.length === 0 && system.size === 0) return null;
   const shown = expanded ? own : own.slice(0, 3);
   return (
     <span className="mt-1 flex flex-wrap items-center gap-1">
+      <SystemLabelPills labels={row.system_labels} />
       {shown.map((t) => <Pill key={t} tone="default">{t}</Pill>)}
       {own.length > 3 && (
         <button
@@ -281,11 +282,8 @@ export function AddCreatorsDrawer({
                     label: 'Name',
                     render: (r, { disabled }) => (
                       <div>
-                        <span className="flex flex-wrap items-center gap-1.5">
-                          <span className={disabled ? 'text-ink-tertiary' : 'font-medium text-ink'}>
-                            {r.full_name}
-                          </span>
-                          <SystemLabelPills labels={r.system_labels} />
+                        <span className={disabled ? 'block text-ink-tertiary' : 'block font-medium text-ink'}>
+                          {r.full_name}
                         </span>
                         <CreatorTagPills row={r} />
                         {disabled && (

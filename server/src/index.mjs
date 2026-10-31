@@ -28,6 +28,7 @@ import { adminRouter } from './routes/admin.mjs';
 import { orgRouter } from './routes/org.mjs';
 import { reportsRouter } from './routes/reports.mjs';
 import { lookupRouter } from './routes/lookup.mjs';
+import { notificationsRouter } from './routes/notifications.mjs';
 import { tagsRouter } from './routes/tags.mjs';
 import { instagramRouter } from './routes/instagram.mjs';
 import { attachUser } from './middleware/auth.mjs';
@@ -78,6 +79,7 @@ app.use('/api/reports', reportsRouter);
 app.use('/api/tags', tagsRouter);
 app.use('/api/instagram', instagramRouter);
 app.use('/api/lookup', lookupRouter);
+app.use('/api/notifications', notificationsRouter);
 
 const webDist = path.join(rootDir, 'web/dist');
 app.use(express.static(webDist));

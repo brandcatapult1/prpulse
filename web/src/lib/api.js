@@ -214,6 +214,10 @@ export const registrationsApi = {
   update: (id, body) => api(`/registrations/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 };
 
+export const notificationsApi = {
+  unseen: () => api('/notifications'),
+};
+
 export const brandsApi = {
   list: () => api('/brands'),
   create: (body) => api('/brands', { method: 'POST', body: JSON.stringify(body) }),

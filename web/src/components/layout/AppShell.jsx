@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { SidebarBrand } from './SidebarBrand.jsx';
 import { NavSidebarContent } from './NavSidebarContent.jsx';
 import { MobileNavDrawer } from './MobileNavDrawer.jsx';
+import { NotificationToasts } from './NotificationToasts.jsx';
 import { useOrgLogo } from '../../hooks/useOrgLogo.js';
 
 function MenuIcon() {
@@ -83,6 +84,7 @@ export function AppShell({ onAddContact }) {
           <Outlet />
         </main>
       </div>
+      <NotificationToasts />
     </div>
   );
 }

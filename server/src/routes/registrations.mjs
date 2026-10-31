@@ -184,6 +184,7 @@ registrationsRouter.post('/', async (req, res) => {
         notes ?? null,
       ],
     );
+    await notify(pool, 'registration_new', `New signup: ${full_name.trim()} (${storedCity})`);
     res.status(201).json({ ...rows[0], primary_category_name: categoryRow.name });
   } catch (err) {
     console.warn('Registration submit failed:', err.message ?? err);

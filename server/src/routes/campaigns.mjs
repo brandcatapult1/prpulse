@@ -13,6 +13,7 @@ import {
   parseRequiredTargetCollaborations,
   parseTermMonths,
 } from '../lib/campaignValidation.mjs';
+import { notify } from '../lib/notifications.mjs';
 import { ensureCampaignCycles } from '../lib/campaignCycles.mjs';
 
 export const campaignsRouter = Router();
@@ -169,6 +170,11 @@ campaignsRouter.post('/', requireAuth, requireStaffRole, async (req, res) => {
       return loadCampaignDetail(client, rows[0].id);
     });
 
+    const who = req.user.full_name ?? 'Someone';
+    await notify(pool, 'campaign_created', `${who} created campaign "${row.campaign_name}"`, req.user.id);
+    if (row.status === 'completed') {
+      await notify(pool, 'campaign_completed', `Campaign "${row.campaign_name}" was marked completed by ${who}`, req.user.id);
+    }
     res.status(201).json(row);
   } catch (err) {
     res.status(err.status ?? 503).json({ error: err.message ?? 'Could not create campaign' });
@@ -189,9 +195,18 @@ campaignsRouter.get('/:id', requireAuth, async (req, res) => {
 
 campaignsRouter.patch('/:id', requireAuth, requireCampaignWriteAccess('id'), async (req, res) => {
   try {
+    const { rows: [before] } = await pool.query('SELECT status FROM campaigns WHERE id = $1', [req.params.id]);
     const campaign = await withUserTransaction(req.user.id, async (client) =>
       applyCampaignPatch(client, req.params.id, req.body, req.user),
     );
+    if (campaign?.status === 'completed' && before?.status !== 'completed') {
+      await notify(
+        pool,
+        'campaign_completed',
+        `Campaign "${campaign.campaign_name}" was marked completed by ${req.user.full_name ?? 'someone'}`,
+        req.user.id,
+      );
+    }
     res.json(campaign);
   } catch (err) {
     res.status(err.status ?? 503).json({ error: err.message ?? 'Update failed' });
@@ -230,6 +245,19 @@ campaignsRouter.post('/:id/populate', requireAuth, requireCampaignWriteAccess('i
 
   const createdIds = new Set(created.map((row) => String(row.contact_id)));
   const skipped = contact_ids.filter((id) => !createdIds.has(String(id)));
+
+  if (created.length > 0) {
+    const { rows: [cam] } = await pool.query('SELECT campaign_name FROM campaigns WHERE id = $1', [req.params.id]);
+    const { rows: names } = await pool.query(
+      'SELECT full_name FROM contacts WHERE id = ANY($1::uuid[]) ORDER BY full_name',
+      [created.map((r) => r.contact_id)],
+    );
+    const who = req.user.full_name ?? 'Someone';
+    const list = names.length <= 2
+      ? names.map((n) => n.full_name).join(' and ')
+      : `${names[0].full_name} and ${names.length - 1} more creators`;
+    await notify(pool, 'creator_added', `${who} added ${list} to "${cam?.campaign_name ?? 'a campaign'}"`, req.user.id);
+  }
 
   res.status(201).json({ created, skipped });
 });

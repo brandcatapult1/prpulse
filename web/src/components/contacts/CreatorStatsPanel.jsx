@@ -192,7 +192,7 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
             onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
             aria-expanded={open}
             aria-label={open ? 'Hide deliverables' : 'Show deliverables'}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-tertiary hover:bg-zinc-100 hover:text-ink"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-brand text-white hover:bg-brand/90"
           >
             <span className={`transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden>▸</span>
           </button>

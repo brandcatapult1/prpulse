@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth.mjs';
 import { requireSeniorOrAdmin } from '../middleware/permissions.mjs';
 import { normalizeMobileToE164 } from '../lib/mobileNumber.mjs';
 import { createContactDeduped } from '../lib/contactCreate.mjs';
+import { syncContactSocial } from '../lib/socialSync.mjs';
 import { assertValidCity, loadCities, loadCountries } from '../lib/cities.mjs';
 import { assertValidCategoryId, loadCategories } from '../lib/categories.mjs';
 import { collaborationPreferenceError } from '../lib/collaborationPrefs.mjs';
@@ -305,6 +306,14 @@ registrationsRouter.patch('/:id', requireAuth, requireSeniorOrAdmin, async (req,
     });
 
     if (!row) return res.status(404).json({ error: 'Registration not found' });
+
+    // Approved signups get followers, engagement rate and avg views like a newly added contact.
+    if (status === 'approved' && row.linked_contact_id) {
+      const run = syncContactSocial(pool, row.linked_contact_id, { minIntervalMs: 5 * 60_000 }).catch((err) => {
+        console.warn('Instagram sync after approval failed:', err.message);
+      });
+      await Promise.race([run, new Promise((resolve) => setTimeout(resolve, 10000))]);
+    }
     res.json(row);
   } catch (err) {
     const httpStatus = err.status ?? 503;

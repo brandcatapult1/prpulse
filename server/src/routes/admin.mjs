@@ -302,8 +302,11 @@ adminRouter.delete('/countries/:code', async (req, res) => {
     const { rows: [used] } = await pool.query(
       'SELECT count(*)::int AS n FROM contacts WHERE country = $1', [req.params.code],
     );
-    if (used.n > 0) {
-      return res.status(409).json({ error: `${used.n} contact(s) use this country, so it can't be removed` });
+    if (used.n > 0 && req.query.force !== 'true') {
+      return res.status(409).json({
+        error: `${used.n} contact(s) use this country`,
+        contacts_using: used.n,
+      });
     }
     await pool.query('DELETE FROM cities WHERE country = $1', [req.params.code]);
     const { rowCount } = await pool.query('DELETE FROM countries WHERE code = $1', [req.params.code]);

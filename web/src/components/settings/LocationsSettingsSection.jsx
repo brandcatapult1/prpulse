@@ -151,14 +151,28 @@ export function LocationsSettingsSection() {
   }
 
   async function removeCountry(country) {
-    if (!window.confirm(`Remove ${country.label} and its cities?`)) return;
+    if (!window.confirm(`Remove ${country.label} and all its cities?`)) return;
     try {
       await adminApi.deleteCountry(country.code);
-      setToast(`${country.label} removed`);
-      await load();
     } catch (err) {
-      setToast(err.message ?? 'Could not remove country');
+      const inUse = err.data?.contacts_using;
+      if (!inUse) {
+        setToast(err.message ?? 'Could not remove country');
+        return;
+      }
+      const sure = window.confirm(
+        `${inUse} contact(s) use ${country.label}. They keep their saved country and city, but those will no longer appear in the dropdowns. Remove anyway?`,
+      );
+      if (!sure) return;
+      try {
+        await adminApi.deleteCountry(country.code, true);
+      } catch (err2) {
+        setToast(err2.message ?? 'Could not remove country');
+        return;
+      }
     }
+    setToast(`${country.label} removed`);
+    await load();
   }
 
   async function addCity(country) {

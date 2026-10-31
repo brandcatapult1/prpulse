@@ -238,7 +238,7 @@ export const adminApi = {
     api('/admin/org-branding', { method: 'PATCH', body: JSON.stringify(body) }),
   createCountry: (body) => api('/admin/countries', { method: 'POST', body: JSON.stringify(body) }),
   updateCountry: (code, body) => api(`/admin/countries/${encodeURIComponent(code)}`, { method: 'PATCH', body: JSON.stringify(body) }),
-  deleteCountry: (code) => api(`/admin/countries/${encodeURIComponent(code)}`, { method: 'DELETE' }),
+  deleteCountry: (code, force = false) => api(`/admin/countries/${encodeURIComponent(code)}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
   createCity: (body) => api('/admin/cities', { method: 'POST', body: JSON.stringify(body) }),
   deleteCity: (id) => api(`/admin/cities/${id}`, { method: 'DELETE' }),
   seedDemo: (reset = false) =>

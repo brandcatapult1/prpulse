@@ -168,13 +168,23 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
     : formatCount(stats?.reach);
   return (
     <div className="panel overflow-hidden p-0">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className="flex w-full flex-wrap items-center gap-x-6 gap-y-1 px-4 py-3 text-left hover:bg-zinc-50"
+      <div
+        role="link"
+        tabIndex={0}
+        onClick={() => onOpenEngagement(row.id)}
+        onKeyDown={(e) => { if (e.key === 'Enter') onOpenEngagement(row.id); }}
+        className="flex w-full cursor-pointer flex-wrap items-center gap-x-6 gap-y-1 px-2 py-3 text-left hover:bg-zinc-50"
+        title="Open engagement"
       >
-        <span className={`text-ink-tertiary transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden>▸</span>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
+          aria-expanded={open}
+          aria-label={open ? 'Hide deliverables' : 'Show deliverables'}
+          className="flex h-8 w-8 items-center justify-center rounded-md text-ink-tertiary hover:bg-zinc-100 hover:text-ink"
+        >
+          <span className={`transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden>▸</span>
+        </button>
         <span className="min-w-[10rem] flex-1">
           <span className="block text-sm font-medium text-ink">{row.campaign_name}</span>
           <span className="block text-2xs text-ink-tertiary">{row.brand_name} · {formatDate(row.last_contact_date)}</span>
@@ -183,7 +193,7 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
         {METRICS.map(([k, label]) => (
           <Field key={k} label={label}>{k === 'reach' ? reachText : formatCount(stats?.[k])}</Field>
         ))}
-      </button>
+      </div>
       {open && (
         <div className="border-t border-line">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-1 px-4 py-3">
@@ -192,9 +202,6 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
             <Field label="Fee">{formatFee(row.agreed_fee)}</Field>
             <Field label="Rating">{row.avg_rating != null ? `★${row.avg_rating.toFixed(1)}` : '—'}</Field>
             <Field label="Would work again">{row.would_work_again == null ? '—' : row.would_work_again ? 'Yes' : 'No'}</Field>
-            <button type="button" className="btn-secondary ml-auto" onClick={() => onOpenEngagement(row.id)}>
-              Open engagement →
-            </button>
           </div>
           <div className="border-t border-line/60">
             <DeliverableStatsTable deliverables={deliverables} classification={classification} followers={followers} />

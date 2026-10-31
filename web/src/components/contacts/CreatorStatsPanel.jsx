@@ -185,25 +185,29 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
         >
           <span className={`transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden>▸</span>
         </button>
-        <span className="min-w-[10rem] flex-1">
-          <span className="block text-sm font-medium text-ink">{row.campaign_name}</span>
-          <span className="block text-2xs text-ink-tertiary">{row.brand_name} · {formatDate(row.last_contact_date)}</span>
-        </span>
-        <Field label="Deliverables">{row.deliverables_completed}</Field>
-        {METRICS.map(([k, label]) => (
-          <Field key={k} label={label}>{k === 'reach' ? reachText : formatCount(stats?.[k])}</Field>
-        ))}
-      </div>
-      {open && (
-        <div className="border-t border-line">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+            <span className="min-w-[10rem] flex-1">
+              <span className="block text-sm font-medium text-ink">{row.campaign_name}</span>
+              <span className="block text-2xs text-ink-tertiary">{row.brand_name} · {formatDate(row.last_contact_date)}</span>
+            </span>
+            <Field label="Deliverables">{row.deliverables_completed}</Field>
+            {METRICS.map(([k, label]) => (
+              <Field key={k} label={label}>{k === 'reach' ? reachText : formatCount(stats?.[k])}</Field>
+            ))}
+          </div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-5 gap-y-1">
             <Field label="Manager">{row.owner_name ?? '—'}</Field>
             <Field label="Primary reason">{formatCollaborationReason(row.primary_collaboration_reason) ?? '—'}</Field>
             <Field label="Fee">{formatFee(row.agreed_fee)}</Field>
             <Field label="Rating">{row.avg_rating != null ? `★${row.avg_rating.toFixed(1)}` : '—'}</Field>
             <Field label="Would work again">{row.would_work_again == null ? '—' : row.would_work_again ? 'Yes' : 'No'}</Field>
           </div>
-          <div className="border-t border-line/60">
+        </div>
+      </div>
+      {open && (
+        <div className="border-t border-line">
+          <div>
             <DeliverableStatsTable deliverables={deliverables} classification={classification} followers={followers} />
           </div>
         </div>

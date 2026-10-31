@@ -16,10 +16,10 @@ export function normalizeMobileToE164(raw, defaultCountry = DEFAULT_MOBILE_COUNT
 }
 
 /** ISO country from a stored E.164 mobile — used when bulk import omits country. */
-export function countryFromE164(e164, defaultCountry = DEFAULT_MOBILE_COUNTRY) {
+export function countryFromE164(e164, defaultCountry = DEFAULT_MOBILE_COUNTRY, knownCodes = ['IN', 'AE', 'US', 'GB']) {
   const parsed = parsePhoneNumberFromString(String(e164 ?? '').trim());
   const code = parsed?.country;
-  if (code === 'IN' || code === 'AE' || code === 'US' || code === 'GB') return code;
+  if (code && knownCodes.includes(code)) return code;
   return defaultCountry;
 }
 

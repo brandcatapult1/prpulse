@@ -1,5 +1,10 @@
-/** Supported location / phone countries — single source for server validation. */
-export const SUPPORTED_COUNTRY_CODES = ['IN', 'AE', 'US', 'GB'];
+/** Countries are admin-managed in the `countries` table (seeded with IN, AE, US, GB). */
+export async function loadCountries(client) {
+  const { rows } = await client.query(
+    `SELECT code, label, dial_code FROM countries ORDER BY sort_order, label`,
+  );
+  return rows;
+}
 
 export const DEFAULT_CITIES = [
   // India
@@ -44,7 +49,7 @@ export async function ensureCities(client) {
 
 export async function loadCities(client, { country } = {}) {
   await ensureCities(client);
-  if (country && SUPPORTED_COUNTRY_CODES.includes(country)) {
+  if (country) {
     const { rows } = await client.query(
       `SELECT id, name, country, created_at FROM cities WHERE country = $1 ORDER BY name`,
       [country],
@@ -57,11 +62,12 @@ export async function loadCities(client, { country } = {}) {
   return rows;
 }
 
-export function assertSupportedCountry(code) {
-  if (!code || !SUPPORTED_COUNTRY_CODES.includes(code)) {
-    throw Object.assign(new Error('Invalid country'), { status: 400 });
+export async function assertSupportedCountry(client, code) {
+  if (code) {
+    const { rows } = await client.query('SELECT 1 FROM countries WHERE code = $1', [code]);
+    if (rows[0]) return code;
   }
-  return code;
+  throw Object.assign(new Error('Invalid country'), { status: 400 });
 }
 
 /**
@@ -72,7 +78,7 @@ export async function ensureCityRegistered(client, cityName, countryCode) {
   const name = String(cityName ?? '').trim();
   if (!name) return null;
 
-  const country = assertSupportedCountry(countryCode);
+  const country = await assertSupportedCountry(client, countryCode);
   await ensureCities(client);
 
   const { rows: existing } = await client.query(
@@ -95,7 +101,7 @@ export async function assertValidCity(client, cityName, countryCode) {
   const name = String(cityName ?? '').trim();
   if (!name) return null;
 
-  const country = assertSupportedCountry(countryCode);
+  const country = await assertSupportedCountry(client, countryCode);
   await ensureCities(client);
 
   const { rows } = await client.query(

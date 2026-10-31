@@ -1,11 +1,41 @@
 /** Shared country + city constants — used by public signup and all internal contact forms. */
 
+/** Starts with the built-ins; replaced in place by the admin-managed list once it loads (see applyCountries). */
 export const SUPPORTED_COUNTRIES = [
   { code: 'IN', dialCode: '+91', label: 'India' },
   { code: 'AE', dialCode: '+971', label: 'UAE' },
   { code: 'US', dialCode: '+1', label: 'USA' },
   { code: 'GB', dialCode: '+44', label: 'UK' },
 ];
+
+/** Replace the country list in place so every importer sees the admin-managed countries. */
+export function applyCountries(list) {
+  if (!Array.isArray(list) || list.length === 0) return;
+  SUPPORTED_COUNTRIES.splice(0, SUPPORTED_COUNTRIES.length, ...list.map((c) => ({
+    code: c.code,
+    dialCode: c.dial_code ?? c.dialCode,
+    label: c.label,
+  })));
+}
+
+/** Country names of the world (for the add-country form), each with its ISO code. */
+export function worldCountryOptions() {
+  let names;
+  try {
+    names = new Intl.DisplayNames(['en'], { type: 'region' });
+  } catch {
+    return [];
+  }
+  const out = [];
+  for (let a = 65; a <= 90; a += 1) {
+    for (let b = 65; b <= 90; b += 1) {
+      const code = String.fromCharCode(a, b);
+      const label = names.of(code);
+      if (label && label !== code) out.push({ code, label });
+    }
+  }
+  return out.sort((x, y) => x.label.localeCompare(y.label));
+}
 
 export function countryLabel(code) {
   return SUPPORTED_COUNTRIES.find((c) => c.code === code)?.label ?? code ?? '—';

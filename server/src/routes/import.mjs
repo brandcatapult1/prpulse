@@ -4,7 +4,7 @@ import { requireAuth } from '../middleware/auth.mjs';
 import { requireSeniorOrAdmin } from '../middleware/permissions.mjs';
 import { findContactByMobile, normalizeMobileToE164, countryFromE164 } from '../lib/mobileNumber.mjs';
 import { assertValidCategoryId } from '../lib/categories.mjs';
-import { ensureCityRegistered } from '../lib/cities.mjs';
+import { ensureCityRegistered, loadCountries } from '../lib/cities.mjs';
 
 export const importRouter = Router();
 
@@ -21,6 +21,7 @@ importRouter.post('/contacts', requireAuth, requireImportRole, async (req, res) 
   try {
     const created = await withUserTransaction(req.user.id, async (client) => {
       const results = [];
+      const knownCodes = (await loadCountries(client)).map((c) => c.code);
       for (const row of rows) {
         const { full_name, mobile_number, city, instagram_url, email, primary_category_id } = row;
         if (!full_name?.trim() || !mobile_number?.trim()) continue;
@@ -39,7 +40,7 @@ importRouter.post('/contacts', requireAuth, requireImportRole, async (req, res) 
         }
 
         let cityValue = city?.trim() || null;
-        let countryValue = countryFromE164(e164);
+        let countryValue = countryFromE164(e164, undefined, knownCodes);
         if (cityValue) {
           const cityRow = await ensureCityRegistered(client, cityValue, countryValue);
           cityValue = cityRow.name;

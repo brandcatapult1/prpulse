@@ -15,6 +15,12 @@ export const SETTINGS_SECTIONS = [
     allowedRoles: ['admin', 'senior_manager'],
   },
   {
+    key: 'locations',
+    label: 'Countries & cities',
+    path: 'locations',
+    allowedRoles: ['admin'],
+  },
+  {
     key: 'users',
     label: 'Users & roles',
     path: 'users',

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { authApi } from '../lib/api.js';
+import { authApi, lookupApi } from '../lib/api.js';
+import { applyCountries } from '../lib/locations.js';
 
 const AuthContext = createContext(null);
 
@@ -32,6 +33,12 @@ export function AuthProvider({ children }) {
       await refresh();
     })();
   }, [refresh]);
+
+  // Admin-managed countries (with phone extensions) replace the built-in list for every form.
+  useEffect(() => {
+    if (!user) return;
+    lookupApi.countries().then(applyCountries).catch(() => {});
+  }, [user]);
 
   const logout = useCallback(async () => {
     if (devMode) {

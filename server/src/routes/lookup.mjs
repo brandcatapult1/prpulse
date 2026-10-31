@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
 import { ensureReferenceData } from '../lib/referenceData.mjs';
-import { loadCities } from '../lib/cities.mjs';
+import { loadCities, loadCountries } from '../lib/cities.mjs';
 import { loadCategories } from '../lib/categories.mjs';
 
 export const lookupRouter = Router();
@@ -41,5 +41,13 @@ lookupRouter.get('/cities', async (req, res) => {
     res.json(cities);
   } catch (err) {
     res.status(503).json({ error: err.message ?? 'Could not load cities' });
+  }
+});
+
+lookupRouter.get('/countries', async (_req, res) => {
+  try {
+    res.json(await loadCountries(pool));
+  } catch (err) {
+    res.status(503).json({ error: err.message ?? 'Could not load countries' });
   }
 });

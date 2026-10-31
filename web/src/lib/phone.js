@@ -22,7 +22,7 @@ export function normalizeMobileToE164(raw, defaultCountry = DEFAULT_MOBILE_COUNT
 export function countryFromE164(e164, defaultCountry = DEFAULT_MOBILE_COUNTRY) {
   const parsed = parsePhoneNumberFromString(String(e164 ?? '').trim());
   const code = parsed?.country;
-  if (code === 'IN' || code === 'AE' || code === 'US' || code === 'GB') return code;
+  if (code && SUPPORTED_COUNTRIES.some((c) => c.code === code)) return code;
   return defaultCountry;
 }
 

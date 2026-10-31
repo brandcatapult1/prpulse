@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db.mjs';
 import { requireAuth, requireRole } from '../middleware/auth.mjs';
 import { runDemoSeed } from '../../../scripts/seed-demo.mjs';
+import { getCountries, getCountryCallingCode } from 'libphonenumber-js';
 import { assertSupportedCountry } from '../lib/cities.mjs';
 import {
   assertValidUserEmail,
@@ -248,12 +249,55 @@ adminRouter.delete('/categories/:id', async (req, res) => {
   }
 });
 
+adminRouter.post('/countries', async (req, res) => {
+  const code = String(req.body?.code ?? '').trim().toUpperCase();
+  const label = String(req.body?.label ?? '').trim();
+  const dialDigits = String(req.body?.dial_code ?? '').replace(/\D/g, '');
+  if (!label) return res.status(400).json({ error: 'Country name is required' });
+  if (!dialDigits) return res.status(400).json({ error: 'Phone extension is required (for example +91)' });
+  if (!getCountries().includes(code)) {
+    return res.status(400).json({ error: 'Pick the country name from the suggestion list' });
+  }
+  if (String(getCountryCallingCode(code)) !== dialDigits) {
+    return res.status(400).json({ error: `The phone extension for ${label} is +${getCountryCallingCode(code)}` });
+  }
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO countries (code, label, dial_code, sort_order)
+       VALUES ($1, $2, $3, 100) ON CONFLICT (code) DO NOTHING
+       RETURNING code, label, dial_code`,
+      [code, label, `+${dialDigits}`],
+    );
+    if (!rows[0]) return res.status(409).json({ error: `${label} is already added` });
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    res.status(503).json({ error: err.message ?? 'Could not add country' });
+  }
+});
+
+adminRouter.delete('/countries/:code', async (req, res) => {
+  try {
+    const { rows: [used] } = await pool.query(
+      'SELECT count(*)::int AS n FROM contacts WHERE country = $1', [req.params.code],
+    );
+    if (used.n > 0) {
+      return res.status(409).json({ error: `${used.n} contact(s) use this country, so it can't be removed` });
+    }
+    await pool.query('DELETE FROM cities WHERE country = $1', [req.params.code]);
+    const { rowCount } = await pool.query('DELETE FROM countries WHERE code = $1', [req.params.code]);
+    if (rowCount === 0) return res.status(404).json({ error: 'Country not found' });
+    res.status(204).end();
+  } catch (err) {
+    res.status(503).json({ error: err.message ?? 'Could not remove country' });
+  }
+});
+
 adminRouter.post('/cities', async (req, res) => {
   const name = req.body?.name?.trim();
   const country = req.body?.country?.trim();
   if (!name) return res.status(400).json({ error: 'City name is required' });
   try {
-    assertSupportedCountry(country);
+    await assertSupportedCountry(pool, country);
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }

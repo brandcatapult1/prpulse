@@ -164,8 +164,8 @@ function Field({ label, children }) {
 function Col({ label, children, className = '' }) {
   return (
     <div className={`shrink-0 ${className}`}>
-      <div className="text-[10px] font-medium uppercase tracking-wider text-ink-tertiary">{label}</div>
-      <div className="mt-0.5 text-2xs font-semibold tabular-nums text-ink">{children}</div>
+      {label && <div className="text-[10px] font-medium uppercase tracking-wider text-ink-tertiary">{label}</div>}
+      <div className={`${label ? 'mt-0.5' : ''} text-2xs font-semibold tabular-nums text-ink`}>{children}</div>
     </div>
   );
 }
@@ -196,11 +196,9 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
           >
             <span className={`transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden>▸</span>
           </button>
-          <Col label="Campaign" className="w-40">
+          <Col className="w-44">
             <span className="block truncate text-sm font-medium text-ink">{row.campaign_name}</span>
-          </Col>
-          <Col label="Brand" className="w-24">
-            <span className="block truncate">{row.brand_name ?? '—'}</span>
+            <span className="block truncate text-2xs font-normal text-ink-tertiary">{row.brand_name}</span>
           </Col>
           <Col label="Date">{formatDate(row.last_contact_date)}</Col>
           <Col label="Deliverables">{row.deliverables_completed}</Col>

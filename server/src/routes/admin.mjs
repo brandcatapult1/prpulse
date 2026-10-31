@@ -275,6 +275,28 @@ adminRouter.post('/countries', async (req, res) => {
   }
 });
 
+adminRouter.patch('/countries/:code', async (req, res) => {
+  const code = String(req.params.code ?? '').toUpperCase();
+  const label = String(req.body?.label ?? '').trim();
+  const dialDigits = String(req.body?.dial_code ?? '').replace(/\D/g, '');
+  if (!label) return res.status(400).json({ error: 'Country name is required' });
+  if (!dialDigits) return res.status(400).json({ error: 'Phone extension is required (for example +91)' });
+  if (!getCountries().includes(code)) return res.status(404).json({ error: 'Country not found' });
+  if (String(getCountryCallingCode(code)) !== dialDigits) {
+    return res.status(400).json({ error: `The phone extension for ${label} is +${getCountryCallingCode(code)}` });
+  }
+  try {
+    const { rows } = await pool.query(
+      `UPDATE countries SET label = $2, dial_code = $3 WHERE code = $1 RETURNING code, label, dial_code`,
+      [code, label, `+${dialDigits}`],
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Country not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(503).json({ error: err.message ?? 'Could not update country' });
+  }
+});
+
 adminRouter.delete('/countries/:code', async (req, res) => {
   try {
     const { rows: [used] } = await pool.query(

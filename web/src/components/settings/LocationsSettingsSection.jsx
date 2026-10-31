@@ -3,6 +3,90 @@ import { Card, Toast } from '../ui/Primitives.jsx';
 import { adminApi, lookupApi } from '../../lib/api.js';
 import { applyCountries, worldCountryOptions } from '../../lib/locations.js';
 
+function CountryAccordion({ country, cities, draft, onDraft, onAddCity, onRemoveCity, onRemoveCountry, onSaveCountry }) {
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [label, setLabel] = useState(country.label);
+  const [dialCode, setDialCode] = useState(country.dial_code);
+
+  async function save() {
+    if (await onSaveCountry(country, label.trim(), dialCode.trim())) setEditing(false);
+  }
+
+  return (
+    <Card className="!p-0 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-zinc-50"
+      >
+        <span className={`text-ink-tertiary transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden>▸</span>
+        <span className="text-sm font-medium text-ink">{country.label}</span>
+        <span className="text-2xs text-ink-tertiary">{country.dial_code}</span>
+        <span className="ml-auto text-2xs text-ink-secondary">
+          {cities.length} {cities.length === 1 ? 'city' : 'cities'}
+        </span>
+      </button>
+      {open && (
+        <div className="space-y-3 border-t border-line px-4 py-3">
+          {editing ? (
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="w-28 text-2xs text-ink-secondary">
+                Phone extension
+                <input className="input-field mt-1" value={dialCode} onChange={(e) => setDialCode(e.target.value)} />
+              </label>
+              <label className="min-w-[10rem] flex-1 text-2xs text-ink-secondary">
+                Country name
+                <input className="input-field mt-1" value={label} onChange={(e) => setLabel(e.target.value)} />
+              </label>
+              <button type="button" className="btn-primary" onClick={save}>Save</button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => { setEditing(false); setLabel(country.label); setDialCode(country.dial_code); }}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <button type="button" className="btn-secondary" onClick={() => setEditing(true)}>Edit country</button>
+              <button type="button" className="btn-ghost !text-red-700" onClick={onRemoveCountry}>Remove country</button>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-1.5">
+            {cities.length === 0 && <span className="text-2xs text-ink-tertiary">No cities yet</span>}
+            {cities.map((c) => (
+              <span key={c.id} className="inline-flex items-center gap-1 rounded-full border border-line bg-white px-2.5 py-1 text-2xs text-ink">
+                {c.name}
+                <button
+                  type="button"
+                  aria-label={`Remove ${c.name}`}
+                  className="text-ink-tertiary hover:text-red-700"
+                  onClick={() => onRemoveCity(c)}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+          <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); onAddCity(); }}>
+            <input
+              className="input-field max-w-xs"
+              value={draft}
+              onChange={(e) => onDraft(e.target.value)}
+              placeholder={`Add a city in ${country.label}`}
+            />
+            <button type="submit" className="btn-secondary">Add city</button>
+          </form>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 /** Admin: add countries (name + phone extension) and the cities that belong to each. */
 export function LocationsSettingsSection() {
   const [countries, setCountries] = useState([]);
@@ -51,6 +135,18 @@ export function LocationsSettingsSection() {
       setToast(err.message ?? 'Could not add country');
     } finally {
       setAdding(false);
+    }
+  }
+
+  async function saveCountry(country, label, dialCode) {
+    try {
+      await adminApi.updateCountry(country.code, { label, dial_code: dialCode });
+      setToast(`${label} updated`);
+      await load();
+      return true;
+    } catch (err) {
+      setToast(err.message ?? 'Could not update country');
+      return false;
     }
   }
 
@@ -120,49 +216,19 @@ export function LocationsSettingsSection() {
         </form>
       </Card>
 
-      {countries.map((country) => {
-        const own = cities.filter((c) => c.country === country.code);
-        return (
-          <Card key={country.code} className="!p-4">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-medium text-ink">
-                {country.label} <span className="ml-1 text-2xs font-normal text-ink-tertiary">{country.dial_code}</span>
-              </h3>
-              <button type="button" className="btn-ghost !text-red-700" onClick={() => removeCountry(country)}>
-                Remove country
-              </button>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {own.length === 0 && <span className="text-2xs text-ink-tertiary">No cities yet</span>}
-              {own.map((c) => (
-                <span key={c.id} className="inline-flex items-center gap-1 rounded-full border border-line bg-white px-2.5 py-1 text-2xs text-ink">
-                  {c.name}
-                  <button
-                    type="button"
-                    aria-label={`Remove ${c.name}`}
-                    className="text-ink-tertiary hover:text-red-700"
-                    onClick={() => removeCity(c)}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-            <form
-              className="mt-3 flex gap-2"
-              onSubmit={(e) => { e.preventDefault(); addCity(country); }}
-            >
-              <input
-                className="input-field max-w-xs"
-                value={cityDrafts[country.code] ?? ''}
-                onChange={(e) => setCityDrafts((d) => ({ ...d, [country.code]: e.target.value }))}
-                placeholder={`Add a city in ${country.label}`}
-              />
-              <button type="submit" className="btn-secondary">Add city</button>
-            </form>
-          </Card>
-        );
-      })}
+      {countries.map((country) => (
+        <CountryAccordion
+          key={country.code}
+          country={country}
+          cities={cities.filter((c) => c.country === country.code)}
+          draft={cityDrafts[country.code] ?? ''}
+          onDraft={(v) => setCityDrafts((d) => ({ ...d, [country.code]: v }))}
+          onAddCity={() => addCity(country)}
+          onRemoveCity={removeCity}
+          onRemoveCountry={() => removeCountry(country)}
+          onSaveCountry={saveCountry}
+        />
+      ))}
 
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </div>

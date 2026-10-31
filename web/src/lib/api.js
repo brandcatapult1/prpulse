@@ -210,6 +210,7 @@ export const registrationsApi = {
   countries: () => api('/registrations/countries'),
   categories: () => api('/registrations/categories'),
   submit: (body) => api('/registrations', { method: 'POST', body: JSON.stringify(body) }),
+  instagramPreview: (id) => api(`/registrations/${id}/instagram-preview`),
   update: (id, body) => api(`/registrations/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
 };
 

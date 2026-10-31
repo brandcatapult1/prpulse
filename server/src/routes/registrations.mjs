@@ -4,7 +4,9 @@ import { requireAuth } from '../middleware/auth.mjs';
 import { requireSeniorOrAdmin } from '../middleware/permissions.mjs';
 import { normalizeMobileToE164 } from '../lib/mobileNumber.mjs';
 import { createContactDeduped } from '../lib/contactCreate.mjs';
-import { syncContactSocial } from '../lib/socialSync.mjs';
+import {
+  syncContactSocial, fetchInstagramProfile, instagramHandle, RATE_LIMIT_RE, RATE_LIMIT_MESSAGE,
+} from '../lib/socialSync.mjs';
 import { assertValidCity, loadCities, loadCountries } from '../lib/cities.mjs';
 import { assertValidCategoryId, loadCategories } from '../lib/categories.mjs';
 import { collaborationPreferenceError } from '../lib/collaborationPrefs.mjs';
@@ -202,6 +204,43 @@ registrationsRouter.get('/', requireAuth, async (_req, res) => {
   } catch (err) {
     console.warn('Registration list failed:', err.message ?? err);
     res.status(503).json({ error: 'Registration list unavailable' });
+  }
+});
+
+// Live follower / engagement / avg-views preview for the approval screen (cached to spare Instagram's API limit).
+const previewCache = new Map();
+const PREVIEW_TTL_MS = 15 * 60_000;
+
+registrationsRouter.get('/:id/instagram-preview', requireAuth, requireSeniorOrAdmin, async (req, res) => {
+  try {
+    const { rows: [sub] } = await pool.query(
+      'SELECT id, instagram_link FROM registration_submissions WHERE id = $1',
+      [req.params.id],
+    );
+    if (!sub) return res.status(404).json({ error: 'Registration not found' });
+    const handle = instagramHandle(sub.instagram_link);
+    if (!handle) return res.json({ available: false });
+
+    const hit = previewCache.get(sub.id);
+    if (hit && Date.now() - hit.at < PREVIEW_TTL_MS && hit.handle === handle) return res.json(hit.data);
+
+    try {
+      const p = await fetchInstagramProfile(handle);
+      const data = {
+        available: true,
+        handle,
+        followers: p.followers,
+        engagement_rate: p.engagement_rate,
+        avg_views: p.avg_views,
+      };
+      previewCache.set(sub.id, { at: Date.now(), handle, data });
+      res.json(data);
+    } catch (err) {
+      const message = RATE_LIMIT_RE.test(err.message) ? RATE_LIMIT_MESSAGE : err.message;
+      res.json({ available: true, handle, error: message });
+    }
+  } catch (err) {
+    res.status(503).json({ error: err.message ?? 'Could not load Instagram stats' });
   }
 });
 

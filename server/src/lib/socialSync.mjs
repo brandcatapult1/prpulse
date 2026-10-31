@@ -284,8 +284,8 @@ const STATS_ERROR = `
  * completed (posted) deliverable links on that platform. Never overwrites a metric
  * a person entered manually (reach/shares/reposts/saves are only filled when null).
  */
-const RATE_LIMIT_RE = /\(#4\)|\(#17\)|\(#32\)|\(#613\)|request limit|rate limit|too many calls/i;
-const RATE_LIMIT_MESSAGE = 'Instagram is rate-limiting our app right now. Please try again in about an hour.';
+export const RATE_LIMIT_RE = /\(#4\)|\(#17\)|\(#32\)|\(#613\)|request limit|rate limit|too many calls/i;
+export const RATE_LIMIT_MESSAGE = 'Instagram is rate-limiting our app right now. Please try again in about an hour.';
 
 export async function syncContactSocial(pool, contactId, { minIntervalMs = 0 } = {}) {
   const enabled = syncProviders();

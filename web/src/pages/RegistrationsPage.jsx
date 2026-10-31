@@ -264,8 +264,20 @@ function ReviewDrawer({ registration, contacts, onClose, onApprove, onReject, on
       .catch(() => setTagOptions([]));
   }, []);
 
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
   useEffect(() => {
     setTagIds([]);
+    setStats(null);
+    if (!registration?.id || !registration.instagram_link) return undefined;
+    let cancelled = false;
+    setStatsLoading(true);
+    registrationsApi.instagramPreview(registration.id)
+      .then((d) => { if (!cancelled) setStats(d); })
+      .catch((err) => { if (!cancelled) setStats({ error: err.message ?? 'Could not load Instagram stats' }); })
+      .finally(() => { if (!cancelled) setStatsLoading(false); });
+    return () => { cancelled = true; };
   }, [registration?.id]);
 
   if (!registration) return null;
@@ -322,6 +334,24 @@ function ReviewDrawer({ registration, contacts, onClose, onApprove, onReject, on
           ].filter(Boolean).join(' · ') || '—'}
         />
         <Detail label="Instagram" value={registration.instagram_link ?? '—'} link />
+        {registration.instagram_link && (
+          <div className="rounded-lg border border-line bg-surface-muted/40 px-3 py-3">
+            <dt className="text-2xs font-medium text-ink-tertiary">Instagram stats (live)</dt>
+            {statsLoading ? (
+              <dd className="mt-1 text-2xs text-ink-secondary">Fetching from Instagram…</dd>
+            ) : stats?.error ? (
+              <dd className="mt-1 text-2xs text-red-700">{stats.error}</dd>
+            ) : stats?.available ? (
+              <dd className="mt-1 grid grid-cols-3 gap-3">
+                <StatBit label="Followers" value={stats.followers != null ? stats.followers.toLocaleString('en-IN') : '—'} />
+                <StatBit label="Engagement rate" value={stats.engagement_rate != null ? `${stats.engagement_rate}%` : '—'} />
+                <StatBit label="Avg views" value={stats.avg_views != null ? stats.avg_views.toLocaleString('en-IN') : '—'} />
+              </dd>
+            ) : (
+              <dd className="mt-1 text-2xs text-ink-secondary">No Instagram profile found in the link.</dd>
+            )}
+          </div>
+        )}
         <Detail label="YouTube" value={registration.youtube_link ?? '—'} link />
         <Detail label="Primary category" value={formatPrimaryCategory(registration)} />
         {isPending && (
@@ -371,6 +401,15 @@ function ReviewDrawer({ registration, contacts, onClose, onApprove, onReject, on
         )}
       </dl>
     </Drawer>
+  );
+}
+
+function StatBit({ label, value }) {
+  return (
+    <div>
+      <div className="text-2xs text-ink-tertiary">{label}</div>
+      <div className="text-sm font-semibold text-ink">{value}</div>
+    </div>
   );
 }
 

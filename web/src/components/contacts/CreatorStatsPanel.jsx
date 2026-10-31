@@ -186,7 +186,7 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
         className="cursor-pointer overflow-x-auto px-2 py-3 hover:bg-zinc-50"
         title="Open engagement"
       >
-        <div className="flex min-w-max items-center gap-4 text-left">
+        <div className="flex min-w-max items-center gap-7 text-left">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}

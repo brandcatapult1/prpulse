@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { contactsApi } from '../../lib/api.js';
-import { DataTable } from '../ui/DataKit.jsx';
 import { EmptyState, Toast } from '../ui/Primitives.jsx';
 import { Pill, formatDate, formatStatus } from '../../lib/format.jsx';
 import { formatCount } from './SystemLabelPills.jsx';
@@ -34,7 +33,7 @@ function Stat({ label, value, display }) {
   );
 }
 
-export function CreatorStatsPanel({ contactId }) {
+function useCreatorStats(contactId) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [syncing, setSyncing] = useState(false);
@@ -64,6 +63,125 @@ export function CreatorStatsPanel({ contactId }) {
     }
   }
 
+  return { data, setData, error, syncing, sync, toast, setToast };
+}
+
+/** Audience card (followers, engagement rate, avg views) — shown on the profile Overview tab. */
+export function AudienceCard({ contactId }) {
+  const { data, error, syncing, sync, toast, setToast } = useCreatorStats(contactId);
+
+  if (error) return <div className="panel p-4 text-2xs text-red-800">{error}</div>;
+  if (!data) return <div className="panel p-6 text-center text-2xs text-ink-secondary">Loading stats…</div>;
+
+  const byPlatform = Object.fromEntries(data.social.map((s) => [s.platform, s]));
+  const configured = data.sync_available?.instagram;
+
+  return (
+    <>
+      <div className="panel p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-medium text-ink">Audience</h3>
+          <button type="button" className="btn-secondary" disabled={syncing || !configured} onClick={sync}
+            title={configured ? '' : 'Set META_ACCESS_TOKEN / META_IG_USER_ID on the server to enable sync'}>
+            {syncing ? 'Syncing…' : 'Refresh from Instagram'}
+          </button>
+        </div>
+        <div className="mt-3 grid gap-4">
+          {PLATFORMS.map(([key, name, followLabel]) => {
+            const s = byPlatform[key];
+            return (
+              <div key={key}>
+                <div className="mb-2 flex items-center gap-2 text-2xs text-ink-secondary">
+                  <span className="font-medium text-ink">{name}</span>
+                  {s?.handle && <span>@{s.handle}</span>}
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <Stat label={followLabel} value={s?.followers}
+                    display={s?.followers == null ? '—' : Number(s.followers).toLocaleString('en-IN')} />
+                  <Stat label="Engagement rate (latest 5 posts)" value={s?.engagement_rate}
+                    display={s?.engagement_rate == null ? '—' : `${Number(s.engagement_rate)}%`} />
+                  <Stat label="Avg views (latest 5 reels)" value={s?.avg_views} />
+                </div>
+                {s?.sync_error && <p className="mt-1 text-2xs text-health-red">{s.sync_error}</p>}
+                {s?.synced_at && <p className="mt-1 text-2xs text-ink-tertiary">Updated {formatDate(s.synced_at)}</p>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+    </>
+  );
+}
+
+/** One campaign row: click to open its deliverables. */
+function CampaignAccordion({ campaign, deliverables, totalsReach, classification, followers }) {
+  const [open, setOpen] = useState(false);
+  const { total, estimated } = totalsReach;
+  const reachText = total > 0 ? `${estimated ? '~' : ''}${formatCount(total)}` : formatCount(campaign.reach);
+  return (
+    <div className="panel overflow-hidden p-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full flex-wrap items-center gap-x-6 gap-y-1 px-4 py-3 text-left hover:bg-zinc-50"
+      >
+        <span className={`text-ink-tertiary transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden>▸</span>
+        <span className="min-w-[10rem] flex-1">
+          <span className="block text-sm font-medium text-ink">{campaign.campaign_name}</span>
+          <span className="block text-2xs text-ink-tertiary">{campaign.brand_name}</span>
+        </span>
+        <span className="text-2xs text-ink-secondary">
+          <b className="tabular-nums text-ink">{campaign.completed_deliverables}</b> deliverable{campaign.completed_deliverables === 1 ? '' : 's'}
+        </span>
+        {METRICS.map(([k, label]) => (
+          <span key={k} className="text-2xs text-ink-secondary">
+            {label} <b className="tabular-nums text-ink">{k === 'reach' ? reachText : formatCount(campaign[k])}</b>
+          </span>
+        ))}
+      </button>
+      {open && (
+        <div className="overflow-x-auto border-t border-line">
+          <table className="w-full text-2xs">
+            <thead>
+              <tr className="border-b border-line text-left text-ink-tertiary">
+                <th className="px-3 py-2">Deliverable</th>
+                {METRICS.map(([k, label]) => <th key={k} className="px-2 py-2">{label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {deliverables.flatMap((d) => (d.links.length ? d.links : [{ content_url: null }]).map((l, i) => (
+                <tr key={`${d.deliverable_id}-${i}`} className="border-b border-line/60 last:border-0">
+                  <td className="px-3 py-2">
+                    <div className="font-medium text-ink">{TYPE_LABEL[d.deliverable_type] ?? formatStatus(d.deliverable_type)}</div>
+                    <div className="text-ink-tertiary">
+                      {l.content_url
+                        ? <a href={l.content_url} target="_blank" rel="noreferrer" className="text-brand hover:underline">{l.content_url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 40)}</a>
+                        : 'No link (screenshot proof)'}
+                    </div>
+                  </td>
+                  {METRICS.map(([k]) => {
+                    const est = k === 'reach' ? estimateReach(l, classification, followers) : null;
+                    return (
+                      <td key={k} className="px-2 py-2">
+                        {est != null ? `~${formatCount(est)}` : formatCount(l[k])}
+                      </td>
+                    );
+                  })}
+                </tr>
+              )))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function CreatorStatsPanel({ contactId }) {
+  const { data, setData, error, toast, setToast } = useCreatorStats(contactId);
+
   if (error) return <div className="panel p-4 text-2xs text-red-800">{error}</div>;
   if (!data) return <div className="panel p-6 text-center text-2xs text-ink-secondary">Loading stats…</div>;
 
@@ -88,69 +206,10 @@ export function CreatorStatsPanel({ contactId }) {
     }
     return { total, estimated };
   };
-  // Engagement rate on reach = (likes + comments) / reach x 100, using Instagram's reach where we have it,
-  // otherwise the worked-out reach. A link shared by two deliverables counts once.
-  const reachRate = (links) => {
-    let interactions = 0;
-    let reach = 0;
-    let estimated = false;
-    const seen = new Set();
-    for (const l of links) {
-      if (l.content_url) {
-        if (seen.has(l.content_url)) continue;
-        seen.add(l.content_url);
-      }
-      let r = Number(l.reach);
-      if (!(Number.isFinite(r) && r > 0)) {
-        r = estimateReach(l, data.classification, followers);
-        if (r != null) estimated = true;
-      }
-      if (!(r > 0)) continue;
-      reach += r;
-      interactions += (Number(l.likes) || 0) + (Number(l.comments) || 0);
-    }
-    if (reach <= 0) return null;
-    return `${estimated ? '~' : ''}${(Math.round((interactions / reach) * 10000) / 100)}%`;
-  };
-  const allLinks = data.deliverables.flatMap((d) => d.links);
-  const configured = data.sync_available?.instagram;
 
   return (
     <div className="space-y-4">
       {SHOW_ACCESS_CARD && <InstagramAccessCard data={data} contactId={contactId} onChange={setData} onToast={setToast} />}
-
-      <div className="panel p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-medium text-ink">Audience</h3>
-          <button type="button" className="btn-secondary" disabled={syncing || !configured} onClick={sync}
-            title={configured ? '' : 'Set META_ACCESS_TOKEN / META_IG_USER_ID on the server to enable sync'}>
-            {syncing ? 'Syncing…' : 'Refresh from Instagram'}
-          </button>
-        </div>
-        <div className="mt-3 grid gap-4">
-          {PLATFORMS.map(([key, name, followLabel]) => {
-            const s = byPlatform[key];
-            return (
-              <div key={key}>
-                <div className="mb-2 flex items-center gap-2 text-2xs text-ink-secondary">
-                  <span className="font-medium text-ink">{name}</span>
-                  {s?.handle && <span>@{s.handle}</span>}
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <Stat label={followLabel} value={s?.followers}
-                    display={s?.followers == null ? '—' : Number(s.followers).toLocaleString('en-IN')} />
-                  <Stat label="Engagement rate (latest 5 posts)" value={s?.engagement_rate}
-                    display={s?.engagement_rate == null ? '—' : `${Number(s.engagement_rate)}%`} />
-                  <Stat label="Engagement rate (on reach)" display={reachRate(allLinks) ?? '—'} />
-                  <Stat label="Avg views (latest 5 reels)" value={s?.avg_views} />
-                </div>
-                {s?.sync_error && <p className="mt-1 text-2xs text-health-red">{s.sync_error}</p>}
-                {s?.synced_at && <p className="mt-1 text-2xs text-ink-tertiary">Updated {formatDate(s.synced_at)}</p>}
-              </div>
-            );
-          })}
-        </div>
-      </div>
 
       {SHOW_PERFORMANCE_CARD && (
       <div className="panel p-4">
@@ -169,58 +228,18 @@ export function CreatorStatsPanel({ contactId }) {
       {data.campaigns.length === 0 ? (
         <EmptyState title="No completed deliverables yet" description="Metrics appear once deliverables are marked posted." />
       ) : (
-        <>
-          <DataTable
-            columns={[
-              { key: 'campaign_name', label: 'Campaign', render: (r) => <span className="font-medium">{r.campaign_name}</span> },
-              { key: 'brand_name', label: 'Brand' },
-              { key: 'completed_deliverables', label: 'Deliverables' },
-              ...METRICS.map(([k, label]) => ({
-                key: k,
-                label,
-                render: (r) => {
-                  if (k !== 'reach') return formatCount(r[k]);
-                  const { total, estimated } = campaignReach(r.campaign_id);
-                  return total > 0 ? `${estimated ? '~' : ''}${formatCount(total)}` : formatCount(r[k]);
-                },
-              })),
-            ]}
-            rows={data.campaigns.map((c) => ({ ...c, id: c.campaign_id }))}
-          />
-          <div className="panel overflow-x-auto p-0">
-            <table className="w-full text-2xs">
-              <thead>
-                <tr className="border-b border-line text-left text-ink-tertiary">
-                  <th className="px-3 py-2">Deliverable</th>
-                  {METRICS.map(([k, label]) => <th key={k} className="px-2 py-2">{label}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {data.deliverables.flatMap((d) => (d.links.length ? d.links : [{ content_url: null }]).map((l, i) => (
-                  <tr key={`${d.deliverable_id}-${i}`} className="border-b border-line/60">
-                    <td className="px-3 py-2">
-                      <div className="font-medium text-ink">{d.campaign_name} · {TYPE_LABEL[d.deliverable_type] ?? formatStatus(d.deliverable_type)}</div>
-                      <div className="text-ink-tertiary">
-                        {l.content_url
-                          ? <a href={l.content_url} target="_blank" rel="noreferrer" className="text-brand hover:underline">{l.content_url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 40)}</a>
-                          : 'No link (screenshot proof)'}
-                      </div>
-                    </td>
-                    {METRICS.map(([k]) => {
-                      const est = k === 'reach' ? estimateReach(l, data.classification, followers) : null;
-                      return (
-                        <td key={k} className="px-2 py-2">
-                          {est != null ? `~${formatCount(est)}`
-                            : formatCount(l[k])}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                )))}
-              </tbody>
-            </table>
-          </div>
-        </>
+        <div className="space-y-2">
+          {data.campaigns.map((c) => (
+            <CampaignAccordion
+              key={c.campaign_id}
+              campaign={c}
+              deliverables={data.deliverables.filter((d) => d.campaign_id === c.campaign_id)}
+              totalsReach={campaignReach(c.campaign_id)}
+              classification={data.classification}
+              followers={followers}
+            />
+          ))}
+        </div>
       )}
 
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}

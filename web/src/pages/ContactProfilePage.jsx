@@ -24,7 +24,7 @@ import {
   e164FromDraft,
 } from '../lib/contactDraft.js';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
-import { CreatorStatsPanel } from '../components/contacts/CreatorStatsPanel.jsx';
+import { AudienceCard, CreatorStatsPanel } from '../components/contacts/CreatorStatsPanel.jsx';
 import { SystemLabelPills } from '../components/contacts/SystemLabelPills.jsx';
 import { ContactEditOverview } from '../components/contacts/ContactEditOverview.jsx';
 
@@ -250,6 +250,8 @@ export function ContactProfilePage() {
       </div>
 
       {activeTab === 'Overview' && (
+        <div className="space-y-3">
+        <AudienceCard contactId={contact.id} />
         <ContactEditOverview
           contact={contact}
           extras={extras}
@@ -264,6 +266,7 @@ export function ContactProfilePage() {
           contactId={contact.id}
           submitted={submitted}
         />
+        </div>
       )}
 
       {activeTab === 'Creator Stats' && <CreatorStatsPanel contactId={contact.id} />}

@@ -161,7 +161,7 @@ function Field({ label, children }) {
 }
 
 /** One collaboration: click to open its details and deliverable metrics. */
-function CollaborationAccordion({ row, stats, deliverables, reach, classification, followers, onOpenEngagement }) {
+function CollaborationAccordion({ row, stats, deliverables, reach, classification, followers, onOpenEngagement, onRefresh, refreshing }) {
   const [open, setOpen] = useState(false);
   const reachText = reach.total > 0
     ? `${reach.estimated ? '~' : ''}${formatCount(reach.total)}`
@@ -202,11 +202,19 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
             <Field label="Fee">{formatFee(row.agreed_fee)}</Field>
             <Field label="Rating">{row.avg_rating != null ? `★${row.avg_rating.toFixed(1)}` : '—'}</Field>
             <Field label="Would work again">{row.would_work_again == null ? '—' : row.would_work_again ? 'Yes' : 'No'}</Field>
+            <button type="button" className="btn-secondary ml-auto" onClick={(e) => { e.stopPropagation(); onOpenEngagement(row.id); }}>
+              Open engagement →
+            </button>
           </div>
         </div>
       </div>
       {open && (
         <div className="border-t border-line">
+          <div className="flex justify-end px-4 pt-3">
+            <button type="button" className="btn-secondary" disabled={refreshing} onClick={onRefresh}>
+              {refreshing ? 'Refreshing…' : 'Refresh metrics'}
+            </button>
+          </div>
           <div>
             <DeliverableStatsTable deliverables={deliverables} classification={classification} followers={followers} />
           </div>
@@ -218,7 +226,7 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
 
 /** Collaboration History tab: one accordion per completed collaboration, with its deliverable metrics inside. */
 export function CollaborationHistoryList({ contactId, history, onOpenEngagement }) {
-  const { data, error } = useCreatorStats(contactId);
+  const { data, error, syncing, sync, toast, setToast } = useCreatorStats(contactId);
 
   if (error) return <div className="panel p-4 text-2xs text-red-800">{error}</div>;
   if (!data) return <div className="panel p-6 text-center text-2xs text-ink-secondary">Loading…</div>;
@@ -259,8 +267,11 @@ export function CollaborationHistoryList({ contactId, history, onOpenEngagement 
           classification={data.classification}
           followers={followers}
           onOpenEngagement={onOpenEngagement}
+          onRefresh={sync}
+          refreshing={syncing}
         />
       ))}
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </div>
   );
 }

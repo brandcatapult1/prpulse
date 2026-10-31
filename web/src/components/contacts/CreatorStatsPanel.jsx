@@ -210,9 +210,6 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
           <Col label="Fee">{formatFee(row.agreed_fee)}</Col>
           <Col label="Rating">{row.avg_rating != null ? `★${row.avg_rating.toFixed(1)}` : '—'}</Col>
           <Col label="WWA">{row.would_work_again == null ? '—' : row.would_work_again ? 'Yes' : 'No'}</Col>
-          <button type="button" className="btn-secondary ml-auto shrink-0" onClick={(e) => { e.stopPropagation(); onOpenEngagement(row.id); }}>
-            Open engagement →
-          </button>
         </div>
       </div>
       {open && (

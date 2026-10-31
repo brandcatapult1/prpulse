@@ -186,7 +186,7 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
         className="cursor-pointer overflow-x-auto px-2 py-3 hover:bg-zinc-50"
         title="Open engagement"
       >
-        <div className="flex min-w-max items-center gap-5 text-left">
+        <div className="flex min-w-max items-center gap-4 text-left">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
@@ -196,9 +196,11 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
           >
             <span className={`transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden>▸</span>
           </button>
-          <Col label="Campaign" className="w-44">
+          <Col label="Campaign" className="w-40">
             <span className="block truncate text-sm font-medium text-ink">{row.campaign_name}</span>
-            <span className="block truncate text-2xs font-normal text-ink-tertiary">{row.brand_name}</span>
+          </Col>
+          <Col label="Brand" className="w-24">
+            <span className="block truncate">{row.brand_name ?? '—'}</span>
           </Col>
           <Col label="Date">{formatDate(row.last_contact_date)}</Col>
           <Col label="Deliverables">{row.deliverables_completed}</Col>
@@ -209,7 +211,7 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
           <Col label="Primary reason">{formatCollaborationReason(row.primary_collaboration_reason) ?? '—'}</Col>
           <Col label="Fee">{formatFee(row.agreed_fee)}</Col>
           <Col label="Rating">{row.avg_rating != null ? `★${row.avg_rating.toFixed(1)}` : '—'}</Col>
-          <Col label="Would work again">{row.would_work_again == null ? '—' : row.would_work_again ? 'Yes' : 'No'}</Col>
+          <Col label="WWA">{row.would_work_again == null ? '—' : row.would_work_again ? 'Yes' : 'No'}</Col>
           <button type="button" className="btn-secondary ml-auto shrink-0" onClick={(e) => { e.stopPropagation(); onOpenEngagement(row.id); }}>
             Open engagement →
           </button>

@@ -140,13 +140,13 @@ export function Modal({ open, title, children, onClose, footer, mobileSheet = fa
   );
 }
 
-export function Drawer({ open, title, children, footer, onClose }) {
+export function Drawer({ open, title, children, footer, onClose, widthClass = 'max-w-[480px]' }) {
   if (!open) return null;
   return (
     <OverlayPortal>
       <div className="fixed inset-0 z-[65] flex justify-end bg-ink/20" onClick={onClose} role="presentation">
         <div
-          className="flex h-full w-full max-w-[480px] flex-col border-l border-line bg-white"
+          className={`flex h-full w-full ${widthClass} flex-col border-l border-line bg-white`}
           role="dialog"
           aria-modal="true"
           onClick={(e) => e.stopPropagation()}

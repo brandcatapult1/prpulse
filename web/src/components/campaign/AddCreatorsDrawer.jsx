@@ -203,6 +203,7 @@ export function AddCreatorsDrawer({
       <Drawer
         open={open}
         title="Add creators"
+        widthClass="max-w-[580px]"
         onClose={onClose}
         footer={
           <div className="flex items-center justify-between gap-3">

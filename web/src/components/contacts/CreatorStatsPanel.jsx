@@ -217,7 +217,7 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
             <Col key={k} label={label}>{k === 'reach' ? reachText : formatCount(stats?.[k])}</Col>
           ))}
           <Col label="Manager">{row.owner_name ?? '—'}</Col>
-          <Col label="Primary reason">{formatCollaborationReason(row.primary_collaboration_reason) ?? '—'}</Col>
+          <Col label="Reason">{formatCollaborationReason(row.primary_collaboration_reason) ?? '—'}</Col>
           <Col label="Fee">{formatFee(row.agreed_fee)}</Col>
           <Col label="Rating">{row.avg_rating != null ? `★${row.avg_rating.toFixed(1)}` : '—'}</Col>
           <Col label="WWA">{row.would_work_again == null ? '—' : row.would_work_again ? 'Yes' : 'No'}</Col>

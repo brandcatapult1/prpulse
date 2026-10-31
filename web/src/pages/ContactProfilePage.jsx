@@ -24,7 +24,7 @@ import {
   e164FromDraft,
 } from '../lib/contactDraft.js';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
-import { AudienceCard, CreatorStatsPanel } from '../components/contacts/CreatorStatsPanel.jsx';
+import { AudienceCard, CollaborationHistoryList } from '../components/contacts/CreatorStatsPanel.jsx';
 import { SystemLabelPills } from '../components/contacts/SystemLabelPills.jsx';
 import { ContactEditOverview } from '../components/contacts/ContactEditOverview.jsx';
 
@@ -269,35 +269,11 @@ export function ContactProfilePage() {
         </div>
       )}
 
-      {activeTab === 'Creator Stats' && <CreatorStatsPanel contactId={contact.id} />}
-
       {activeTab === 'Collaboration History' && (
-        <DataTable
-          columns={[
-            { key: 'campaign_name', label: 'Campaign', render: (r) => <span className="font-medium">{r.campaign_name}</span> },
-            { key: 'brand_name', label: 'Brand' },
-            { key: 'last_contact_date', label: 'Date', render: (r) => formatDate(r.last_contact_date) },
-            { key: 'owner_name', label: 'Manager' },
-            {
-              key: 'primary_collaboration_reason',
-              label: 'Primary reason',
-              render: (r) => formatCollaborationReason(r.primary_collaboration_reason),
-            },
-            { key: 'agreed_fee', label: 'Fee', render: (r) => formatFee(r.agreed_fee) },
-            { key: 'deliverables_completed', label: 'Deliverables' },
-            {
-              key: 'avg_rating',
-              label: 'Rating',
-              render: (r) => (r.avg_rating != null ? `★${r.avg_rating.toFixed(1)}` : '—'),
-            },
-            {
-              key: 'would_work_again',
-              label: 'WWA',
-              render: (r) => (r.would_work_again == null ? '—' : r.would_work_again ? 'Yes' : 'No'),
-            },
-          ]}
-          rows={history}
-          onRowClick={(row) => navigate(`/engagements/${row.id}`)}
+        <CollaborationHistoryList
+          contactId={contact.id}
+          history={history}
+          onOpenEngagement={(id) => navigate(`/engagements/${id}`)}
         />
       )}
 

@@ -88,7 +88,6 @@ export const NAV_ITEMS = [
 
 export const CONTACT_PROFILE_TABS = [
   'Overview',
-  'Creator Stats',
   'Collaboration History',
   'Active Engagements',
   'Feedback History',

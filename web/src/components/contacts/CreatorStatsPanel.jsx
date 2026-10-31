@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { contactsApi } from '../../lib/api.js';
 import { EmptyState, Toast } from '../ui/Primitives.jsx';
+import { formatFee } from '../../lib/format.jsx';
+import { formatCollaborationReason } from '../../lib/collaborationReasons.js';
 import { Pill, formatDate, formatStatus } from '../../lib/format.jsx';
 import { formatCount } from './SystemLabelPills.jsx';
 import { estimateReach } from '../../lib/reachEstimate.js';
-import { InstagramAccessCard } from './InstagramAccessCard.jsx';
 
 // Only what Instagram exposes publicly. Reach, saves and shares are private
 // to the account owner, so they are not shown.
@@ -16,9 +17,6 @@ const METRICS = [
   // Saves and Shares are hidden for now: ['saves', 'Saves'], ['shares', 'Shares'],
 ];
 const TYPE_LABEL = { reel: 'Reel', story: 'Story', other: 'Post', static_carousel_post: 'Carousel' };
-// Temporarily hidden cards — flip to true to bring them back.
-const SHOW_ACCESS_CARD = false;
-const SHOW_PERFORMANCE_CARD = false;
 
 const PLATFORMS = [['instagram', 'Instagram', 'Followers']];
 
@@ -114,11 +112,60 @@ export function AudienceCard({ contactId }) {
   );
 }
 
-/** One campaign row: click to open its deliverables. */
-function CampaignAccordion({ campaign, deliverables, totalsReach, classification, followers }) {
+function DeliverableStatsTable({ deliverables, classification, followers }) {
+  if (!deliverables.length) {
+    return <p className="px-4 py-3 text-2xs text-ink-tertiary">No completed deliverables yet — metrics appear once they are marked posted.</p>;
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-2xs">
+        <thead>
+          <tr className="border-b border-line text-left text-ink-tertiary">
+            <th className="px-3 py-2">Deliverable</th>
+            {METRICS.map(([k, label]) => <th key={k} className="px-2 py-2">{label}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {deliverables.flatMap((d) => (d.links.length ? d.links : [{ content_url: null }]).map((l, i) => (
+            <tr key={`${d.deliverable_id}-${i}`} className="border-b border-line/60 last:border-0">
+              <td className="px-3 py-2">
+                <div className="font-medium text-ink">{TYPE_LABEL[d.deliverable_type] ?? formatStatus(d.deliverable_type)}</div>
+                <div className="text-ink-tertiary">
+                  {l.content_url
+                    ? <a href={l.content_url} target="_blank" rel="noreferrer" className="text-brand hover:underline">{l.content_url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 40)}</a>
+                    : 'No link (screenshot proof)'}
+                </div>
+              </td>
+              {METRICS.map(([k]) => {
+                const est = k === 'reach' ? estimateReach(l, classification, followers) : null;
+                return (
+                  <td key={k} className="px-2 py-2">
+                    {est != null ? `~${formatCount(est)}` : formatCount(l[k])}
+                  </td>
+                );
+              })}
+            </tr>
+          )))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <span className="text-2xs text-ink-secondary">
+      {label} <b className="tabular-nums text-ink">{children}</b>
+    </span>
+  );
+}
+
+/** One collaboration: click to open its details and deliverable metrics. */
+function CollaborationAccordion({ row, stats, deliverables, reach, classification, followers, onOpenEngagement }) {
   const [open, setOpen] = useState(false);
-  const { total, estimated } = totalsReach;
-  const reachText = total > 0 ? `${estimated ? '~' : ''}${formatCount(total)}` : formatCount(campaign.reach);
+  const reachText = reach.total > 0
+    ? `${reach.estimated ? '~' : ''}${formatCount(reach.total)}`
+    : formatCount(stats?.reach);
   return (
     <div className="panel overflow-hidden p-0">
       <button
@@ -129,64 +176,46 @@ function CampaignAccordion({ campaign, deliverables, totalsReach, classification
       >
         <span className={`text-ink-tertiary transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden>▸</span>
         <span className="min-w-[10rem] flex-1">
-          <span className="block text-sm font-medium text-ink">{campaign.campaign_name}</span>
-          <span className="block text-2xs text-ink-tertiary">{campaign.brand_name}</span>
+          <span className="block text-sm font-medium text-ink">{row.campaign_name}</span>
+          <span className="block text-2xs text-ink-tertiary">{row.brand_name} · {formatDate(row.last_contact_date)}</span>
         </span>
-        <span className="text-2xs text-ink-secondary">
-          <b className="tabular-nums text-ink">{campaign.completed_deliverables}</b> deliverable{campaign.completed_deliverables === 1 ? '' : 's'}
-        </span>
+        <Field label="Deliverables">{row.deliverables_completed}</Field>
         {METRICS.map(([k, label]) => (
-          <span key={k} className="text-2xs text-ink-secondary">
-            {label} <b className="tabular-nums text-ink">{k === 'reach' ? reachText : formatCount(campaign[k])}</b>
-          </span>
+          <Field key={k} label={label}>{k === 'reach' ? reachText : formatCount(stats?.[k])}</Field>
         ))}
       </button>
       {open && (
-        <div className="overflow-x-auto border-t border-line">
-          <table className="w-full text-2xs">
-            <thead>
-              <tr className="border-b border-line text-left text-ink-tertiary">
-                <th className="px-3 py-2">Deliverable</th>
-                {METRICS.map(([k, label]) => <th key={k} className="px-2 py-2">{label}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {deliverables.flatMap((d) => (d.links.length ? d.links : [{ content_url: null }]).map((l, i) => (
-                <tr key={`${d.deliverable_id}-${i}`} className="border-b border-line/60 last:border-0">
-                  <td className="px-3 py-2">
-                    <div className="font-medium text-ink">{TYPE_LABEL[d.deliverable_type] ?? formatStatus(d.deliverable_type)}</div>
-                    <div className="text-ink-tertiary">
-                      {l.content_url
-                        ? <a href={l.content_url} target="_blank" rel="noreferrer" className="text-brand hover:underline">{l.content_url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 40)}</a>
-                        : 'No link (screenshot proof)'}
-                    </div>
-                  </td>
-                  {METRICS.map(([k]) => {
-                    const est = k === 'reach' ? estimateReach(l, classification, followers) : null;
-                    return (
-                      <td key={k} className="px-2 py-2">
-                        {est != null ? `~${formatCount(est)}` : formatCount(l[k])}
-                      </td>
-                    );
-                  })}
-                </tr>
-              )))}
-            </tbody>
-          </table>
+        <div className="border-t border-line">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 px-4 py-3">
+            <Field label="Manager">{row.owner_name ?? '—'}</Field>
+            <Field label="Primary reason">{formatCollaborationReason(row.primary_collaboration_reason) ?? '—'}</Field>
+            <Field label="Fee">{formatFee(row.agreed_fee)}</Field>
+            <Field label="Rating">{row.avg_rating != null ? `★${row.avg_rating.toFixed(1)}` : '—'}</Field>
+            <Field label="Would work again">{row.would_work_again == null ? '—' : row.would_work_again ? 'Yes' : 'No'}</Field>
+            <button type="button" className="btn-secondary ml-auto" onClick={() => onOpenEngagement(row.id)}>
+              Open engagement →
+            </button>
+          </div>
+          <div className="border-t border-line/60">
+            <DeliverableStatsTable deliverables={deliverables} classification={classification} followers={followers} />
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-export function CreatorStatsPanel({ contactId }) {
-  const { data, setData, error, toast, setToast } = useCreatorStats(contactId);
+/** Collaboration History tab: one accordion per completed collaboration, with its deliverable metrics inside. */
+export function CollaborationHistoryList({ contactId, history, onOpenEngagement }) {
+  const { data, error } = useCreatorStats(contactId);
 
   if (error) return <div className="panel p-4 text-2xs text-red-800">{error}</div>;
-  if (!data) return <div className="panel p-6 text-center text-2xs text-ink-secondary">Loading stats…</div>;
+  if (!data) return <div className="panel p-6 text-center text-2xs text-ink-secondary">Loading…</div>;
+  if (!history.length) {
+    return <EmptyState title="No completed collaborations yet" description="Completed collaborations appear here." />;
+  }
 
-  const byPlatform = Object.fromEntries(data.social.map((s) => [s.platform, s]));
-  const followers = byPlatform.instagram?.followers;
+  const followers = data.social.find((s) => s.platform === 'instagram')?.followers;
   // Per campaign: Instagram's reach where we have it, otherwise the worked-out figure for each link.
   const campaignReach = (campaignId) => {
     let total = 0;
@@ -208,41 +237,19 @@ export function CreatorStatsPanel({ contactId }) {
   };
 
   return (
-    <div className="space-y-4">
-      {SHOW_ACCESS_CARD && <InstagramAccessCard data={data} contactId={contactId} onChange={setData} onToast={setToast} />}
-
-      {SHOW_PERFORMANCE_CARD && (
-      <div className="panel p-4">
-        <h3 className="text-sm font-medium text-ink">
-          Completed-deliverable performance
-          <span className="ml-2 text-2xs font-normal text-ink-tertiary">
-            {data.totals.completed_deliverables} completed deliverable{data.totals.completed_deliverables === 1 ? '' : 's'}
-          </span>
-        </h3>
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-          {METRICS.map(([k, label]) => <Stat key={k} label={label} value={data.totals[k]} />)}
-        </div>
-      </div>
-      )}
-
-      {data.campaigns.length === 0 ? (
-        <EmptyState title="No completed deliverables yet" description="Metrics appear once deliverables are marked posted." />
-      ) : (
-        <div className="space-y-2">
-          {data.campaigns.map((c) => (
-            <CampaignAccordion
-              key={c.campaign_id}
-              campaign={c}
-              deliverables={data.deliverables.filter((d) => d.campaign_id === c.campaign_id)}
-              totalsReach={campaignReach(c.campaign_id)}
-              classification={data.classification}
-              followers={followers}
-            />
-          ))}
-        </div>
-      )}
-
-      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+    <div className="space-y-2">
+      {history.map((row) => (
+        <CollaborationAccordion
+          key={row.id}
+          row={row}
+          stats={data.campaigns.find((c) => c.campaign_id === row.campaign_id)}
+          deliverables={data.deliverables.filter((d) => d.campaign_id === row.campaign_id)}
+          reach={campaignReach(row.campaign_id)}
+          classification={data.classification}
+          followers={followers}
+          onOpenEngagement={onOpenEngagement}
+        />
+      ))}
     </div>
   );
 }

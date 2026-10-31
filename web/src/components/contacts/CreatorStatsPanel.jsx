@@ -186,7 +186,7 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
         className="cursor-pointer px-2 py-3 hover:bg-zinc-50"
         title="Open engagement"
       >
-        <div className="flex flex-wrap items-center gap-x-7 gap-y-3 text-left">
+        <div className="flex flex-wrap items-center gap-x-7 gap-y-3 text-left lg:grid lg:grid-cols-[32px_minmax(150px,1.8fr)_repeat(11,minmax(0,1fr))] lg:gap-x-4">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
@@ -196,7 +196,7 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
           >
             <span className={`transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden>▸</span>
           </button>
-          <Col className="w-44">
+          <Col className="w-44 lg:w-auto">
             <span className="block truncate text-sm font-medium text-ink">{row.campaign_name}</span>
             <span className="block truncate text-2xs font-normal text-ink-tertiary">{row.brand_name}</span>
           </Col>

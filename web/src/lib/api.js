@@ -277,8 +277,8 @@ export const prProgressApi = {
   cycles: (campaign) => api(`/pr-progress/cycles${campaign ? `?campaign=${encodeURIComponent(campaign)}` : ''}`),
   report: (cycle, campaign, manager, creator) =>
     api(`/pr-progress?cycle=${encodeURIComponent(cycle)}${campaign ? `&campaign=${encodeURIComponent(campaign)}` : ''}${manager ? `&manager=${encodeURIComponent(manager)}` : ''}${creator ? `&creator=${encodeURIComponent(creator)}` : ''}`),
-  pdf: (cycle, sort, dir, campaign, manager, creator) =>
-    download(`/pr-progress/pdf?cycle=${encodeURIComponent(cycle)}&sort=${encodeURIComponent(sort)}&dir=${dir}${campaign ? `&campaign=${encodeURIComponent(campaign)}` : ''}${manager ? `&manager=${encodeURIComponent(manager)}` : ''}${creator ? `&creator=${encodeURIComponent(creator)}` : ''}`),
+  pdf: (cycle, sort, dir, campaign, manager, creator, expanded = []) =>
+    download(`/pr-progress/pdf?cycle=${encodeURIComponent(cycle)}&sort=${encodeURIComponent(sort)}&dir=${dir}${campaign ? `&campaign=${encodeURIComponent(campaign)}` : ''}${manager ? `&manager=${encodeURIComponent(manager)}` : ''}${creator ? `&creator=${encodeURIComponent(creator)}` : ''}${expanded.length ? `&expanded=${expanded.join(',')}` : ''}`),
 };
 
 export const lookupApi = {

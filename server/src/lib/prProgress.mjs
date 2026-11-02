@@ -9,16 +9,16 @@ const STATUS_LABELS = {
 };
 
 export const PR_PROGRESS_COLUMNS = [
-  { key: 'campaign_name', label: 'Campaign', width: 120, align: 'left' },
-  { key: 'managers', label: 'Account manager', width: 100, align: 'left' },
-  { key: 'total', label: 'Target collaboration', width: 55, align: 'center' },
-  { key: 'creators', label: 'Creator name', width: 110, align: 'left' },
-  { key: 'in_conversation', label: 'In Conversation', width: 58, align: 'center' },
-  { key: 'scheduled', label: 'Scheduled', width: 52, align: 'center' },
-  { key: 'awaiting', label: 'Awaiting Deliverables', width: 68, align: 'center' },
-  { key: 'completed', label: 'Completed', width: 56, align: 'center' },
-  { key: 'status', label: 'Status', width: 55, align: 'center' },
-  { key: 'remaining', label: 'Remaining to complete', width: 64, align: 'center' },
+  { key: 'campaign_name', label: 'Campaign', width: 115, align: 'left' },
+  { key: 'managers', label: 'Account manager', width: 95, align: 'left' },
+  { key: 'total', label: 'Target collaboration', width: 66, align: 'center' },
+  { key: 'creators', label: 'Creator name', width: 100, align: 'left' },
+  { key: 'in_conversation', label: 'In Conversation', width: 64, align: 'center' },
+  { key: 'scheduled', label: 'Scheduled', width: 58, align: 'center' },
+  { key: 'awaiting', label: 'Awaiting Deliverables', width: 72, align: 'center' },
+  { key: 'completed', label: 'Completed', width: 60, align: 'center' },
+  { key: 'status', label: 'Status', width: 56, align: 'center' },
+  { key: 'remaining', label: 'Remaining to complete', width: 68, align: 'center' },
 ];
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -240,6 +240,38 @@ export function asOfLabel() {
   return `${ordinal(d)} ${month} ${y}`;
 }
 
+const STAGE_LABELS = {
+  not_contacted: 'Not contacted',
+  in_conversation: 'In conversation',
+  scheduled: 'Scheduled',
+  no_response: 'No response',
+  awaiting_final_deliverables: 'Awaiting deliverables',
+  collaboration_complete: 'Completed',
+};
+const TYPE_LABELS = { reel: 'Reel', story: 'Story', static_carousel_post: 'Post / Carousel', other: 'Other' };
+
+function shortDate(iso) {
+  if (!iso) return '';
+  const [, m, d] = String(iso).slice(0, 10).split('-').map(Number);
+  return `${d} ${MONTHS[m - 1]}`;
+}
+
+function deliverableLine(d) {
+  const type = `${TYPE_LABELS[d.type] ?? d.type}${d.quantity > 1 ? ` x${d.quantity}` : ''}`;
+  if (d.status === 'posted') return `${type} - Posted${d.published_date ? ` ${shortDate(d.published_date)}` : ''}`;
+  const status = `${d.status[0].toUpperCase()}${d.status.slice(1)}`;
+  return `${type} - ${status}${d.due_date ? ` (due ${shortDate(d.due_date)})` : ''}`;
+}
+
+const DETAIL_COLUMNS = [
+  { label: 'Creator', width: 130 },
+  { label: 'Account manager', width: 120 },
+  { label: 'Stage', width: 95 },
+  { label: 'Posted', width: 50, align: 'center' },
+  { label: 'Deliverables', width: 343 },
+];
+
+/** Rows may carry `details` (creator-wise deliverables) for campaigns that were expanded on screen. */
 export async function buildPrProgressPdf({ rows, cycleLabel, range = '' }) {
   const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margins: { top: 36, right: 36, bottom: 36, left: 36 } });
   const chunks = [];
@@ -250,9 +282,10 @@ export async function buildPrProgressPdf({ rows, cycleLabel, range = '' }) {
   const left = (doc.page.width - tableWidth) / 2;
   const bottom = doc.page.height - doc.page.margins.bottom;
   const pad = 5;
+  const indent = 16;
 
   const drawHeader = (y) => {
-    doc.font('Helvetica-Bold').fontSize(9);
+    doc.font('Helvetica-Bold').fontSize(7.5);
     const h = 30;
     let x = left;
     for (const col of PR_PROGRESS_COLUMNS) {
@@ -269,20 +302,23 @@ export async function buildPrProgressPdf({ rows, cycleLabel, range = '' }) {
     .text(`${cycleLabel}${range ? ` (${range})` : ''}`, left, 58, { width: tableWidth, align: 'center' });
 
   let y = drawHeader(78);
+  const newPage = () => {
+    doc.addPage();
+    y = drawHeader(doc.page.margins.top);
+    doc.font('Helvetica').fontSize(9);
+  };
+
   doc.font('Helvetica').fontSize(9);
   for (const row of rows) {
     const cells = PR_PROGRESS_COLUMNS.map((c) => String(row[c.key] ?? ''));
     const heights = cells.map((t, i) =>
       doc.heightOfString(t, { width: PR_PROGRESS_COLUMNS[i].width - pad * 2 }));
     const h = Math.max(20, Math.max(...heights) + 10);
-    if (y + h > bottom) {
-      doc.addPage();
-      y = drawHeader(doc.page.margins.top);
-      doc.font('Helvetica').fontSize(9);
-    }
+    if (y + h > bottom) newPage();
     let x = left;
     PR_PROGRESS_COLUMNS.forEach((col, i) => {
-      doc.rect(x, y, col.width, h).stroke('#9ca3af');
+      if (row.manager_count > 1) doc.rect(x, y, col.width, h).fillAndStroke('#fef3c7', '#9ca3af');
+      else doc.rect(x, y, col.width, h).stroke('#9ca3af');
       doc.fillColor('#111827').text(cells[i], x + pad, y + (h - heights[i]) / 2, {
         width: col.width - pad * 2,
         align: col.align,
@@ -290,6 +326,49 @@ export async function buildPrProgressPdf({ rows, cycleLabel, range = '' }) {
       x += col.width;
     });
     y += h;
+
+    if (row.details) {
+      const dLeft = left + indent;
+      const drawDetailHeader = () => {
+        doc.font('Helvetica-Bold').fontSize(8);
+        let dx = dLeft;
+        for (const col of DETAIL_COLUMNS) {
+          doc.rect(dx, y, col.width, 18).fillAndStroke('#f3f4f6', '#9ca3af');
+          doc.fillColor('#374151').text(col.label, dx + pad, y + 5, { width: col.width - pad * 2, align: col.align ?? 'left' });
+          dx += col.width;
+        }
+        y += 18;
+        doc.font('Helvetica').fontSize(8);
+      };
+      if (row.details.length === 0) {
+        if (y + 20 > bottom) newPage();
+        doc.rect(dLeft, y, tableWidth - indent, 20).stroke('#9ca3af');
+        doc.font('Helvetica').fontSize(8).fillColor('#6b7280')
+          .text('No creators for this selection.', dLeft + pad, y + 6, { width: tableWidth - indent - pad * 2 });
+        y += 20;
+      } else {
+        if (y + 18 + 20 > bottom) newPage();
+        drawDetailHeader();
+        for (const c of row.details) {
+          const lines = c.deliverables.length ? c.deliverables.map(deliverableLine).join('\n') : '-';
+          const posted = `${c.deliverables.filter((d) => d.status === 'posted').length}/${c.deliverables.length}`;
+          const vals = [c.full_name, c.manager_name ?? '-', STAGE_LABELS[c.stage] ?? (String(c.stage).startsWith('dropped') ? 'Dropped' : c.stage), posted, lines];
+          doc.font('Helvetica').fontSize(8);
+          const hs = vals.map((t, i) => doc.heightOfString(String(t), { width: DETAIL_COLUMNS[i].width - pad * 2 }));
+          const dh = Math.max(18, Math.max(...hs) + 8);
+          if (y + dh > bottom) { newPage(); drawDetailHeader(); }
+          let dx = dLeft;
+          DETAIL_COLUMNS.forEach((col, i) => {
+            doc.rect(dx, y, col.width, dh).stroke('#d1d5db');
+            doc.fillColor('#111827').text(String(vals[i]), dx + pad, y + 4, { width: col.width - pad * 2, align: col.align ?? 'left' });
+            dx += col.width;
+          });
+          y += dh;
+        }
+      }
+      y += 6;
+      doc.font('Helvetica').fontSize(9);
+    }
   }
   if (rows.length === 0) {
     doc.fillColor('#6b7280').text('No campaigns have this cycle.', left, y + 12, { width: tableWidth, align: 'center' });

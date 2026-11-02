@@ -87,6 +87,15 @@ prProgressRouter.get('/pdf', async (req, res) => {
     const rows = sortPrProgressRows(
       await loadPrProgressRows(pool, cycle.number, progressScope(req.user), campaignParam(req), managerParam(req), creatorParam(req)), req.query.sort, req.query.dir,
     );
+    // Campaigns that were expanded on screen get their creator-wise deliverables in the PDF too.
+    const expanded = new Set(String(req.query.expanded ?? '').split(',').filter((id) => UUID_RE.test(id)).slice(0, 100));
+    for (const row of rows) {
+      if (expanded.has(row.id)) {
+        row.details = await loadCampaignCreatorDeliverables(
+          pool, row.id, progressScope(req.user), managerParam(req), creatorParam(req),
+        );
+      }
+    }
     const { cycles } = await loadPrProgressCycles(pool, progressScope(req.user), campaignParam(req));
     const picked = cycles.find((c) => String(c.number) === String(req.query.cycle));
     const pdf = await buildPrProgressPdf({

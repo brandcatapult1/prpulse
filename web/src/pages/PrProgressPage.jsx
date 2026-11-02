@@ -206,7 +206,7 @@ export function PrProgressPage() {
     if (!cycle || exporting) return;
     setExporting(true);
     try {
-      const { blob, contentDisposition } = await prProgressApi.pdf(cycle, sort.key, sort.dir, campaignId, managerId, creator);
+      const { blob, contentDisposition } = await prProgressApi.pdf(cycle, sort.key, sort.dir, campaignId, managerId, creator, [...openIds]);
       const match = /filename="?([^";]+)"?/i.exec(contentDisposition);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

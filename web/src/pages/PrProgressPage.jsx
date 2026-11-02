@@ -19,17 +19,17 @@ const dateLabel = (iso) =>
   iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—';
 
 /** Expanded row: every creator on the campaign with their deliverables. */
-function CreatorDeliverables({ campaignId, managerId, creator, before, colSpan }) {
+function CreatorDeliverables({ campaignId, managerId, creator, before, prev, colSpan }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
-    prProgressApi.creators(campaignId, managerId, creator, before)
+    prProgressApi.creators(campaignId, managerId, creator, before, prev)
       .then((d) => { if (!cancelled) setRows(Array.isArray(d) ? d : []); })
       .catch((err) => { if (!cancelled) setError(err.message ?? 'Could not load creators'); });
     return () => { cancelled = true; };
-  }, [campaignId, managerId, creator, before]);
+  }, [campaignId, managerId, creator, before, prev]);
 
   const carried = (rows ?? []).flatMap((c) =>
     c.deliverables.filter((d) => d.carried).map((d) => ({ creator: c.full_name, manager: c.manager_name, d })));
@@ -95,7 +95,7 @@ function CreatorDeliverables({ campaignId, managerId, creator, before, colSpan }
         {carried.length > 0 && (
           <div className="mt-4">
             <h3 className="mb-1.5 text-2xs font-semibold text-amber-800">
-              Balance from previous cycles ({carried.length})
+              Balance from previous cycle ({carried.length})
             </h3>
             <table className="w-full border-collapse text-2xs">
               <thead>
@@ -398,7 +398,7 @@ export function PrProgressPage() {
                       </td>
                     ))}
                   </tr>
-                  {openIds.has(row.id) && <CreatorDeliverables campaignId={row.id} managerId={managerId} creator={creator} before={row.cycle_start} colSpan={COLUMNS.length} />}
+                  {openIds.has(row.id) && <CreatorDeliverables campaignId={row.id} managerId={managerId} creator={creator} before={row.cycle_start} prev={row.prev_start} colSpan={COLUMNS.length} />}
                 </Fragment>
               ))}
             </tbody>

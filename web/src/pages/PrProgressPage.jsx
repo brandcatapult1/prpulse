@@ -1,9 +1,96 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { MODULES } from '../lib/modules.js';
 import { prProgressApi } from '../lib/api.js';
+
+const STAGE_LABELS = {
+  not_contacted: 'Not contacted',
+  in_conversation: 'In conversation',
+  scheduled: 'Scheduled',
+  no_response: 'No response',
+  awaiting_final_deliverables: 'Awaiting deliverables',
+  collaboration_complete: 'Completed',
+};
+const TYPE_LABELS = { reel: 'Reel', story: 'Story', static_carousel_post: 'Post / Carousel', other: 'Other' };
+const stageLabel = (s) => STAGE_LABELS[s] ?? (s?.startsWith('dropped') ? 'Dropped' : s);
+const dateLabel = (iso) =>
+  iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—';
+
+/** Expanded row: every creator on the campaign with their deliverables. */
+function CreatorDeliverables({ campaignId, colSpan }) {
+  const [rows, setRows] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    prProgressApi.creators(campaignId)
+      .then((d) => { if (!cancelled) setRows(Array.isArray(d) ? d : []); })
+      .catch((err) => { if (!cancelled) setError(err.message ?? 'Could not load creators'); });
+    return () => { cancelled = true; };
+  }, [campaignId]);
+
+  return (
+    <tr>
+      <td colSpan={colSpan} className="border border-line bg-zinc-50 p-3">
+        {error ? (
+          <p className="text-2xs text-red-700">{error}</p>
+        ) : !rows ? (
+          <p className="text-2xs text-ink-secondary">Loading creators…</p>
+        ) : rows.length === 0 ? (
+          <p className="text-2xs text-ink-secondary">No creators added to this campaign yet.</p>
+        ) : (
+          <table className="w-full border-collapse text-2xs">
+            <thead>
+              <tr className="text-left text-ink-tertiary">
+                <th className="border-b border-line px-2 py-1.5 font-medium">Creator</th>
+                <th className="border-b border-line px-2 py-1.5 font-medium">Stage</th>
+                <th className="border-b border-line px-2 py-1.5 text-center font-medium">Posted</th>
+                <th className="border-b border-line px-2 py-1.5 font-medium">Deliverables</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((c) => {
+                const total = c.deliverables.length;
+                const posted = c.deliverables.filter((d) => d.status === 'posted').length;
+                return (
+                  <tr key={c.engagement_id} className="align-top">
+                    <td className="border-b border-line px-2 py-1.5 font-medium text-ink">{c.full_name}</td>
+                    <td className="border-b border-line px-2 py-1.5">{stageLabel(c.stage)}</td>
+                    <td className="border-b border-line px-2 py-1.5 text-center tabular-nums">{posted}/{total}</td>
+                    <td className="border-b border-line px-2 py-1.5">
+                      {total === 0 ? '—' : (
+                        <ul className="space-y-0.5">
+                          {c.deliverables.map((d, i) => (
+                            <li key={i}>
+                              {TYPE_LABELS[d.type] ?? d.type}
+                              {d.quantity > 1 ? ` ×${d.quantity}` : ''} ·{' '}
+                              <span className={d.status === 'posted' ? 'text-green-700' : 'text-ink-secondary'}>
+                                {d.status === 'posted'
+                                  ? `Posted${d.published_date ? ` ${dateLabel(d.published_date)}` : ''}`
+                                  : `${d.status[0].toUpperCase()}${d.status.slice(1)}${d.due_date ? ` · due ${dateLabel(d.due_date)}` : ''}`}
+                              </span>
+                              {d.content_link && (
+                                <a href={d.content_link} target="_blank" rel="noreferrer" className="ml-1 text-brand hover:underline">
+                                  link
+                                </a>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </td>
+    </tr>
+  );
+}
 
 const COLUMNS = [
   { key: 'campaign_name', label: 'Campaign', align: 'left' },
@@ -43,6 +130,7 @@ export function PrProgressPage() {
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
+  const [openIds, setOpenIds] = useState(() => new Set());
   const [sort, setSort] = useState({ key: 'campaign_name', dir: 'asc' });
 
   useEffect(() => {
@@ -80,6 +168,13 @@ export function PrProgressPage() {
   );
 
   if (!allowed) return <Navigate to="/" replace />;
+
+  const toggleOpen = (id) =>
+    setOpenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
 
   const toggleSort = (key) =>
     setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
@@ -189,16 +284,40 @@ export function PrProgressPage() {
                 <tr><td colSpan={COLUMNS.length} className="px-3 py-6 text-center text-2xs text-ink-secondary">No campaigns have this cycle.</td></tr>
               )}
               {!loading && rows.map((row) => (
-                <tr key={row.id} className="hover:bg-zinc-50">
-                  {COLUMNS.map((col) => (
-                    <td
-                      key={col.key}
-                      className={`border border-line px-3 py-2 ${col.align === 'left' ? 'text-left' : 'text-center tabular-nums'}`}
-                    >
-                      {row[col.key] === '' || row[col.key] == null ? '—' : row[col.key]}
-                    </td>
-                  ))}
-                </tr>
+                <Fragment key={row.id}>
+                  <tr className="hover:bg-zinc-50">
+                    {COLUMNS.map((col, i) => (
+                      <td
+                        key={col.key}
+                        className={`border border-line px-3 py-2 ${col.align === 'left' ? 'text-left' : 'text-center tabular-nums'}`}
+                      >
+                        {i === 0 ? (
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => toggleOpen(row.id)}
+                              aria-expanded={openIds.has(row.id)}
+                              aria-label={openIds.has(row.id) ? 'Hide creators' : 'Show creators'}
+                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand text-white hover:bg-brand/90"
+                            >
+                              <svg
+                                className={`h-3.5 w-3.5 transition-transform ${openIds.has(row.id) ? 'rotate-90' : ''}`}
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden
+                              >
+                                <path d="M9 5l7 7-7 7" />
+                              </svg>
+                            </button>
+                            <span>{row[col.key]}</span>
+                          </div>
+                        ) : (
+                          row[col.key] === '' || row[col.key] == null ? '—' : row[col.key]
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                  {openIds.has(row.id) && <CreatorDeliverables campaignId={row.id} colSpan={COLUMNS.length} />}
+                </Fragment>
               ))}
             </tbody>
           </table>

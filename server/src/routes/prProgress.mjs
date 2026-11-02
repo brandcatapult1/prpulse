@@ -3,7 +3,7 @@ import { pool } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
 import { assertStaffUser } from '../lib/permissions.mjs';
 import {
-  asOfLabel, buildPrProgressPdf, loadPrProgressCampaigns, loadPrProgressCycles, loadPrProgressRows, progressScope, sortPrProgressRows,
+  asOfLabel, buildPrProgressPdf, loadCampaignCreatorDeliverables, loadPrProgressCampaigns, loadPrProgressCycles, loadPrProgressRows, progressScope, sortPrProgressRows,
 } from '../lib/prProgress.mjs';
 
 export const prProgressRouter = Router();
@@ -31,6 +31,15 @@ prProgressRouter.get('/campaigns', async (req, res) => {
     res.json(await loadPrProgressCampaigns(pool, progressScope(req.user)));
   } catch (err) {
     res.status(503).json({ error: err.message ?? 'Could not load campaigns' });
+  }
+});
+
+prProgressRouter.get('/campaigns/:id/creators', async (req, res) => {
+  try {
+    if (!UUID_RE.test(req.params.id)) return res.status(400).json({ error: 'Invalid campaign' });
+    res.json(await loadCampaignCreatorDeliverables(pool, req.params.id, progressScope(req.user)));
+  } catch (err) {
+    res.status(503).json({ error: err.message ?? 'Could not load creators' });
   }
 });
 

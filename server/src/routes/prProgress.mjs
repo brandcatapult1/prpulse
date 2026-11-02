@@ -30,6 +30,11 @@ const campaignParam = (req) => (UUID_RE.test(req.query.campaign ?? '') ? req.que
 const managerParam = (req) =>
   progressScope(req.user) === null && UUID_RE.test(req.query.manager ?? '') ? req.query.manager : null;
 
+const creatorParam = (req) => {
+  const q = String(req.query.creator ?? '').trim().slice(0, 80);
+  return q || null;
+};
+
 prProgressRouter.get('/managers', async (req, res) => {
   try {
     if (progressScope(req.user) !== null) return res.json([]);
@@ -50,7 +55,7 @@ prProgressRouter.get('/campaigns', async (req, res) => {
 prProgressRouter.get('/campaigns/:id/creators', async (req, res) => {
   try {
     if (!UUID_RE.test(req.params.id)) return res.status(400).json({ error: 'Invalid campaign' });
-    res.json(await loadCampaignCreatorDeliverables(pool, req.params.id, progressScope(req.user), managerParam(req)));
+    res.json(await loadCampaignCreatorDeliverables(pool, req.params.id, progressScope(req.user), managerParam(req), creatorParam(req)));
   } catch (err) {
     res.status(503).json({ error: err.message ?? 'Could not load creators' });
   }
@@ -68,7 +73,7 @@ prProgressRouter.get('/', async (req, res) => {
   try {
     const cycle = cycleParam(req);
     if (!cycle) return res.status(400).json({ error: 'Select a cycle' });
-    const rows = await loadPrProgressRows(pool, cycle.number, progressScope(req.user), campaignParam(req), managerParam(req));
+    const rows = await loadPrProgressRows(pool, cycle.number, progressScope(req.user), campaignParam(req), managerParam(req), creatorParam(req));
     res.json({ cycle: cycle.number ?? 'current', as_of: asOfLabel(), rows });
   } catch (err) {
     res.status(503).json({ error: err.message ?? 'Could not load PR progress' });
@@ -80,7 +85,7 @@ prProgressRouter.get('/pdf', async (req, res) => {
     const cycle = cycleParam(req);
     if (!cycle) return res.status(400).json({ error: 'Select a cycle' });
     const rows = sortPrProgressRows(
-      await loadPrProgressRows(pool, cycle.number, progressScope(req.user), campaignParam(req), managerParam(req)), req.query.sort, req.query.dir,
+      await loadPrProgressRows(pool, cycle.number, progressScope(req.user), campaignParam(req), managerParam(req), creatorParam(req)), req.query.sort, req.query.dir,
     );
     const { cycles } = await loadPrProgressCycles(pool, progressScope(req.user), campaignParam(req));
     const picked = cycles.find((c) => String(c.number) === String(req.query.cycle));

@@ -42,7 +42,7 @@ const ownCampaignSql = (n) => `($${n}::uuid IS NULL OR EXISTS (
 const OWN_CAMPAIGN_SQL = ownCampaignSql(2);
 
 /** Creator-wise deliverables for one campaign (the expanded row). */
-export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUserId = null, managerId = null) {
+export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUserId = null, managerId = null, creator = null) {
   const { rows } = await pool.query(
     `SELECT e.id AS engagement_id, ct.full_name, mgr.full_name AS manager_name,
             e.conversation_status::text AS stage,
@@ -57,9 +57,10 @@ export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUser
      LEFT JOIN deliverables d ON d.engagement_id = e.id
      WHERE e.campaign_id = $1::uuid AND ${OWN_CAMPAIGN_SQL}
        AND ($3::uuid IS NULL OR e.assigned_manager = $3::uuid)
+       AND ($4::text IS NULL OR ct.full_name ILIKE '%' || $4::text || '%')
      GROUP BY e.id, ct.full_name, mgr.full_name, e.conversation_status
      ORDER BY ct.full_name`,
-    [campaignId, onlyUserId, managerId],
+    [campaignId, onlyUserId, managerId, creator],
   );
   return rows;
 }
@@ -141,7 +142,7 @@ export async function loadPrProgressCycles(pool, onlyUserId = null, campaignId =
  * cycleNumber = a number → that cycle of every campaign that has it.
  * cycleNumber = null → each campaign's own running cycle (the one that includes today).
  */
-export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, campaignId = null, managerId = null) {
+export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, campaignId = null, managerId = null, creator = null) {
   const { rows } = await pool.query(
     `SELECT cam.id, cam.campaign_name, cam.status,
             cc.target, cc.completed_collaborations, cc.remaining_collaborations,
@@ -156,16 +157,23 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
               FROM engagements e JOIN contacts ct ON ct.id = e.contact_id
               WHERE e.campaign_id = cam.id AND e.conversation_status::text NOT LIKE 'dropped%'
                 AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid)
+                AND ($6::text IS NULL OR ct.full_name ILIKE '%' || $6::text || '%')
             ), '') AS creators,
             (SELECT count(*) FROM engagements e WHERE e.campaign_id = cam.id
                AND e.conversation_status = 'in_conversation'
-                 AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid))::int AS in_conversation,
+                 AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid)
+                 AND ($6::text IS NULL OR EXISTS (
+                   SELECT 1 FROM contacts cn WHERE cn.id = e.contact_id AND cn.full_name ILIKE '%' || $6::text || '%')))::int AS in_conversation,
             (SELECT count(*) FROM engagements e WHERE e.campaign_id = cam.id
                AND e.conversation_status = 'scheduled'
-                 AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid))::int AS scheduled,
+                 AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid)
+                 AND ($6::text IS NULL OR EXISTS (
+                   SELECT 1 FROM contacts cn WHERE cn.id = e.contact_id AND cn.full_name ILIKE '%' || $6::text || '%')))::int AS scheduled,
             (SELECT count(*) FROM engagements e WHERE e.campaign_id = cam.id
                AND e.conversation_status = 'awaiting_final_deliverables'
-                 AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid))::int AS awaiting
+                 AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid)
+                 AND ($6::text IS NULL OR EXISTS (
+                   SELECT 1 FROM contacts cn WHERE cn.id = e.contact_id AND cn.full_name ILIKE '%' || $6::text || '%')))::int AS awaiting
      FROM campaigns cam
      JOIN LATERAL (
        SELECT c.* FROM campaign_cycles c
@@ -179,8 +187,12 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
        AND ($4::uuid IS NULL OR cam.id = $4::uuid)
        AND ($5::uuid IS NULL OR EXISTS (
          SELECT 1 FROM campaign_managers pm WHERE pm.campaign_id = cam.id AND pm.user_id = $5::uuid))
+       AND ($6::text IS NULL OR EXISTS (
+         SELECT 1 FROM engagements fe JOIN contacts fc ON fc.id = fe.contact_id
+         WHERE fe.campaign_id = cam.id AND fc.full_name ILIKE '%' || $6::text || '%'
+           AND ($5::uuid IS NULL OR fe.assigned_manager = $5::uuid)))
      ORDER BY cam.campaign_name`,
-    [cycleNumber, onlyUserId, todayIst(), campaignId, managerId],
+    [cycleNumber, onlyUserId, todayIst(), campaignId, managerId, creator],
   );
   return rows.map((r) => {
     const completed = r.completed_collaborations ?? 0;

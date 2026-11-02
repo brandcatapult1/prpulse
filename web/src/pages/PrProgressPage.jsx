@@ -19,17 +19,17 @@ const dateLabel = (iso) =>
   iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—';
 
 /** Expanded row: every creator on the campaign with their deliverables. */
-function CreatorDeliverables({ campaignId, managerId, colSpan }) {
+function CreatorDeliverables({ campaignId, managerId, creator, colSpan }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
-    prProgressApi.creators(campaignId, managerId)
+    prProgressApi.creators(campaignId, managerId, creator)
       .then((d) => { if (!cancelled) setRows(Array.isArray(d) ? d : []); })
       .catch((err) => { if (!cancelled) setError(err.message ?? 'Could not load creators'); });
     return () => { cancelled = true; };
-  }, [campaignId, managerId]);
+  }, [campaignId, managerId, creator]);
 
   return (
     <tr>
@@ -129,6 +129,8 @@ export function PrProgressPage() {
   const [campaignId, setCampaignId] = useState('');
   const [managers, setManagers] = useState([]);
   const [managerId, setManagerId] = useState('');
+  const [creatorInput, setCreatorInput] = useState('');
+  const [creator, setCreator] = useState('');
   const [cycle, setCycle] = useState('');
   const [currentCycle, setCurrentCycle] = useState('');
   const [data, setData] = useState(null);
@@ -142,6 +144,11 @@ export function PrProgressPage() {
     if (!allowed) return;
     prProgressApi.campaigns().then((rows) => setCampaigns(Array.isArray(rows) ? rows : [])).catch(() => {});
   }, [allowed]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setCreator(creatorInput.trim()), 350);
+    return () => clearTimeout(t);
+  }, [creatorInput]);
 
   useEffect(() => {
     if (!canFilterManagers) return;
@@ -171,12 +178,12 @@ export function PrProgressPage() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    prProgressApi.report(cycle, campaignId, managerId)
+    prProgressApi.report(cycle, campaignId, managerId, creator)
       .then((d) => { if (!cancelled) setData(d); })
       .catch((err) => { if (!cancelled) setError(err.message ?? 'Could not load PR progress'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [cycle, campaignId, managerId]);
+  }, [cycle, campaignId, managerId, creator]);
 
   const rows = useMemo(
     () => (data ? sortRows(data.rows, sort.key, sort.dir) : []),
@@ -199,7 +206,7 @@ export function PrProgressPage() {
     if (!cycle || exporting) return;
     setExporting(true);
     try {
-      const { blob, contentDisposition } = await prProgressApi.pdf(cycle, sort.key, sort.dir, campaignId, managerId);
+      const { blob, contentDisposition } = await prProgressApi.pdf(cycle, sort.key, sort.dir, campaignId, managerId, creator);
       const match = /filename="?([^";]+)"?/i.exec(contentDisposition);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -251,6 +258,16 @@ export function PrProgressPage() {
           </select>
         </label>
         )}
+        <label className="block">
+          <span className="mb-1.5 block text-2xs font-medium text-ink-secondary">Creator name</span>
+          <input
+            className="input-field w-56"
+            type="search"
+            value={creatorInput}
+            onChange={(e) => setCreatorInput(e.target.value)}
+            placeholder="Search creator"
+          />
+        </label>
         <label className="block">
           <span className="mb-1.5 block text-2xs font-medium text-ink-secondary">Cycle</span>
           <select className="input-field w-80" value={cycle} onChange={(e) => setCycle(e.target.value)}>
@@ -346,7 +363,7 @@ export function PrProgressPage() {
                       </td>
                     ))}
                   </tr>
-                  {openIds.has(row.id) && <CreatorDeliverables campaignId={row.id} managerId={managerId} colSpan={COLUMNS.length} />}
+                  {openIds.has(row.id) && <CreatorDeliverables campaignId={row.id} managerId={managerId} creator={creator} colSpan={COLUMNS.length} />}
                 </Fragment>
               ))}
             </tbody>

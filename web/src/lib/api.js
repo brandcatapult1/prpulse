@@ -268,13 +268,17 @@ export const reportsApi = {
 export const prProgressApi = {
   campaigns: () => api('/pr-progress/campaigns'),
   managers: (campaign) => api(`/pr-progress/managers${campaign ? `?campaign=${encodeURIComponent(campaign)}` : ''}`),
-  creators: (campaignId, manager) =>
-    api(`/pr-progress/campaigns/${campaignId}/creators${manager ? `?manager=${encodeURIComponent(manager)}` : ''}`),
+  creators: (campaignId, manager, creator) => {
+    const q = new URLSearchParams();
+    if (manager) q.set('manager', manager);
+    if (creator) q.set('creator', creator);
+    return api(`/pr-progress/campaigns/${campaignId}/creators${q.size ? `?${q}` : ''}`);
+  },
   cycles: (campaign) => api(`/pr-progress/cycles${campaign ? `?campaign=${encodeURIComponent(campaign)}` : ''}`),
-  report: (cycle, campaign, manager) =>
-    api(`/pr-progress?cycle=${encodeURIComponent(cycle)}${campaign ? `&campaign=${encodeURIComponent(campaign)}` : ''}${manager ? `&manager=${encodeURIComponent(manager)}` : ''}`),
-  pdf: (cycle, sort, dir, campaign, manager) =>
-    download(`/pr-progress/pdf?cycle=${encodeURIComponent(cycle)}&sort=${encodeURIComponent(sort)}&dir=${dir}${campaign ? `&campaign=${encodeURIComponent(campaign)}` : ''}${manager ? `&manager=${encodeURIComponent(manager)}` : ''}`),
+  report: (cycle, campaign, manager, creator) =>
+    api(`/pr-progress?cycle=${encodeURIComponent(cycle)}${campaign ? `&campaign=${encodeURIComponent(campaign)}` : ''}${manager ? `&manager=${encodeURIComponent(manager)}` : ''}${creator ? `&creator=${encodeURIComponent(creator)}` : ''}`),
+  pdf: (cycle, sort, dir, campaign, manager, creator) =>
+    download(`/pr-progress/pdf?cycle=${encodeURIComponent(cycle)}&sort=${encodeURIComponent(sort)}&dir=${dir}${campaign ? `&campaign=${encodeURIComponent(campaign)}` : ''}${manager ? `&manager=${encodeURIComponent(manager)}` : ''}${creator ? `&creator=${encodeURIComponent(creator)}` : ''}`),
 };
 
 export const lookupApi = {

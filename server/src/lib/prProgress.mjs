@@ -44,7 +44,8 @@ const OWN_CAMPAIGN_SQL = ownCampaignSql(2);
 /** Creator-wise deliverables for one campaign (the expanded row). */
 export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUserId = null, managerId = null) {
   const { rows } = await pool.query(
-    `SELECT e.id AS engagement_id, ct.full_name, e.conversation_status::text AS stage,
+    `SELECT e.id AS engagement_id, ct.full_name, mgr.full_name AS manager_name,
+            e.conversation_status::text AS stage,
             COALESCE(json_agg(json_build_object(
               'type', d.deliverable_type::text, 'quantity', d.quantity, 'status', d.status::text,
               'due_date', d.due_date, 'published_date', d.published_date, 'content_link', d.content_link
@@ -52,10 +53,11 @@ export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUser
      FROM engagements e
      JOIN campaigns cam ON cam.id = e.campaign_id
      JOIN contacts ct ON ct.id = e.contact_id
+     LEFT JOIN users mgr ON mgr.id = e.assigned_manager
      LEFT JOIN deliverables d ON d.engagement_id = e.id
      WHERE e.campaign_id = $1::uuid AND ${OWN_CAMPAIGN_SQL}
        AND ($3::uuid IS NULL OR e.assigned_manager = $3::uuid)
-     GROUP BY e.id, ct.full_name, e.conversation_status
+     GROUP BY e.id, ct.full_name, mgr.full_name, e.conversation_status
      ORDER BY ct.full_name`,
     [campaignId, onlyUserId, managerId],
   );

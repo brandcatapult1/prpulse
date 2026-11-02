@@ -45,6 +45,7 @@ function CreatorDeliverables({ campaignId, managerId, colSpan }) {
             <thead>
               <tr className="text-left text-ink-tertiary">
                 <th className="border-b border-line px-2 py-1.5 font-medium">Creator</th>
+                <th className="border-b border-line px-2 py-1.5 font-medium">Account manager</th>
                 <th className="border-b border-line px-2 py-1.5 font-medium">Stage</th>
                 <th className="border-b border-line px-2 py-1.5 text-center font-medium">Posted</th>
                 <th className="border-b border-line px-2 py-1.5 font-medium">Deliverables</th>
@@ -57,6 +58,7 @@ function CreatorDeliverables({ campaignId, managerId, colSpan }) {
                 return (
                   <tr key={c.engagement_id} className="align-top">
                     <td className="border-b border-line px-2 py-1.5 font-medium text-ink">{c.full_name}</td>
+                    <td className="border-b border-line px-2 py-1.5">{c.manager_name ?? '—'}</td>
                     <td className="border-b border-line px-2 py-1.5">{stageLabel(c.stage)}</td>
                     <td className="border-b border-line px-2 py-1.5 text-center tabular-nums">{posted}/{total}</td>
                     <td className="border-b border-line px-2 py-1.5">

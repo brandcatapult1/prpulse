@@ -212,12 +212,12 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
             <span className="block truncate text-2xs font-normal text-ink-tertiary">{row.brand_name}</span>
           </Col>
           <Col label="Date">{formatDate(row.last_contact_date)}</Col>
+          <Col label="Manager">{row.owner_name ?? '—'}</Col>
+          <Col label="Reason">{formatCollaborationReason(row.primary_collaboration_reason) ?? '—'}</Col>
           <Col label="Deliverables">{row.deliverables_completed}</Col>
           {METRICS.map(([k, label]) => (
             <Col key={k} label={label}>{k === 'reach' ? reachText : formatCount(stats?.[k])}</Col>
           ))}
-          <Col label="Manager">{row.owner_name ?? '—'}</Col>
-          <Col label="Reason">{formatCollaborationReason(row.primary_collaboration_reason) ?? '—'}</Col>
           <Col label="Fee">{formatFee(row.agreed_fee)}</Col>
           <Col label="Rating">{row.avg_rating != null ? `★${row.avg_rating.toFixed(1)}` : '—'}</Col>
           <Col label="WWA">{row.would_work_again == null ? '—' : row.would_work_again ? 'Yes' : 'No'}</Col>

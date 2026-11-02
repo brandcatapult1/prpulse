@@ -89,7 +89,7 @@ export const NAV_ITEMS = [
   MODULES.brands,
   MODULES.registration,
   MODULES.reporting,
-  MODULES.prProgress,
+  // PR Progress (/pr-progress) is hidden from the menu for now; the page itself still works.
   MODULES.settings,
 ].map((m) => ({ to: m.path, label: m.navLabel, end: m.path === '/' }));
 

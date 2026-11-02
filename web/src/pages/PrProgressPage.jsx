@@ -95,7 +95,7 @@ function CreatorDeliverables({ campaignId, colSpan }) {
 const COLUMNS = [
   { key: 'campaign_name', label: 'Campaign', align: 'left' },
   { key: 'managers', label: 'Account manager', align: 'left' },
-  { key: 'total', label: 'Total deliverables' },
+  { key: 'total', label: 'Target collaboration' },
   { key: 'creators', label: 'Creator name', align: 'left' },
   { key: 'in_conversation', label: 'In Conversation' },
   { key: 'scheduled', label: 'Scheduled' },

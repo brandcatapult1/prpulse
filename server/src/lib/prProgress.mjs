@@ -11,7 +11,7 @@ const STATUS_LABELS = {
 export const PR_PROGRESS_COLUMNS = [
   { key: 'campaign_name', label: 'Campaign', width: 120, align: 'left' },
   { key: 'managers', label: 'Account manager', width: 100, align: 'left' },
-  { key: 'total', label: 'Total deliverables', width: 55, align: 'center' },
+  { key: 'total', label: 'Target collaboration', width: 55, align: 'center' },
   { key: 'creators', label: 'Creator name', width: 110, align: 'left' },
   { key: 'in_conversation', label: 'In Conversation', width: 58, align: 'center' },
   { key: 'scheduled', label: 'Scheduled', width: 52, align: 'center' },

@@ -137,8 +137,8 @@ const COLUMNS = [
   { key: 'scheduled', label: 'Scheduled' },
   { key: 'awaiting', label: 'Awaiting Deliverables' },
   { key: 'completed', label: 'Completed' },
-  { key: 'status', label: 'Status' },
   { key: 'balance_prev', label: 'Balance from last month' },
+  { key: 'status', label: 'Status' },
   { key: 'remaining', label: 'Remaining to complete' },
 ];
 

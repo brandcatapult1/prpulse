@@ -17,8 +17,8 @@ export const PR_PROGRESS_COLUMNS = [
   { key: 'scheduled', label: 'Scheduled', width: 52, align: 'center' },
   { key: 'awaiting', label: 'Awaiting Deliverables', width: 64, align: 'center' },
   { key: 'completed', label: 'Completed', width: 56, align: 'center' },
-  { key: 'status', label: 'Status', width: 52, align: 'center' },
   { key: 'balance_prev', label: 'Balance from last month', width: 62, align: 'center' },
+  { key: 'status', label: 'Status', width: 52, align: 'center' },
   { key: 'remaining', label: 'Remaining to complete', width: 58, align: 'center' },
 ];
 

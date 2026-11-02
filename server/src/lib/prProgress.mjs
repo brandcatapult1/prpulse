@@ -51,7 +51,7 @@ export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUser
               'type', d.deliverable_type::text, 'quantity', d.quantity, 'status', d.status::text,
               'due_date', d.due_date, 'published_date', d.published_date, 'content_link', d.content_link,
               'carried', (d.status <> 'posted' AND e.conversation_status::text NOT LIKE 'dropped%'
-                          AND $5::date IS NOT NULL AND COALESCE(d.due_date, d.created_at::date) < $5::date)
+                          AND $5::date IS NOT NULL AND COALESCE(d.due_date, (e.created_at AT TIME ZONE 'Asia/Kolkata')::date) < $5::date)
             ) ORDER BY d.created_at) FILTER (WHERE d.id IS NOT NULL), '[]'::json) AS deliverables
      FROM engagements e
      JOIN campaigns cam ON cam.id = e.campaign_id
@@ -162,7 +162,7 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
             (SELECT count(*) FROM deliverables d JOIN engagements e ON e.id = d.engagement_id
               WHERE e.campaign_id = cam.id AND d.status <> 'posted'
                 AND e.conversation_status::text NOT LIKE 'dropped%'
-                AND COALESCE(d.due_date, d.created_at::date) < cc.cycle_start
+                AND COALESCE(d.due_date, (e.created_at AT TIME ZONE 'Asia/Kolkata')::date) < cc.cycle_start
                 AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid)
                 AND ($6::text IS NULL OR EXISTS (
                   SELECT 1 FROM contacts bc WHERE bc.id = e.contact_id AND bc.full_name ILIKE '%' || $6::text || '%'))

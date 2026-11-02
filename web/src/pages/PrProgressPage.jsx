@@ -95,7 +95,7 @@ function CreatorDeliverables({ campaignId, managerId, creator, before, prev, col
         {carried.length > 0 && (
           <div className="mt-4">
             <h3 className="mb-1.5 text-2xs font-semibold text-amber-800">
-              Balance from previous cycle ({carried.length})
+              Balance from previous cycles ({carried.length})
             </h3>
             <table className="w-full border-collapse text-2xs">
               <thead>

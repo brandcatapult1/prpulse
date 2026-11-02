@@ -51,9 +51,8 @@ export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUser
               'type', d.deliverable_type::text, 'quantity', d.quantity, 'status', d.status::text,
               'due_date', d.due_date, 'published_date', d.published_date, 'content_link', d.content_link,
               'carried', (d.status <> 'posted' AND e.conversation_status::text NOT LIKE 'dropped%'
-                          AND $5::date IS NOT NULL AND $6::date IS NOT NULL
-                          AND COALESCE(d.due_date, (e.created_at AT TIME ZONE 'Asia/Kolkata')::date) < $5::date
-                          AND COALESCE(d.due_date, (e.created_at AT TIME ZONE 'Asia/Kolkata')::date) >= $6::date)
+                          AND $5::date IS NOT NULL
+                          AND COALESCE(d.due_date, (e.created_at AT TIME ZONE 'Asia/Kolkata')::date) < $5::date)
             ) ORDER BY d.created_at) FILTER (WHERE d.id IS NOT NULL), '[]'::json) AS deliverables
      FROM engagements e
      JOIN campaigns cam ON cam.id = e.campaign_id
@@ -65,7 +64,7 @@ export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUser
        AND ($4::text IS NULL OR ct.full_name ILIKE '%' || $4::text || '%')
      GROUP BY e.id, ct.full_name, mgr.full_name, e.conversation_status
      ORDER BY ct.full_name`,
-    [campaignId, onlyUserId, managerId, creator, before, prevStart],
+    [campaignId, onlyUserId, managerId, creator, before],
   );
   return rows;
 }
@@ -160,12 +159,11 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
   const { rows } = await pool.query(
     `SELECT cam.id, cam.campaign_name, cam.status,
             cc.target, cc.completed_collaborations, cc.remaining_collaborations,
-            cc.cycle_start::text AS cycle_start, prev.cycle_start::text AS prev_start,
+            cc.cycle_start::text AS cycle_start,
             (SELECT count(*) FROM deliverables d JOIN engagements e ON e.id = d.engagement_id
               WHERE e.campaign_id = cam.id AND d.status <> 'posted'
                 AND e.conversation_status::text NOT LIKE 'dropped%'
                 AND COALESCE(d.due_date, (e.created_at AT TIME ZONE 'Asia/Kolkata')::date) < cc.cycle_start
-                AND COALESCE(d.due_date, (e.created_at AT TIME ZONE 'Asia/Kolkata')::date) >= prev.cycle_start
                 AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid)
                 AND ($6::text IS NULL OR EXISTS (
                   SELECT 1 FROM contacts bc WHERE bc.id = e.contact_id AND bc.full_name ILIKE '%' || $6::text || '%'))
@@ -212,7 +210,6 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
                 CASE WHEN c.cycle_start <= $3::date THEN -c.cycle_number ELSE c.cycle_number END
        LIMIT 1
      ) cc ON true
-     LEFT JOIN campaign_cycles prev ON prev.campaign_id = cam.id AND prev.cycle_number = cc.cycle_number - 1
      WHERE cam.status <> 'archived' AND ${OWN_CAMPAIGN_SQL}
        AND ($4::uuid IS NULL OR cam.id = $4::uuid)
        AND ($5::uuid IS NULL OR EXISTS (
@@ -232,7 +229,6 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
       managers: r.managers,
       manager_count: r.manager_count,
       cycle_start: r.cycle_start,
-      prev_start: r.prev_start,
       balance_prev: r.balance_prev,
       total: r.target ?? 0,
       creators: r.creators,
@@ -407,7 +403,7 @@ export async function buildPrProgressPdf({ rows, cycleLabel, range = '' }) {
           if (y + 16 + 18 + 20 > bottom) newPage();
           y += 4;
           doc.font('Helvetica-Bold').fontSize(8).fillColor('#92400e')
-            .text(`Balance from previous cycle (${carried.length})`, dLeft, y, { width: tableWidth - indent });
+            .text(`Balance from previous cycles (${carried.length})`, dLeft, y, { width: tableWidth - indent });
           y += 14;
           const CARRY_COLS = [
             { label: 'Creator', width: 130 }, { label: 'Account manager', width: 120 },

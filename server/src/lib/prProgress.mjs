@@ -18,8 +18,8 @@ export const PR_PROGRESS_COLUMNS = [
   { key: 'awaiting', label: 'Awaiting Deliverables', width: 64, align: 'center' },
   { key: 'completed', label: 'Completed', width: 56, align: 'center' },
   { key: 'status', label: 'Status', width: 52, align: 'center' },
-  { key: 'remaining', label: 'Remaining to complete', width: 58, align: 'center' },
   { key: 'balance_prev', label: 'Balance from last month', width: 62, align: 'center' },
+  { key: 'remaining', label: 'Remaining to complete', width: 58, align: 'center' },
 ];
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -237,7 +237,8 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
       awaiting: r.awaiting,
       completed,
       status: STATUS_LABELS[r.status] ?? r.status,
-      remaining: r.remaining_collaborations ?? Math.max(0, (r.target ?? 0) - completed),
+      // Cycle target still to do, plus what was left over from earlier cycles.
+      remaining: (r.remaining_collaborations ?? Math.max(0, (r.target ?? 0) - completed)) + (r.balance_prev ?? 0),
     };
   });
 }

@@ -138,8 +138,8 @@ const COLUMNS = [
   { key: 'awaiting', label: 'Awaiting Deliverables' },
   { key: 'completed', label: 'Completed' },
   { key: 'status', label: 'Status' },
-  { key: 'remaining', label: 'Remaining to complete' },
   { key: 'balance_prev', label: 'Balance from last month' },
+  { key: 'remaining', label: 'Remaining to complete' },
 ];
 
 function sortRows(rows, key, dir) {

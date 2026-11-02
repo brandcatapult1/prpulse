@@ -11,7 +11,7 @@ const METRIC_LABELS = [
 ];
 
 /** Engagement counts (only those recorded) — shown when the report supplies them. */
-function MetricsLine({ metrics, classification, followers }) {
+export function MetricsLine({ metrics, classification, followers }) {
   const shown = METRIC_LABELS.filter(([k]) => Number(metrics?.[k]) > 0);
   const estReach = estimateReach(metrics, classification, followers);
   if (shown.length === 0) return null;

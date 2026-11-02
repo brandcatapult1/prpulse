@@ -199,6 +199,8 @@ export function EngagementRecordPage() {
   const { user } = useAuth();
   const [modal, setModal] = useState(null);
   const [toast, setToast] = useState(null);
+  const [creatorStats, setCreatorStats] = useState(null);
+  const [refreshingMetrics, setRefreshingMetrics] = useState(false);
   const [reopenConfirm, setReopenConfirm] = useState(false);
   const [reopening, setReopening] = useState(false);
   const [followUpSuggestion, setFollowUpSuggestion] = useState(null);
@@ -411,6 +413,7 @@ export function EngagementRecordPage() {
           if (contact) mergeContactsCache([contact]);
           const engs = await contactsApi.engagements(eng.contact_id).catch(() => []);
           setContactEngagements(Array.isArray(engs) ? engs : []);
+          contactsApi.creatorStats(eng.contact_id).then(setCreatorStats).catch(() => setCreatorStats(null));
         }
       })
       .catch(() => {
@@ -418,6 +421,27 @@ export function EngagementRecordPage() {
       })
       .finally(() => setLoading(false));
   }, [id]);
+
+  const metricsFor = (deliverableId) => {
+    const hit = creatorStats?.deliverables?.find((x) => x.deliverable_id === deliverableId);
+    if (!hit) return null;
+    const followers = creatorStats.social?.find((x) => x.platform === 'instagram')?.followers ?? null;
+    return { links: hit.links, classification: creatorStats.classification, followers };
+  };
+
+  const refreshMetrics = async () => {
+    if (!engagement?.contact_id || refreshingMetrics) return;
+    setRefreshingMetrics(true);
+    try {
+      const res = await contactsApi.syncCreatorStats(engagement.contact_id);
+      setCreatorStats(res);
+      setToast('Metrics refreshed');
+    } catch (err) {
+      setToast(err.message ?? 'Could not refresh metrics');
+    } finally {
+      setRefreshingMetrics(false);
+    }
+  };
 
   useEffect(() => {
     if (!engagement) return;
@@ -1265,6 +1289,7 @@ export function EngagementRecordPage() {
                   <DeliverableRow
                     key={d.id}
                     deliverable={d}
+                    stats={metricsFor(d.id)}
                     engagementId={id}
                     canEditProof={deliverablesRule.canEditProof}
                     canShowProofUI={deliverablesRule.canShowProofUI}
@@ -1280,6 +1305,11 @@ export function EngagementRecordPage() {
                     compact
                   />
                 ))}
+                {creatorStats?.deliverables?.some((x) => x.engagement_id === id) && (
+                  <button type="button" className="btn-secondary" disabled={refreshingMetrics} onClick={refreshMetrics}>
+                    {refreshingMetrics ? 'Refreshing…' : 'Refresh metrics'}
+                  </button>
+                )}
               </div>
             )}
 
@@ -1366,6 +1396,25 @@ export function EngagementRecordPage() {
             <div>
               <dt className="text-2xs text-ink-tertiary">Previous brands</dt>
               <dd className="mt-1 text-sm font-medium text-ink">{previousBrands || '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-2xs text-ink-tertiary">Tags</dt>
+              <dd className="mt-1 flex flex-wrap gap-1.5">
+                {(contactRecord?.tags ?? []).length === 0 ? (
+                  <span className="text-sm text-ink-secondary">—</span>
+                ) : (
+                  contactRecord.tags.map((t) => (
+                    <span
+                      key={t.id ?? t.name}
+                      className={`rounded-md px-2 py-0.5 text-2xs font-medium ${
+                        t.type === 'system' ? 'bg-brand-soft text-brand' : 'bg-zinc-100 text-ink-secondary'
+                      }`}
+                    >
+                      {t.name}
+                    </span>
+                  ))
+                )}
+              </dd>
             </div>
             <div>
               <dt className="text-2xs text-ink-tertiary">Avg rating</dt>

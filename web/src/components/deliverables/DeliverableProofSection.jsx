@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { MetricsLine } from './DeliverableProofList.jsx';
 import { deliverableTypeLabel } from '../../lib/deliverableTypes.js';
 import { formatFee } from '../../lib/format.jsx';
 import {
@@ -258,6 +259,7 @@ export function DeliverableProofSection({
 
 export function DeliverableRow({
   deliverable,
+  stats = null,
   canEditProof,
   canShowProofUI = false,
   showLineFee = false,
@@ -360,6 +362,41 @@ export function DeliverableRow({
           markPostedBusy={markPostedBusy}
         />
       )}
+
+      {stats && <DeliverableMetrics stats={stats} />}
+    </div>
+  );
+}
+
+/** Instagram numbers for each posted link on this deliverable, shown after its proof/screenshots. */
+function DeliverableMetrics({ stats }) {
+  const links = stats.links ?? [];
+  if (links.length === 0) return null;
+  return (
+    <div className="mt-3 border-t border-line/60 pt-2">
+      <p className="text-2xs font-medium text-ink-tertiary">Metrics</p>
+      {links.map((l, i) => {
+        const hasAny = ['likes', 'comments', 'views', 'reach', 'saves', 'shares'].some((k) => Number(l[k]) > 0);
+        return (
+          <div key={l.content_url ?? i} className="mt-1">
+            {l.content_url && (
+              <a
+                href={/^https?:\/\//i.test(l.content_url) ? l.content_url : `https://${l.content_url}`}
+                target="_blank"
+                rel="noreferrer"
+                className="block truncate text-2xs text-brand hover:underline"
+              >
+                {l.content_url}
+              </a>
+            )}
+            {hasAny ? (
+              <MetricsLine metrics={l} classification={stats.classification} followers={stats.followers} />
+            ) : (
+              <p className="mt-1 text-2xs text-ink-tertiary">No metrics yet — use Refresh metrics below.</p>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { prProgressApi } from '../lib/api.js';
 const COLUMNS = [
   { key: 'campaign_name', label: 'Campaign', align: 'left' },
   { key: 'managers', label: 'Account manager', align: 'left' },
+  { key: 'total', label: 'Total deliverables' },
   { key: 'in_conversation', label: 'In Conversation' },
   { key: 'scheduled', label: 'Scheduled' },
   { key: 'awaiting', label: 'Awaiting Deliverables' },

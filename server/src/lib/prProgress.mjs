@@ -9,14 +9,15 @@ const STATUS_LABELS = {
 };
 
 export const PR_PROGRESS_COLUMNS = [
-  { key: 'campaign_name', label: 'Campaign', width: 150, align: 'left' },
-  { key: 'managers', label: 'Account manager', width: 130, align: 'left' },
-  { key: 'in_conversation', label: 'In Conversation', width: 75, align: 'center' },
-  { key: 'scheduled', label: 'Scheduled', width: 65, align: 'center' },
-  { key: 'awaiting', label: 'Awaiting Deliverables', width: 85, align: 'center' },
-  { key: 'completed', label: 'Completed', width: 65, align: 'center' },
-  { key: 'status', label: 'Status', width: 65, align: 'center' },
-  { key: 'remaining', label: 'Remaining to complete', width: 80, align: 'center' },
+  { key: 'campaign_name', label: 'Campaign', width: 140, align: 'left' },
+  { key: 'managers', label: 'Account manager', width: 120, align: 'left' },
+  { key: 'total', label: 'Total deliverables', width: 70, align: 'center' },
+  { key: 'in_conversation', label: 'In Conversation', width: 70, align: 'center' },
+  { key: 'scheduled', label: 'Scheduled', width: 62, align: 'center' },
+  { key: 'awaiting', label: 'Awaiting Deliverables', width: 80, align: 'center' },
+  { key: 'completed', label: 'Completed', width: 62, align: 'center' },
+  { key: 'status', label: 'Status', width: 62, align: 'center' },
+  { key: 'remaining', label: 'Remaining to complete', width: 76, align: 'center' },
 ];
 
 /** Cycle numbers that exist on at least one non-archived campaign, and the one running today. */
@@ -68,6 +69,7 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null) {
       id: r.id,
       campaign_name: r.campaign_name,
       managers: r.managers,
+      total: r.target ?? 0,
       in_conversation: r.in_conversation,
       scheduled: r.scheduled,
       awaiting: r.awaiting,

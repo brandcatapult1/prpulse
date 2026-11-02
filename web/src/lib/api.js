@@ -267,7 +267,7 @@ export const reportsApi = {
 
 export const prProgressApi = {
   campaigns: () => api('/pr-progress/campaigns'),
-  managers: () => api('/pr-progress/managers'),
+  managers: (campaign) => api(`/pr-progress/managers${campaign ? `?campaign=${encodeURIComponent(campaign)}` : ''}`),
   creators: (campaignId, manager) =>
     api(`/pr-progress/campaigns/${campaignId}/creators${manager ? `?manager=${encodeURIComponent(manager)}` : ''}`),
   cycles: (campaign) => api(`/pr-progress/cycles${campaign ? `?campaign=${encodeURIComponent(campaign)}` : ''}`),

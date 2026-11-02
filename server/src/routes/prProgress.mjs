@@ -33,7 +33,7 @@ const managerParam = (req) =>
 prProgressRouter.get('/managers', async (req, res) => {
   try {
     if (progressScope(req.user) !== null) return res.json([]);
-    res.json(await loadPrProgressManagers(pool, null));
+    res.json(await loadPrProgressManagers(pool, null, campaignParam(req)));
   } catch (err) {
     res.status(503).json({ error: err.message ?? 'Could not load account managers' });
   }

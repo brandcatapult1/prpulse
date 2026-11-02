@@ -141,8 +141,18 @@ export function PrProgressPage() {
   useEffect(() => {
     if (!allowed) return;
     prProgressApi.campaigns().then((rows) => setCampaigns(Array.isArray(rows) ? rows : [])).catch(() => {});
-    if (canFilterManagers) prProgressApi.managers().then((rows) => setManagers(Array.isArray(rows) ? rows : [])).catch(() => {});
   }, [allowed]);
+
+  useEffect(() => {
+    if (!canFilterManagers) return;
+    prProgressApi.managers(campaignId)
+      .then((rows) => {
+        const list = Array.isArray(rows) ? rows : [];
+        setManagers(list);
+        setManagerId((cur) => (cur && campaignId && !list.some((m) => m.id === cur && m.in_campaign) ? '' : cur));
+      })
+      .catch(() => {});
+  }, [canFilterManagers, campaignId]);
 
   useEffect(() => {
     if (!allowed) return;
@@ -234,7 +244,9 @@ export function PrProgressPage() {
           <select className="input-field w-56" value={managerId} onChange={(e) => setManagerId(e.target.value)}>
             <option value="">All account managers</option>
             {managers.map((m) => (
-              <option key={m.id} value={m.id}>{m.full_name}</option>
+              <option key={m.id} value={m.id} disabled={Boolean(campaignId) && !m.in_campaign}>
+                {m.full_name}
+              </option>
             ))}
           </select>
         </label>

@@ -65,15 +65,17 @@ export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUser
 }
 
 /** Account managers the viewer can filter by. */
-export async function loadPrProgressManagers(pool, onlyUserId = null) {
+export async function loadPrProgressManagers(pool, onlyUserId = null, campaignId = null) {
   const { rows } = await pool.query(
-    `SELECT DISTINCT u.id, u.full_name
+    `SELECT u.id, u.full_name,
+            bool_or($2::uuid IS NOT NULL AND cam.id = $2::uuid) AS in_campaign
      FROM campaign_managers cm
      JOIN campaigns cam ON cam.id = cm.campaign_id
      JOIN users u ON u.id = cm.user_id
      WHERE cam.status <> 'archived' AND ${ownCampaignSql(1)}
+     GROUP BY u.id, u.full_name
      ORDER BY u.full_name`,
-    [onlyUserId],
+    [onlyUserId, campaignId],
   );
   return rows;
 }

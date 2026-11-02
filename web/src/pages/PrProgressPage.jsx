@@ -109,10 +109,12 @@ export function PrProgressPage() {
       <div className="flex flex-wrap items-end gap-3">
         <label className="block">
           <span className="mb-1.5 block text-2xs font-medium text-ink-secondary">Cycle</span>
-          <select className="input-field w-44" value={cycle} onChange={(e) => setCycle(e.target.value)}>
+          <select className="input-field w-72" value={cycle} onChange={(e) => setCycle(e.target.value)}>
             {cycles.length === 0 && <option value="">No cycles</option>}
-            {cycles.map((n) => (
-              <option key={n} value={n}>Cycle {n}</option>
+            {cycles.map((c) => (
+              <option key={c.number} value={c.number}>
+                Cycle {c.number}{c.range ? ` · ${c.range}` : ''}
+              </option>
             ))}
           </select>
         </label>

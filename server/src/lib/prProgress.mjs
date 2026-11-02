@@ -21,6 +21,17 @@ export const PR_PROGRESS_COLUMNS = [
 ];
 
 /** Cycle numbers that exist on at least one non-archived campaign, and the one running today. */
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** "1 Nov – 30 Nov 2026" from two YYYY-MM-DD dates (inclusive). */
+export function formatRange(startIso, endIso) {
+  if (!startIso || !endIso) return '';
+  const [sy, sm, sd] = startIso.slice(0, 10).split('-').map(Number);
+  const [ey, em, ed] = endIso.slice(0, 10).split('-').map(Number);
+  const start = `${sd} ${MONTHS[sm - 1]}${sy === ey ? '' : ` ${sy}`}`;
+  return `${start} – ${ed} ${MONTHS[em - 1]} ${ey}`;
+}
+
 /** Campaign managers see only campaigns they manage; admins and senior managers see all. */
 export function progressScope(user) {
   return user.role === 'admin' || user.role === 'senior_manager' ? null : user.id;
@@ -31,7 +42,9 @@ const OWN_CAMPAIGN_SQL = `($2::uuid IS NULL OR EXISTS (
 
 export async function loadPrProgressCycles(pool, onlyUserId = null) {
   const { rows } = await pool.query(
-    `SELECT cc.cycle_number, bool_or(cc.cycle_start <= $1::date) AS started
+    `SELECT cc.cycle_number, bool_or(cc.cycle_start <= $1::date) AS started,
+            min(cc.cycle_start)::text AS start_date,
+            (max(cc.cycle_end) - 1)::text AS end_date
      FROM campaign_cycles cc JOIN campaigns cam ON cam.id = cc.campaign_id
      WHERE cam.status <> 'archived' AND ${OWN_CAMPAIGN_SQL}
      GROUP BY cc.cycle_number ORDER BY cc.cycle_number`,
@@ -39,7 +52,13 @@ export async function loadPrProgressCycles(pool, onlyUserId = null) {
   );
   const numbers = rows.map((r) => r.cycle_number);
   const started = rows.filter((r) => r.started).map((r) => r.cycle_number);
-  return { cycles: numbers, current: started.length ? Math.max(...started) : (numbers[0] ?? null) };
+  return {
+    cycles: rows.map((r) => ({
+      number: r.cycle_number,
+      range: formatRange(r.start_date, r.end_date),
+    })),
+    current: started.length ? Math.max(...started) : (numbers[0] ?? null),
+  };
 }
 
 export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null) {
@@ -107,7 +126,7 @@ export function asOfLabel() {
   return `${ordinal(d)} ${month} ${y}`;
 }
 
-export async function buildPrProgressPdf({ rows, cycleNumber }) {
+export async function buildPrProgressPdf({ rows, cycleNumber, range = '' }) {
   const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margins: { top: 36, right: 36, bottom: 36, left: 36 } });
   const chunks = [];
   doc.on('data', (c) => chunks.push(c));
@@ -133,7 +152,7 @@ export async function buildPrProgressPdf({ rows, cycleNumber }) {
   doc.font('Helvetica-Bold').fontSize(15).fillColor('#111827')
     .text(`PR Progress Report - As of ${asOfLabel()}`, left, 36, { width: tableWidth, align: 'center' });
   doc.font('Helvetica').fontSize(9).fillColor('#6b7280')
-    .text(`Cycle ${cycleNumber}`, left, 58, { width: tableWidth, align: 'center' });
+    .text(`Cycle ${cycleNumber}${range ? ` (${range})` : ''}`, left, 58, { width: tableWidth, align: 'center' });
 
   let y = drawHeader(78);
   doc.font('Helvetica').fontSize(9);

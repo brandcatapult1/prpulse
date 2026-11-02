@@ -45,7 +45,9 @@ prProgressRouter.get('/pdf', async (req, res) => {
     const cycle = cycleParam(req);
     if (!cycle) return res.status(400).json({ error: 'Select a cycle' });
     const rows = sortPrProgressRows(await loadPrProgressRows(pool, cycle, progressScope(req.user)), req.query.sort, req.query.dir);
-    const pdf = await buildPrProgressPdf({ rows, cycleNumber: cycle });
+    const { cycles } = await loadPrProgressCycles(pool, progressScope(req.user));
+    const range = cycles.find((c) => c.number === cycle)?.range ?? '';
+    const pdf = await buildPrProgressPdf({ rows, cycleNumber: cycle, range });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="pr-progress-cycle-${cycle}.pdf"`);
     res.send(pdf);

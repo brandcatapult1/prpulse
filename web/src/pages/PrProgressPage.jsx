@@ -30,7 +30,7 @@ function sortRows(rows, key, dir) {
 
 export function PrProgressPage() {
   const { user } = useAuth();
-  const allowed = user?.role === 'admin' || user?.role === 'senior_manager';
+  const allowed = Boolean(user);
 
   const [cycles, setCycles] = useState([]);
   const [cycle, setCycle] = useState('');
@@ -97,7 +97,7 @@ export function PrProgressPage() {
     <div className="mx-auto max-w-6xl space-y-5">
       <PageHeader
         title={MODULES.prProgress.pageTitle}
-        subtitle={MODULES.prProgress.subtitle}
+        subtitle={user?.role === 'campaign_manager' ? 'Progress of your campaigns for a cycle' : MODULES.prProgress.subtitle}
         actions={
           <button type="button" className="btn-primary" disabled={!cycle || loading || exporting} onClick={exportPdf}>
             {exporting ? 'Exporting…' : 'Export PDF'}

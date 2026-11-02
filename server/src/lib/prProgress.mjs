@@ -20,20 +20,28 @@ export const PR_PROGRESS_COLUMNS = [
 ];
 
 /** Cycle numbers that exist on at least one non-archived campaign, and the one running today. */
-export async function loadPrProgressCycles(pool) {
+/** Campaign managers see only campaigns they manage; admins and senior managers see all. */
+export function progressScope(user) {
+  return user.role === 'admin' || user.role === 'senior_manager' ? null : user.id;
+}
+
+const OWN_CAMPAIGN_SQL = `($2::uuid IS NULL OR EXISTS (
+  SELECT 1 FROM campaign_managers mine WHERE mine.campaign_id = cam.id AND mine.user_id = $2::uuid))`;
+
+export async function loadPrProgressCycles(pool, onlyUserId = null) {
   const { rows } = await pool.query(
     `SELECT cc.cycle_number, bool_or(cc.cycle_start <= $1::date) AS started
      FROM campaign_cycles cc JOIN campaigns cam ON cam.id = cc.campaign_id
-     WHERE cam.status <> 'archived'
+     WHERE cam.status <> 'archived' AND ${OWN_CAMPAIGN_SQL}
      GROUP BY cc.cycle_number ORDER BY cc.cycle_number`,
-    [todayIst()],
+    [todayIst(), onlyUserId],
   );
   const numbers = rows.map((r) => r.cycle_number);
   const started = rows.filter((r) => r.started).map((r) => r.cycle_number);
   return { cycles: numbers, current: started.length ? Math.max(...started) : (numbers[0] ?? null) };
 }
 
-export async function loadPrProgressRows(pool, cycleNumber) {
+export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null) {
   const { rows } = await pool.query(
     `SELECT cam.id, cam.campaign_name, cam.status,
             cc.target, cc.completed_collaborations, cc.remaining_collaborations,
@@ -50,9 +58,9 @@ export async function loadPrProgressRows(pool, cycleNumber) {
                AND e.conversation_status = 'awaiting_final_deliverables')::int AS awaiting
      FROM campaigns cam
      JOIN campaign_cycles cc ON cc.campaign_id = cam.id AND cc.cycle_number = $1
-     WHERE cam.status <> 'archived'
+     WHERE cam.status <> 'archived' AND ${OWN_CAMPAIGN_SQL}
      ORDER BY cam.campaign_name`,
-    [cycleNumber],
+    [cycleNumber, onlyUserId],
   );
   return rows.map((r) => {
     const completed = r.completed_collaborations ?? 0;

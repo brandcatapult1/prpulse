@@ -19,17 +19,20 @@ const dateLabel = (iso) =>
   iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—';
 
 /** Expanded row: every creator on the campaign with their deliverables. */
-function CreatorDeliverables({ campaignId, managerId, creator, colSpan }) {
+function CreatorDeliverables({ campaignId, managerId, creator, before, colSpan }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
-    prProgressApi.creators(campaignId, managerId, creator)
+    prProgressApi.creators(campaignId, managerId, creator, before)
       .then((d) => { if (!cancelled) setRows(Array.isArray(d) ? d : []); })
       .catch((err) => { if (!cancelled) setError(err.message ?? 'Could not load creators'); });
     return () => { cancelled = true; };
-  }, [campaignId, managerId, creator]);
+  }, [campaignId, managerId, creator, before]);
+
+  const carried = (rows ?? []).flatMap((c) =>
+    c.deliverables.filter((d) => d.carried).map((d) => ({ creator: c.full_name, manager: c.manager_name, d })));
 
   return (
     <tr>
@@ -62,9 +65,9 @@ function CreatorDeliverables({ campaignId, managerId, creator, colSpan }) {
                     <td className="border-b border-line px-2 py-1.5">{stageLabel(c.stage)}</td>
                     <td className="border-b border-line px-2 py-1.5 text-center tabular-nums">{posted}/{total}</td>
                     <td className="border-b border-line px-2 py-1.5">
-                      {total === 0 ? '—' : (
+                      {c.deliverables.filter((d) => !d.carried).length === 0 ? '—' : (
                         <ul className="space-y-0.5">
-                          {c.deliverables.map((d, i) => (
+                          {c.deliverables.filter((d) => !d.carried).map((d, i) => (
                             <li key={i}>
                               {TYPE_LABELS[d.type] ?? d.type}
                               {d.quantity > 1 ? ` ×${d.quantity}` : ''} ·{' '}
@@ -89,6 +92,37 @@ function CreatorDeliverables({ campaignId, managerId, creator, colSpan }) {
             </tbody>
           </table>
         )}
+        {carried.length > 0 && (
+          <div className="mt-4">
+            <h3 className="mb-1.5 text-2xs font-semibold text-amber-800">
+              Balance from previous cycles ({carried.length})
+            </h3>
+            <table className="w-full border-collapse text-2xs">
+              <thead>
+                <tr className="bg-amber-50 text-left text-ink-tertiary">
+                  <th className="border-b border-line px-2 py-1.5 font-medium">Creator</th>
+                  <th className="border-b border-line px-2 py-1.5 font-medium">Account manager</th>
+                  <th className="border-b border-line px-2 py-1.5 font-medium">Deliverable</th>
+                  <th className="border-b border-line px-2 py-1.5 font-medium">Was due</th>
+                  <th className="border-b border-line px-2 py-1.5 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {carried.map((item, i) => (
+                  <tr key={i}>
+                    <td className="border-b border-line px-2 py-1.5 font-medium text-ink">{item.creator}</td>
+                    <td className="border-b border-line px-2 py-1.5">{item.manager ?? '—'}</td>
+                    <td className="border-b border-line px-2 py-1.5">
+                      {TYPE_LABELS[item.d.type] ?? item.d.type}{item.d.quantity > 1 ? ` ×${item.d.quantity}` : ''}
+                    </td>
+                    <td className="border-b border-line px-2 py-1.5">{dateLabel(item.d.due_date)}</td>
+                    <td className="border-b border-line px-2 py-1.5 capitalize">{item.d.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </td>
     </tr>
   );
@@ -105,6 +139,7 @@ const COLUMNS = [
   { key: 'completed', label: 'Completed' },
   { key: 'status', label: 'Status' },
   { key: 'remaining', label: 'Remaining to complete' },
+  { key: 'balance_prev', label: 'Balance from last month' },
 ];
 
 function sortRows(rows, key, dir) {
@@ -363,7 +398,7 @@ export function PrProgressPage() {
                       </td>
                     ))}
                   </tr>
-                  {openIds.has(row.id) && <CreatorDeliverables campaignId={row.id} managerId={managerId} creator={creator} colSpan={COLUMNS.length} />}
+                  {openIds.has(row.id) && <CreatorDeliverables campaignId={row.id} managerId={managerId} creator={creator} before={row.cycle_start} colSpan={COLUMNS.length} />}
                 </Fragment>
               ))}
             </tbody>

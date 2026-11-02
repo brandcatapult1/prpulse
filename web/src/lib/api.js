@@ -268,8 +268,9 @@ export const reportsApi = {
 export const prProgressApi = {
   campaigns: () => api('/pr-progress/campaigns'),
   managers: (campaign) => api(`/pr-progress/managers${campaign ? `?campaign=${encodeURIComponent(campaign)}` : ''}`),
-  creators: (campaignId, manager, creator) => {
+  creators: (campaignId, manager, creator, before) => {
     const q = new URLSearchParams();
+    if (before) q.set('before', before);
     if (manager) q.set('manager', manager);
     if (creator) q.set('creator', creator);
     return api(`/pr-progress/campaigns/${campaignId}/creators${q.size ? `?${q}` : ''}`);

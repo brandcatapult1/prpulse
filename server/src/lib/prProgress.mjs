@@ -9,16 +9,17 @@ const STATUS_LABELS = {
 };
 
 export const PR_PROGRESS_COLUMNS = [
-  { key: 'campaign_name', label: 'Campaign', width: 115, align: 'left' },
-  { key: 'managers', label: 'Account manager', width: 95, align: 'left' },
-  { key: 'total', label: 'Target collaboration', width: 66, align: 'center' },
-  { key: 'creators', label: 'Creator name', width: 100, align: 'left' },
-  { key: 'in_conversation', label: 'In Conversation', width: 64, align: 'center' },
-  { key: 'scheduled', label: 'Scheduled', width: 58, align: 'center' },
-  { key: 'awaiting', label: 'Awaiting Deliverables', width: 72, align: 'center' },
-  { key: 'completed', label: 'Completed', width: 60, align: 'center' },
-  { key: 'status', label: 'Status', width: 56, align: 'center' },
-  { key: 'remaining', label: 'Remaining to complete', width: 68, align: 'center' },
+  { key: 'campaign_name', label: 'Campaign', width: 105, align: 'left' },
+  { key: 'managers', label: 'Account manager', width: 85, align: 'left' },
+  { key: 'total', label: 'Target collaboration', width: 60, align: 'center' },
+  { key: 'creators', label: 'Creator name', width: 90, align: 'left' },
+  { key: 'in_conversation', label: 'In Conversation', width: 56, align: 'center' },
+  { key: 'scheduled', label: 'Scheduled', width: 52, align: 'center' },
+  { key: 'awaiting', label: 'Awaiting Deliverables', width: 64, align: 'center' },
+  { key: 'completed', label: 'Completed', width: 56, align: 'center' },
+  { key: 'status', label: 'Status', width: 52, align: 'center' },
+  { key: 'remaining', label: 'Remaining to complete', width: 58, align: 'center' },
+  { key: 'balance_prev', label: 'Balance from last month', width: 62, align: 'center' },
 ];
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -42,13 +43,15 @@ const ownCampaignSql = (n) => `($${n}::uuid IS NULL OR EXISTS (
 const OWN_CAMPAIGN_SQL = ownCampaignSql(2);
 
 /** Creator-wise deliverables for one campaign (the expanded row). */
-export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUserId = null, managerId = null, creator = null) {
+export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUserId = null, managerId = null, creator = null, before = null) {
   const { rows } = await pool.query(
     `SELECT e.id AS engagement_id, ct.full_name, mgr.full_name AS manager_name,
             e.conversation_status::text AS stage,
             COALESCE(json_agg(json_build_object(
               'type', d.deliverable_type::text, 'quantity', d.quantity, 'status', d.status::text,
-              'due_date', d.due_date, 'published_date', d.published_date, 'content_link', d.content_link
+              'due_date', d.due_date, 'published_date', d.published_date, 'content_link', d.content_link,
+              'carried', (d.status <> 'posted' AND e.conversation_status::text NOT LIKE 'dropped%'
+                          AND $5::date IS NOT NULL AND COALESCE(d.due_date, d.created_at::date) < $5::date)
             ) ORDER BY d.created_at) FILTER (WHERE d.id IS NOT NULL), '[]'::json) AS deliverables
      FROM engagements e
      JOIN campaigns cam ON cam.id = e.campaign_id
@@ -60,7 +63,7 @@ export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUser
        AND ($4::text IS NULL OR ct.full_name ILIKE '%' || $4::text || '%')
      GROUP BY e.id, ct.full_name, mgr.full_name, e.conversation_status
      ORDER BY ct.full_name`,
-    [campaignId, onlyUserId, managerId, creator],
+    [campaignId, onlyUserId, managerId, creator, before],
   );
   return rows;
 }
@@ -122,17 +125,26 @@ export async function loadPrProgressCycles(pool, onlyUserId = null, campaignId =
     return { cycles, current: running ? running.cycle_number : null };
   }
 
+  // Several campaigns share a cycle number but not always its dates; show the dates most campaigns use.
   const { rows } = await pool.query(
-    `SELECT cc.cycle_number
+    `SELECT cc.cycle_number, cc.cycle_start::text AS start_date, (cc.cycle_end - 1)::text AS end_date,
+            count(*)::int AS n
      FROM campaign_cycles cc JOIN campaigns cam ON cam.id = cc.campaign_id
      WHERE cam.status <> 'archived' AND ${OWN_CAMPAIGN_SQL} AND cc.cycle_start <= $1::date
-     GROUP BY cc.cycle_number ORDER BY cc.cycle_number`,
+     GROUP BY cc.cycle_number, cc.cycle_start, cc.cycle_end
+     ORDER BY cc.cycle_number, count(*) DESC, cc.cycle_start`,
     [today, onlyUserId],
   );
+  const byNumber = new Map();
+  for (const r of rows) if (!byNumber.has(r.cycle_number)) byNumber.set(r.cycle_number, r);
   return {
     cycles: [
       { number: 'current', label: 'Current cycle', range: "each campaign's running cycle" },
-      ...rows.map((r) => ({ number: r.cycle_number, label: `Cycle ${r.cycle_number}`, range: '' })),
+      ...[...byNumber.values()].map((r) => ({
+        number: r.cycle_number,
+        label: `Cycle ${r.cycle_number}`,
+        range: formatRange(r.start_date, r.end_date),
+      })),
     ],
     current: 'current',
   };
@@ -146,6 +158,15 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
   const { rows } = await pool.query(
     `SELECT cam.id, cam.campaign_name, cam.status,
             cc.target, cc.completed_collaborations, cc.remaining_collaborations,
+            cc.cycle_start::text AS cycle_start,
+            (SELECT count(*) FROM deliverables d JOIN engagements e ON e.id = d.engagement_id
+              WHERE e.campaign_id = cam.id AND d.status <> 'posted'
+                AND e.conversation_status::text NOT LIKE 'dropped%'
+                AND COALESCE(d.due_date, d.created_at::date) < cc.cycle_start
+                AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid)
+                AND ($6::text IS NULL OR EXISTS (
+                  SELECT 1 FROM contacts bc WHERE bc.id = e.contact_id AND bc.full_name ILIKE '%' || $6::text || '%'))
+            )::int AS balance_prev,
             COALESCE((
               SELECT string_agg(u.full_name, ', ' ORDER BY u.full_name)
               FROM campaign_managers cm JOIN users u ON u.id = cm.user_id
@@ -201,6 +222,8 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
       campaign_name: r.campaign_name,
       managers: r.managers,
       manager_count: r.manager_count,
+      cycle_start: r.cycle_start,
+      balance_prev: r.balance_prev,
       total: r.target ?? 0,
       creators: r.creators,
       in_conversation: r.in_conversation,
@@ -268,7 +291,7 @@ const DETAIL_COLUMNS = [
   { label: 'Account manager', width: 120 },
   { label: 'Stage', width: 95 },
   { label: 'Posted', width: 50, align: 'center' },
-  { label: 'Deliverables', width: 343 },
+  { label: 'Deliverables', width: 329 },
 ];
 
 /** Rows may carry `details` (creator-wise deliverables) for campaigns that were expanded on screen. */
@@ -286,7 +309,7 @@ export async function buildPrProgressPdf({ rows, cycleLabel, range = '' }) {
 
   const drawHeader = (y) => {
     doc.font('Helvetica-Bold').fontSize(7.5);
-    const h = 30;
+    const h = 34;
     let x = left;
     for (const col of PR_PROGRESS_COLUMNS) {
       doc.rect(x, y, col.width, h).fillAndStroke('#e5e7eb', '#111827');
@@ -350,7 +373,8 @@ export async function buildPrProgressPdf({ rows, cycleLabel, range = '' }) {
         if (y + 18 + 20 > bottom) newPage();
         drawDetailHeader();
         for (const c of row.details) {
-          const lines = c.deliverables.length ? c.deliverables.map(deliverableLine).join('\n') : '-';
+          const current = c.deliverables.filter((d) => !d.carried);
+          const lines = current.length ? current.map(deliverableLine).join('\n') : '-';
           const posted = `${c.deliverables.filter((d) => d.status === 'posted').length}/${c.deliverables.length}`;
           const vals = [c.full_name, c.manager_name ?? '-', STAGE_LABELS[c.stage] ?? (String(c.stage).startsWith('dropped') ? 'Dropped' : c.stage), posted, lines];
           doc.font('Helvetica').fontSize(8);
@@ -364,6 +388,51 @@ export async function buildPrProgressPdf({ rows, cycleLabel, range = '' }) {
             dx += col.width;
           });
           y += dh;
+        }
+
+        // Deliverables left over from earlier cycles, under their own heading.
+        const carried = row.details.flatMap((c) =>
+          c.deliverables.filter((d) => d.carried).map((d) => ({ creator: c.full_name, manager: c.manager_name, d })));
+        if (carried.length) {
+          if (y + 16 + 18 + 20 > bottom) newPage();
+          y += 4;
+          doc.font('Helvetica-Bold').fontSize(8).fillColor('#92400e')
+            .text(`Balance from previous cycles (${carried.length})`, dLeft, y, { width: tableWidth - indent });
+          y += 14;
+          const CARRY_COLS = [
+            { label: 'Creator', width: 130 }, { label: 'Account manager', width: 120 },
+            { label: 'Deliverable', width: 220 }, { label: 'Was due', width: 90 }, { label: 'Status', width: 164 },
+          ];
+          const drawCarryHeader = () => {
+            doc.font('Helvetica-Bold').fontSize(8);
+            let dx = dLeft;
+            for (const col of CARRY_COLS) {
+              doc.rect(dx, y, col.width, 18).fillAndStroke('#fef3c7', '#9ca3af');
+              doc.fillColor('#374151').text(col.label, dx + pad, y + 5, { width: col.width - pad * 2 });
+              dx += col.width;
+            }
+            y += 18;
+            doc.font('Helvetica').fontSize(8);
+          };
+          drawCarryHeader();
+          for (const item of carried) {
+            const vals = [
+              item.creator, item.manager ?? '-',
+              `${TYPE_LABELS[item.d.type] ?? item.d.type}${item.d.quantity > 1 ? ` x${item.d.quantity}` : ''}`,
+              item.d.due_date ? shortDate(item.d.due_date) : '-',
+              `${item.d.status[0].toUpperCase()}${item.d.status.slice(1)}`,
+            ];
+            const hs = vals.map((t, i) => doc.heightOfString(String(t), { width: CARRY_COLS[i].width - pad * 2 }));
+            const dh = Math.max(18, Math.max(...hs) + 8);
+            if (y + dh > bottom) { newPage(); drawCarryHeader(); }
+            let dx = dLeft;
+            CARRY_COLS.forEach((col, i) => {
+              doc.rect(dx, y, col.width, dh).stroke('#d1d5db');
+              doc.fillColor('#111827').text(String(vals[i]), dx + pad, y + 4, { width: col.width - pad * 2 });
+              dx += col.width;
+            });
+            y += dh;
+          }
         }
       }
       y += 6;

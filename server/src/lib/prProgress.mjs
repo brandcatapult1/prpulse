@@ -9,15 +9,16 @@ const STATUS_LABELS = {
 };
 
 export const PR_PROGRESS_COLUMNS = [
-  { key: 'campaign_name', label: 'Campaign', width: 140, align: 'left' },
-  { key: 'managers', label: 'Account manager', width: 120, align: 'left' },
-  { key: 'total', label: 'Total deliverables', width: 70, align: 'center' },
-  { key: 'in_conversation', label: 'In Conversation', width: 70, align: 'center' },
-  { key: 'scheduled', label: 'Scheduled', width: 62, align: 'center' },
-  { key: 'awaiting', label: 'Awaiting Deliverables', width: 80, align: 'center' },
-  { key: 'completed', label: 'Completed', width: 62, align: 'center' },
-  { key: 'status', label: 'Status', width: 62, align: 'center' },
-  { key: 'remaining', label: 'Remaining to complete', width: 76, align: 'center' },
+  { key: 'campaign_name', label: 'Campaign', width: 120, align: 'left' },
+  { key: 'managers', label: 'Account manager', width: 100, align: 'left' },
+  { key: 'total', label: 'Total deliverables', width: 55, align: 'center' },
+  { key: 'creators', label: 'Creator name', width: 110, align: 'left' },
+  { key: 'in_conversation', label: 'In Conversation', width: 58, align: 'center' },
+  { key: 'scheduled', label: 'Scheduled', width: 52, align: 'center' },
+  { key: 'awaiting', label: 'Awaiting Deliverables', width: 68, align: 'center' },
+  { key: 'completed', label: 'Completed', width: 56, align: 'center' },
+  { key: 'status', label: 'Status', width: 55, align: 'center' },
+  { key: 'remaining', label: 'Remaining to complete', width: 64, align: 'center' },
 ];
 
 /** Cycle numbers that exist on at least one non-archived campaign, and the one running today. */
@@ -50,17 +51,23 @@ export async function loadPrProgressCycles(pool, onlyUserId = null) {
      GROUP BY cc.cycle_number ORDER BY cc.cycle_number`,
     [todayIst(), onlyUserId],
   );
-  const numbers = rows.map((r) => r.cycle_number);
-  const started = rows.filter((r) => r.started).map((r) => r.cycle_number);
   return {
-    cycles: rows.map((r) => ({
-      number: r.cycle_number,
-      range: formatRange(r.start_date, r.end_date),
-    })),
-    current: started.length ? Math.max(...started) : (numbers[0] ?? null),
+    cycles: [
+      { number: 'current', label: 'Current cycle', range: "each campaign's running cycle" },
+      ...rows.map((r) => ({
+        number: r.cycle_number,
+        label: `Cycle ${r.cycle_number}`,
+        range: formatRange(r.start_date, r.end_date),
+      })),
+    ],
+    current: 'current',
   };
 }
 
+/**
+ * cycleNumber = a number → that cycle of every campaign that has it.
+ * cycleNumber = null → each campaign's own running cycle (the one that includes today).
+ */
 export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null) {
   const { rows } = await pool.query(
     `SELECT cam.id, cam.campaign_name, cam.status,
@@ -70,6 +77,11 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null) {
               FROM campaign_managers cm JOIN users u ON u.id = cm.user_id
               WHERE cm.campaign_id = cam.id
             ), '') AS managers,
+            COALESCE((
+              SELECT string_agg(ct.full_name, ', ' ORDER BY ct.full_name)
+              FROM engagements e JOIN contacts ct ON ct.id = e.contact_id
+              WHERE e.campaign_id = cam.id AND e.conversation_status::text NOT LIKE 'dropped%'
+            ), '') AS creators,
             (SELECT count(*) FROM engagements e WHERE e.campaign_id = cam.id
                AND e.conversation_status = 'in_conversation')::int AS in_conversation,
             (SELECT count(*) FROM engagements e WHERE e.campaign_id = cam.id
@@ -77,10 +89,17 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null) {
             (SELECT count(*) FROM engagements e WHERE e.campaign_id = cam.id
                AND e.conversation_status = 'awaiting_final_deliverables')::int AS awaiting
      FROM campaigns cam
-     JOIN campaign_cycles cc ON cc.campaign_id = cam.id AND cc.cycle_number = $1
+     JOIN LATERAL (
+       SELECT c.* FROM campaign_cycles c
+       WHERE c.campaign_id = cam.id AND ($1::int IS NULL OR c.cycle_number = $1::int)
+       ORDER BY (c.cycle_start <= $3::date AND $3::date < c.cycle_end) DESC,
+                (c.cycle_start <= $3::date) DESC,
+                CASE WHEN c.cycle_start <= $3::date THEN -c.cycle_number ELSE c.cycle_number END
+       LIMIT 1
+     ) cc ON true
      WHERE cam.status <> 'archived' AND ${OWN_CAMPAIGN_SQL}
      ORDER BY cam.campaign_name`,
-    [cycleNumber, onlyUserId],
+    [cycleNumber, onlyUserId, todayIst()],
   );
   return rows.map((r) => {
     const completed = r.completed_collaborations ?? 0;
@@ -89,6 +108,7 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null) {
       campaign_name: r.campaign_name,
       managers: r.managers,
       total: r.target ?? 0,
+      creators: r.creators,
       in_conversation: r.in_conversation,
       scheduled: r.scheduled,
       awaiting: r.awaiting,
@@ -126,7 +146,7 @@ export function asOfLabel() {
   return `${ordinal(d)} ${month} ${y}`;
 }
 
-export async function buildPrProgressPdf({ rows, cycleNumber, range = '' }) {
+export async function buildPrProgressPdf({ rows, cycleLabel, range = '' }) {
   const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margins: { top: 36, right: 36, bottom: 36, left: 36 } });
   const chunks = [];
   doc.on('data', (c) => chunks.push(c));
@@ -152,7 +172,7 @@ export async function buildPrProgressPdf({ rows, cycleNumber, range = '' }) {
   doc.font('Helvetica-Bold').fontSize(15).fillColor('#111827')
     .text(`PR Progress Report - As of ${asOfLabel()}`, left, 36, { width: tableWidth, align: 'center' });
   doc.font('Helvetica').fontSize(9).fillColor('#6b7280')
-    .text(`Cycle ${cycleNumber}${range ? ` (${range})` : ''}`, left, 58, { width: tableWidth, align: 'center' });
+    .text(`${cycleLabel}${range ? ` (${range})` : ''}`, left, 58, { width: tableWidth, align: 'center' });
 
   let y = drawHeader(78);
   doc.font('Helvetica').fontSize(9);

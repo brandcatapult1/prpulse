@@ -9,6 +9,7 @@ const COLUMNS = [
   { key: 'campaign_name', label: 'Campaign', align: 'left' },
   { key: 'managers', label: 'Account manager', align: 'left' },
   { key: 'total', label: 'Total deliverables' },
+  { key: 'creators', label: 'Creator name', align: 'left' },
   { key: 'in_conversation', label: 'In Conversation' },
   { key: 'scheduled', label: 'Scheduled' },
   { key: 'awaiting', label: 'Awaiting Deliverables' },
@@ -113,7 +114,7 @@ export function PrProgressPage() {
             {cycles.length === 0 && <option value="">No cycles</option>}
             {cycles.map((c) => (
               <option key={c.number} value={c.number}>
-                Cycle {c.number}{c.range ? ` (${c.range})` : ''}
+                {c.label ?? `Cycle ${c.number}`}{c.range ? ` (${c.range})` : ''}
               </option>
             ))}
           </select>

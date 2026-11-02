@@ -16,9 +16,11 @@ prProgressRouter.use(requireAuth, (req, res, next) => {
   }
 });
 
+/** 'current' → { number: null }; a positive integer → { number }; anything else → null. */
 function cycleParam(req) {
+  if (req.query.cycle === 'current') return { number: null };
   const n = Number.parseInt(req.query.cycle, 10);
-  return Number.isInteger(n) && n >= 1 ? n : null;
+  return Number.isInteger(n) && n >= 1 ? { number: n } : null;
 }
 
 prProgressRouter.get('/cycles', async (req, res) => {
@@ -33,8 +35,8 @@ prProgressRouter.get('/', async (req, res) => {
   try {
     const cycle = cycleParam(req);
     if (!cycle) return res.status(400).json({ error: 'Select a cycle' });
-    const rows = await loadPrProgressRows(pool, cycle, progressScope(req.user));
-    res.json({ cycle, as_of: asOfLabel(), rows });
+    const rows = await loadPrProgressRows(pool, cycle.number, progressScope(req.user));
+    res.json({ cycle: cycle.number ?? 'current', as_of: asOfLabel(), rows });
   } catch (err) {
     res.status(503).json({ error: err.message ?? 'Could not load PR progress' });
   }
@@ -44,12 +46,18 @@ prProgressRouter.get('/pdf', async (req, res) => {
   try {
     const cycle = cycleParam(req);
     if (!cycle) return res.status(400).json({ error: 'Select a cycle' });
-    const rows = sortPrProgressRows(await loadPrProgressRows(pool, cycle, progressScope(req.user)), req.query.sort, req.query.dir);
+    const rows = sortPrProgressRows(
+      await loadPrProgressRows(pool, cycle.number, progressScope(req.user)), req.query.sort, req.query.dir,
+    );
     const { cycles } = await loadPrProgressCycles(pool, progressScope(req.user));
-    const range = cycles.find((c) => c.number === cycle)?.range ?? '';
-    const pdf = await buildPrProgressPdf({ rows, cycleNumber: cycle, range });
+    const picked = cycles.find((c) => String(c.number) === String(req.query.cycle));
+    const pdf = await buildPrProgressPdf({
+      rows,
+      cycleLabel: picked?.label ?? 'Current cycle',
+      range: picked?.range ?? '',
+    });
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="pr-progress-cycle-${cycle}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="pr-progress-cycle-${req.query.cycle}.pdf"`);
     res.send(pdf);
   } catch (err) {
     res.status(503).json({ error: err.message ?? 'Could not export PDF' });

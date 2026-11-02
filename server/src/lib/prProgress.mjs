@@ -171,6 +171,11 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
               SELECT string_agg(u.full_name, ', ' ORDER BY u.full_name)
               FROM campaign_managers cm JOIN users u ON u.id = cm.user_id
               WHERE cm.campaign_id = cam.id
+                AND ($5::uuid IS NULL OR cm.user_id = $5::uuid)
+                AND ($6::text IS NULL OR EXISTS (
+                  SELECT 1 FROM engagements me JOIN contacts mc ON mc.id = me.contact_id
+                  WHERE me.campaign_id = cam.id AND me.assigned_manager = cm.user_id
+                    AND mc.full_name ILIKE '%' || $6::text || '%'))
             ), '') AS managers,
             (SELECT count(*) FROM campaign_managers cm WHERE cm.campaign_id = cam.id)::int AS manager_count,
             COALESCE((

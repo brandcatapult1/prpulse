@@ -113,7 +113,7 @@ export function PrProgressPage() {
             {cycles.length === 0 && <option value="">No cycles</option>}
             {cycles.map((c) => (
               <option key={c.number} value={c.number}>
-                Cycle {c.number}{c.range ? ` · ${c.range}` : ''}
+                Cycle {c.number}{c.range ? ` (${c.range})` : ''}
               </option>
             ))}
           </select>

@@ -21,7 +21,6 @@ export const PR_PROGRESS_COLUMNS = [
   { key: 'remaining', label: 'Remaining to complete', width: 64, align: 'center' },
 ];
 
-/** Cycle numbers that exist on at least one non-archived campaign, and the one running today. */
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** "1 Nov – 30 Nov 2026" from two YYYY-MM-DD dates (inclusive). */
@@ -41,24 +40,58 @@ export function progressScope(user) {
 const OWN_CAMPAIGN_SQL = `($2::uuid IS NULL OR EXISTS (
   SELECT 1 FROM campaign_managers mine WHERE mine.campaign_id = cam.id AND mine.user_id = $2::uuid))`;
 
-export async function loadPrProgressCycles(pool, onlyUserId = null) {
+/** Campaigns the viewer may pick in the filter. */
+export async function loadPrProgressCampaigns(pool, onlyUserId = null) {
   const { rows } = await pool.query(
-    `SELECT cc.cycle_number, bool_or(cc.cycle_start <= $1::date) AS started,
-            min(cc.cycle_start)::text AS start_date,
-            (max(cc.cycle_end) - 1)::text AS end_date
-     FROM campaign_cycles cc JOIN campaigns cam ON cam.id = cc.campaign_id
+    `SELECT cam.id, cam.campaign_name FROM campaigns cam
      WHERE cam.status <> 'archived' AND ${OWN_CAMPAIGN_SQL}
+     ORDER BY cam.campaign_name`,
+    [null, onlyUserId],
+  );
+  return rows;
+}
+
+/**
+ * Cycle choices, like the Reports page: only cycles that have started.
+ * For one campaign: "Cycle 2 of 12 (28 Nov – 27 Dec)" and the running cycle is the default.
+ * For all campaigns: "Current cycle" (each campaign's own running cycle) plus cycle numbers.
+ */
+export async function loadPrProgressCycles(pool, onlyUserId = null, campaignId = null) {
+  const today = todayIst();
+  if (campaignId) {
+    const { rows } = await pool.query(
+      `SELECT cc.cycle_number, cc.cycle_start::text AS start_date, (cc.cycle_end - 1)::text AS end_date,
+              (cc.cycle_start <= $3::date AND $3::date < cc.cycle_end) AS running,
+              cam.campaign_type, cam.term_months
+       FROM campaign_cycles cc JOIN campaigns cam ON cam.id = cc.campaign_id
+       WHERE cam.id = $1::uuid AND cam.status <> 'archived' AND ${OWN_CAMPAIGN_SQL}
+         AND cc.cycle_start <= $3::date
+       ORDER BY cc.cycle_number`,
+      [campaignId, onlyUserId, today],
+    );
+    const cycles = rows.map((r) => {
+      const of = r.campaign_type === 'monthly' && r.term_months ? ` of ${r.term_months}` : '';
+      return {
+        number: r.cycle_number,
+        label: `Cycle ${r.cycle_number}${of}`,
+        range: formatRange(r.start_date, r.end_date),
+      };
+    });
+    const running = rows.find((r) => r.running) ?? rows[rows.length - 1];
+    return { cycles, current: running ? running.cycle_number : null };
+  }
+
+  const { rows } = await pool.query(
+    `SELECT cc.cycle_number
+     FROM campaign_cycles cc JOIN campaigns cam ON cam.id = cc.campaign_id
+     WHERE cam.status <> 'archived' AND ${OWN_CAMPAIGN_SQL} AND cc.cycle_start <= $1::date
      GROUP BY cc.cycle_number ORDER BY cc.cycle_number`,
-    [todayIst(), onlyUserId],
+    [today, onlyUserId],
   );
   return {
     cycles: [
       { number: 'current', label: 'Current cycle', range: "each campaign's running cycle" },
-      ...rows.map((r) => ({
-        number: r.cycle_number,
-        label: `Cycle ${r.cycle_number}`,
-        range: formatRange(r.start_date, r.end_date),
-      })),
+      ...rows.map((r) => ({ number: r.cycle_number, label: `Cycle ${r.cycle_number}`, range: '' })),
     ],
     current: 'current',
   };
@@ -68,7 +101,7 @@ export async function loadPrProgressCycles(pool, onlyUserId = null) {
  * cycleNumber = a number → that cycle of every campaign that has it.
  * cycleNumber = null → each campaign's own running cycle (the one that includes today).
  */
-export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null) {
+export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, campaignId = null) {
   const { rows } = await pool.query(
     `SELECT cam.id, cam.campaign_name, cam.status,
             cc.target, cc.completed_collaborations, cc.remaining_collaborations,
@@ -98,8 +131,9 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null) {
        LIMIT 1
      ) cc ON true
      WHERE cam.status <> 'archived' AND ${OWN_CAMPAIGN_SQL}
+       AND ($4::uuid IS NULL OR cam.id = $4::uuid)
      ORDER BY cam.campaign_name`,
-    [cycleNumber, onlyUserId, todayIst()],
+    [cycleNumber, onlyUserId, todayIst(), campaignId],
   );
   return rows.map((r) => {
     const completed = r.completed_collaborations ?? 0;

@@ -35,7 +35,10 @@ export function PrProgressPage() {
   const allowed = Boolean(user);
 
   const [cycles, setCycles] = useState([]);
+  const [campaigns, setCampaigns] = useState([]);
+  const [campaignId, setCampaignId] = useState('');
   const [cycle, setCycle] = useState('');
+  const [currentCycle, setCurrentCycle] = useState('');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -44,25 +47,32 @@ export function PrProgressPage() {
 
   useEffect(() => {
     if (!allowed) return;
-    prProgressApi.cycles()
+    prProgressApi.campaigns().then((rows) => setCampaigns(Array.isArray(rows) ? rows : [])).catch(() => {});
+  }, [allowed]);
+
+  useEffect(() => {
+    if (!allowed) return;
+    setCycle('');
+    prProgressApi.cycles(campaignId)
       .then((p) => {
         setCycles(p.cycles ?? []);
-        if (p.current != null) setCycle(String(p.current));
+        setCurrentCycle(p.current != null ? String(p.current) : '');
+        setCycle(p.current != null ? String(p.current) : '');
       })
       .catch((err) => setError(err.message ?? 'Could not load cycles'));
-  }, [allowed]);
+  }, [allowed, campaignId]);
 
   useEffect(() => {
     if (!cycle) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
-    prProgressApi.report(cycle)
+    prProgressApi.report(cycle, campaignId)
       .then((d) => { if (!cancelled) setData(d); })
       .catch((err) => { if (!cancelled) setError(err.message ?? 'Could not load PR progress'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [cycle]);
+  }, [cycle, campaignId]);
 
   const rows = useMemo(
     () => (data ? sortRows(data.rows, sort.key, sort.dir) : []),
@@ -78,7 +88,7 @@ export function PrProgressPage() {
     if (!cycle || exporting) return;
     setExporting(true);
     try {
-      const { blob, contentDisposition } = await prProgressApi.pdf(cycle, sort.key, sort.dir);
+      const { blob, contentDisposition } = await prProgressApi.pdf(cycle, sort.key, sort.dir, campaignId);
       const match = /filename="?([^";]+)"?/i.exec(contentDisposition);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -109,8 +119,17 @@ export function PrProgressPage() {
 
       <div className="flex flex-wrap items-end gap-3">
         <label className="block">
+          <span className="mb-1.5 block text-2xs font-medium text-ink-secondary">Campaign</span>
+          <select className="input-field w-64" value={campaignId} onChange={(e) => setCampaignId(e.target.value)}>
+            <option value="">All campaigns</option>
+            {campaigns.map((c) => (
+              <option key={c.id} value={c.id}>{c.campaign_name}</option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
           <span className="mb-1.5 block text-2xs font-medium text-ink-secondary">Cycle</span>
-          <select className="input-field w-72" value={cycle} onChange={(e) => setCycle(e.target.value)}>
+          <select className="input-field w-80" value={cycle} onChange={(e) => setCycle(e.target.value)}>
             {cycles.length === 0 && <option value="">No cycles</option>}
             {cycles.map((c) => (
               <option key={c.number} value={c.number}>
@@ -118,6 +137,9 @@ export function PrProgressPage() {
               </option>
             ))}
           </select>
+          {campaignId && cycle && cycle === currentCycle && (
+            <span className="mt-1 block text-2xs text-ink-tertiary">Current cycle</span>
+          )}
         </label>
       </div>
 

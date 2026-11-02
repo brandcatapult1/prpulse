@@ -266,10 +266,12 @@ export const reportsApi = {
 };
 
 export const prProgressApi = {
-  cycles: () => api('/pr-progress/cycles'),
-  report: (cycle) => api(`/pr-progress?cycle=${encodeURIComponent(cycle)}`),
-  pdf: (cycle, sort, dir) =>
-    download(`/pr-progress/pdf?cycle=${encodeURIComponent(cycle)}&sort=${encodeURIComponent(sort)}&dir=${dir}`),
+  campaigns: () => api('/pr-progress/campaigns'),
+  cycles: (campaign) => api(`/pr-progress/cycles${campaign ? `?campaign=${encodeURIComponent(campaign)}` : ''}`),
+  report: (cycle, campaign) =>
+    api(`/pr-progress?cycle=${encodeURIComponent(cycle)}${campaign ? `&campaign=${encodeURIComponent(campaign)}` : ''}`),
+  pdf: (cycle, sort, dir, campaign) =>
+    download(`/pr-progress/pdf?cycle=${encodeURIComponent(cycle)}&sort=${encodeURIComponent(sort)}&dir=${dir}${campaign ? `&campaign=${encodeURIComponent(campaign)}` : ''}`),
 };
 
 export const lookupApi = {

@@ -265,6 +265,13 @@ export const reportsApi = {
   cyclePdf: (cycleId) => download(`/reports/cycles/${cycleId}/pdf`),
 };
 
+export const prProgressApi = {
+  cycles: () => api('/pr-progress/cycles'),
+  report: (cycle) => api(`/pr-progress?cycle=${encodeURIComponent(cycle)}`),
+  pdf: (cycle, sort, dir) =>
+    download(`/pr-progress/pdf?cycle=${encodeURIComponent(cycle)}&sort=${encodeURIComponent(sort)}&dir=${dir}`),
+};
+
 export const lookupApi = {
   tags: () => api('/lookup/tags'),
   categories: () => api('/lookup/categories'),

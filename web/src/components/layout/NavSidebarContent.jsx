@@ -29,6 +29,7 @@ export function NavSidebarContent({
 }) {
   const items = NAV_ITEMS.filter((item) => {
     if (item.to === '/settings') return canAccessSettings(user?.role);
+    if (item.to === '/pr-progress') return user?.role === 'admin' || user?.role === 'senior_manager';
     return true;
   });
 

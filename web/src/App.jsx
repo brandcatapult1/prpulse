@@ -11,6 +11,7 @@ import { CampaignsPage } from './pages/CampaignsPage.jsx';
 import { CampaignViewPage } from './pages/CampaignViewPage.jsx';
 import { EngagementRecordPage, PlaceholderPage } from './pages/EngagementRecordPage.jsx';
 import { ReportsPage } from './pages/ReportsPage.jsx';
+import { PrProgressPage } from './pages/PrProgressPage.jsx';
 import { RegistrationsPage } from './pages/RegistrationsPage.jsx';
 import { BrandsPage } from './pages/BrandsPage.jsx';
 import { BulkImportPage } from './pages/BulkImportPage.jsx';
@@ -38,6 +39,7 @@ export default function App() {
             <Route path="brands" element={<BrandsPage />} />
             <Route path="registrations" element={<RegistrationsPage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="pr-progress" element={<PrProgressPage />} />
             <Route path="import" element={<BulkImportPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="settings/:sectionKey" element={<SettingsPage />} />

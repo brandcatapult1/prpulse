@@ -64,6 +64,12 @@ export const MODULES = {
     subtitle: 'Build a client-ready monthly report',
     path: '/reports',
   },
+  prProgress: {
+    navLabel: 'PR Progress',
+    pageTitle: 'PR Progress',
+    subtitle: 'Campaign-wise outreach progress for a cycle',
+    path: '/pr-progress',
+  },
   feedback: {
     prd: 9,
     pageTitle: 'Feedback',
@@ -83,6 +89,7 @@ export const NAV_ITEMS = [
   MODULES.brands,
   MODULES.registration,
   MODULES.reporting,
+  MODULES.prProgress,
   MODULES.settings,
 ].map((m) => ({ to: m.path, label: m.navLabel, end: m.path === '/' }));
 

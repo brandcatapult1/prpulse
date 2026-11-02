@@ -42,7 +42,7 @@ const ownCampaignSql = (n) => `($${n}::uuid IS NULL OR EXISTS (
 const OWN_CAMPAIGN_SQL = ownCampaignSql(2);
 
 /** Creator-wise deliverables for one campaign (the expanded row). */
-export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUserId = null) {
+export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUserId = null, managerId = null) {
   const { rows } = await pool.query(
     `SELECT e.id AS engagement_id, ct.full_name, e.conversation_status::text AS stage,
             COALESCE(json_agg(json_build_object(
@@ -54,9 +54,24 @@ export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUser
      JOIN contacts ct ON ct.id = e.contact_id
      LEFT JOIN deliverables d ON d.engagement_id = e.id
      WHERE e.campaign_id = $1::uuid AND ${OWN_CAMPAIGN_SQL}
+       AND ($3::uuid IS NULL OR e.assigned_manager = $3::uuid)
      GROUP BY e.id, ct.full_name, e.conversation_status
      ORDER BY ct.full_name`,
-    [campaignId, onlyUserId],
+    [campaignId, onlyUserId, managerId],
+  );
+  return rows;
+}
+
+/** Account managers the viewer can filter by. */
+export async function loadPrProgressManagers(pool, onlyUserId = null) {
+  const { rows } = await pool.query(
+    `SELECT DISTINCT u.id, u.full_name
+     FROM campaign_managers cm
+     JOIN campaigns cam ON cam.id = cm.campaign_id
+     JOIN users u ON u.id = cm.user_id
+     WHERE cam.status <> 'archived' AND ${ownCampaignSql(1)}
+     ORDER BY u.full_name`,
+    [onlyUserId],
   );
   return rows;
 }
@@ -122,7 +137,7 @@ export async function loadPrProgressCycles(pool, onlyUserId = null, campaignId =
  * cycleNumber = a number → that cycle of every campaign that has it.
  * cycleNumber = null → each campaign's own running cycle (the one that includes today).
  */
-export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, campaignId = null) {
+export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, campaignId = null, managerId = null) {
   const { rows } = await pool.query(
     `SELECT cam.id, cam.campaign_name, cam.status,
             cc.target, cc.completed_collaborations, cc.remaining_collaborations,
@@ -131,17 +146,22 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
               FROM campaign_managers cm JOIN users u ON u.id = cm.user_id
               WHERE cm.campaign_id = cam.id
             ), '') AS managers,
+            (SELECT count(*) FROM campaign_managers cm WHERE cm.campaign_id = cam.id)::int AS manager_count,
             COALESCE((
               SELECT string_agg(ct.full_name, ', ' ORDER BY ct.full_name)
               FROM engagements e JOIN contacts ct ON ct.id = e.contact_id
               WHERE e.campaign_id = cam.id AND e.conversation_status::text NOT LIKE 'dropped%'
+                AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid)
             ), '') AS creators,
             (SELECT count(*) FROM engagements e WHERE e.campaign_id = cam.id
-               AND e.conversation_status = 'in_conversation')::int AS in_conversation,
+               AND e.conversation_status = 'in_conversation'
+                 AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid))::int AS in_conversation,
             (SELECT count(*) FROM engagements e WHERE e.campaign_id = cam.id
-               AND e.conversation_status = 'scheduled')::int AS scheduled,
+               AND e.conversation_status = 'scheduled'
+                 AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid))::int AS scheduled,
             (SELECT count(*) FROM engagements e WHERE e.campaign_id = cam.id
-               AND e.conversation_status = 'awaiting_final_deliverables')::int AS awaiting
+               AND e.conversation_status = 'awaiting_final_deliverables'
+                 AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid))::int AS awaiting
      FROM campaigns cam
      JOIN LATERAL (
        SELECT c.* FROM campaign_cycles c
@@ -153,8 +173,10 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
      ) cc ON true
      WHERE cam.status <> 'archived' AND ${OWN_CAMPAIGN_SQL}
        AND ($4::uuid IS NULL OR cam.id = $4::uuid)
+       AND ($5::uuid IS NULL OR EXISTS (
+         SELECT 1 FROM campaign_managers pm WHERE pm.campaign_id = cam.id AND pm.user_id = $5::uuid))
      ORDER BY cam.campaign_name`,
-    [cycleNumber, onlyUserId, todayIst(), campaignId],
+    [cycleNumber, onlyUserId, todayIst(), campaignId, managerId],
   );
   return rows.map((r) => {
     const completed = r.completed_collaborations ?? 0;
@@ -162,6 +184,7 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
       id: r.id,
       campaign_name: r.campaign_name,
       managers: r.managers,
+      manager_count: r.manager_count,
       total: r.target ?? 0,
       creators: r.creators,
       in_conversation: r.in_conversation,

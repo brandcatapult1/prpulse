@@ -3,7 +3,7 @@ import { pool } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
 import { assertStaffUser } from '../lib/permissions.mjs';
 import {
-  asOfLabel, buildPrProgressPdf, loadCampaignCreatorDeliverables, loadPrProgressCampaigns, loadPrProgressCycles, loadPrProgressRows, progressScope, sortPrProgressRows,
+  asOfLabel, buildPrProgressPdf, loadCampaignCreatorDeliverables, loadPrProgressCampaigns, loadPrProgressManagers, loadPrProgressCycles, loadPrProgressRows, progressScope, sortPrProgressRows,
 } from '../lib/prProgress.mjs';
 
 export const prProgressRouter = Router();
@@ -26,6 +26,19 @@ function cycleParam(req) {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const campaignParam = (req) => (UUID_RE.test(req.query.campaign ?? '') ? req.query.campaign : null);
 
+/** Account-manager filter is for admins and senior managers only. */
+const managerParam = (req) =>
+  progressScope(req.user) === null && UUID_RE.test(req.query.manager ?? '') ? req.query.manager : null;
+
+prProgressRouter.get('/managers', async (req, res) => {
+  try {
+    if (progressScope(req.user) !== null) return res.json([]);
+    res.json(await loadPrProgressManagers(pool, null));
+  } catch (err) {
+    res.status(503).json({ error: err.message ?? 'Could not load account managers' });
+  }
+});
+
 prProgressRouter.get('/campaigns', async (req, res) => {
   try {
     res.json(await loadPrProgressCampaigns(pool, progressScope(req.user)));
@@ -37,7 +50,7 @@ prProgressRouter.get('/campaigns', async (req, res) => {
 prProgressRouter.get('/campaigns/:id/creators', async (req, res) => {
   try {
     if (!UUID_RE.test(req.params.id)) return res.status(400).json({ error: 'Invalid campaign' });
-    res.json(await loadCampaignCreatorDeliverables(pool, req.params.id, progressScope(req.user)));
+    res.json(await loadCampaignCreatorDeliverables(pool, req.params.id, progressScope(req.user), managerParam(req)));
   } catch (err) {
     res.status(503).json({ error: err.message ?? 'Could not load creators' });
   }
@@ -55,7 +68,7 @@ prProgressRouter.get('/', async (req, res) => {
   try {
     const cycle = cycleParam(req);
     if (!cycle) return res.status(400).json({ error: 'Select a cycle' });
-    const rows = await loadPrProgressRows(pool, cycle.number, progressScope(req.user), campaignParam(req));
+    const rows = await loadPrProgressRows(pool, cycle.number, progressScope(req.user), campaignParam(req), managerParam(req));
     res.json({ cycle: cycle.number ?? 'current', as_of: asOfLabel(), rows });
   } catch (err) {
     res.status(503).json({ error: err.message ?? 'Could not load PR progress' });
@@ -67,7 +80,7 @@ prProgressRouter.get('/pdf', async (req, res) => {
     const cycle = cycleParam(req);
     if (!cycle) return res.status(400).json({ error: 'Select a cycle' });
     const rows = sortPrProgressRows(
-      await loadPrProgressRows(pool, cycle.number, progressScope(req.user), campaignParam(req)), req.query.sort, req.query.dir,
+      await loadPrProgressRows(pool, cycle.number, progressScope(req.user), campaignParam(req), managerParam(req)), req.query.sort, req.query.dir,
     );
     const { cycles } = await loadPrProgressCycles(pool, progressScope(req.user), campaignParam(req));
     const picked = cycles.find((c) => String(c.number) === String(req.query.cycle));

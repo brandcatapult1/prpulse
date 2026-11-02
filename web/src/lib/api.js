@@ -267,12 +267,14 @@ export const reportsApi = {
 
 export const prProgressApi = {
   campaigns: () => api('/pr-progress/campaigns'),
-  creators: (campaignId) => api(`/pr-progress/campaigns/${campaignId}/creators`),
+  managers: () => api('/pr-progress/managers'),
+  creators: (campaignId, manager) =>
+    api(`/pr-progress/campaigns/${campaignId}/creators${manager ? `?manager=${encodeURIComponent(manager)}` : ''}`),
   cycles: (campaign) => api(`/pr-progress/cycles${campaign ? `?campaign=${encodeURIComponent(campaign)}` : ''}`),
-  report: (cycle, campaign) =>
-    api(`/pr-progress?cycle=${encodeURIComponent(cycle)}${campaign ? `&campaign=${encodeURIComponent(campaign)}` : ''}`),
-  pdf: (cycle, sort, dir, campaign) =>
-    download(`/pr-progress/pdf?cycle=${encodeURIComponent(cycle)}&sort=${encodeURIComponent(sort)}&dir=${dir}${campaign ? `&campaign=${encodeURIComponent(campaign)}` : ''}`),
+  report: (cycle, campaign, manager) =>
+    api(`/pr-progress?cycle=${encodeURIComponent(cycle)}${campaign ? `&campaign=${encodeURIComponent(campaign)}` : ''}${manager ? `&manager=${encodeURIComponent(manager)}` : ''}`),
+  pdf: (cycle, sort, dir, campaign, manager) =>
+    download(`/pr-progress/pdf?cycle=${encodeURIComponent(cycle)}&sort=${encodeURIComponent(sort)}&dir=${dir}${campaign ? `&campaign=${encodeURIComponent(campaign)}` : ''}${manager ? `&manager=${encodeURIComponent(manager)}` : ''}`),
 };
 
 export const lookupApi = {

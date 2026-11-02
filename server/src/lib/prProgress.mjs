@@ -37,8 +37,9 @@ export function progressScope(user) {
   return user.role === 'admin' || user.role === 'senior_manager' ? null : user.id;
 }
 
-const OWN_CAMPAIGN_SQL = `($2::uuid IS NULL OR EXISTS (
-  SELECT 1 FROM campaign_managers mine WHERE mine.campaign_id = cam.id AND mine.user_id = $2::uuid))`;
+const ownCampaignSql = (n) => `($${n}::uuid IS NULL OR EXISTS (
+  SELECT 1 FROM campaign_managers mine WHERE mine.campaign_id = cam.id AND mine.user_id = $${n}::uuid))`;
+const OWN_CAMPAIGN_SQL = ownCampaignSql(2);
 
 /** Creator-wise deliverables for one campaign (the expanded row). */
 export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUserId = null) {
@@ -64,9 +65,9 @@ export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUser
 export async function loadPrProgressCampaigns(pool, onlyUserId = null) {
   const { rows } = await pool.query(
     `SELECT cam.id, cam.campaign_name FROM campaigns cam
-     WHERE cam.status <> 'archived' AND ${OWN_CAMPAIGN_SQL}
+     WHERE cam.status <> 'archived' AND ${ownCampaignSql(1)}
      ORDER BY cam.campaign_name`,
-    [null, onlyUserId],
+    [onlyUserId],
   );
   return rows;
 }

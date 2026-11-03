@@ -15,6 +15,13 @@ const STAGE_LABELS = {
   collaboration_complete: 'Completed',
 };
 const TYPE_LABELS = { reel: 'Reel', story: 'Story', static_carousel_post: 'Post / Carousel', other: 'Other' };
+const stageTone = (s) => {
+  if (s === 'collaboration_complete') return 'success';
+  if (s === 'awaiting_final_deliverables') return 'warning';
+  if (s === 'in_conversation' || s === 'scheduled') return 'info';
+  if (s?.startsWith('dropped')) return 'danger';
+  return 'muted';
+};
 const stageLabel = (s) => STAGE_LABELS[s] ?? (s?.startsWith('dropped') ? 'Dropped' : s);
 const dateLabel = (iso) =>
   iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—';
@@ -35,9 +42,12 @@ function CreatorDeliverables({ campaignId, managerId, creator, before, prev, col
   const carried = (rows ?? []).flatMap((c) =>
     c.deliverables.filter((d) => d.carried).map((d) => ({ creator: c.full_name, manager: c.manager_name, d })));
 
+  const TH = 'px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-ink-tertiary';
+  const TD = 'border-t border-line/60 px-3 py-3 align-top';
+
   return (
     <tr>
-      <td colSpan={colSpan} className="border-b border-line bg-zinc-50/70 px-6 py-4">
+      <td colSpan={colSpan} className="border-b border-line bg-zinc-50/70 px-4 py-4 sm:px-8">
         {error ? (
           <p className="text-2xs text-red-700">{error}</p>
         ) : !rows ? (
@@ -45,79 +55,98 @@ function CreatorDeliverables({ campaignId, managerId, creator, before, prev, col
         ) : rows.length === 0 ? (
           <p className="text-2xs text-ink-secondary">No creators {managerId ? 'for this account manager ' : ''}in this campaign yet.</p>
         ) : (
-          <table className="w-full border-collapse text-2xs">
-            <thead>
-              <tr className="text-left text-ink-tertiary">
-                <th className="border-b border-line px-2 py-1.5 font-medium">Creator</th>
-                <th className="border-b border-line px-2 py-1.5 font-medium">Account manager</th>
-                <th className="border-b border-line px-2 py-1.5 font-medium">Stage</th>
-                <th className="border-b border-line px-2 py-1.5 text-center font-medium">Posted</th>
-                <th className="border-b border-line px-2 py-1.5 font-medium">Deliverables</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((c) => {
-                const total = c.deliverables.length;
-                const posted = c.deliverables.filter((d) => d.status === 'posted').length;
-                return (
-                  <tr key={c.engagement_id} className="align-top">
-                    <td className="border-b border-line px-2 py-1.5 font-medium text-ink">{c.full_name}</td>
-                    <td className="border-b border-line px-2 py-1.5">{c.manager_name ?? '—'}</td>
-                    <td className="border-b border-line px-2 py-1.5">{stageLabel(c.stage)}</td>
-                    <td className="border-b border-line px-2 py-1.5 text-center tabular-nums">{posted}/{total}</td>
-                    <td className="border-b border-line px-2 py-1.5">
-                      {c.deliverables.filter((d) => !d.carried).length === 0 ? '—' : (
-                        <ul className="space-y-0.5">
-                          {c.deliverables.filter((d) => !d.carried).map((d, i) => (
-                            <li key={i}>
-                              {TYPE_LABELS[d.type] ?? d.type}
-                              {d.quantity > 1 ? ` ×${d.quantity}` : ''} ·{' '}
-                              <span className={d.status === 'posted' ? 'text-green-700' : 'text-ink-secondary'}>
-                                {d.status === 'posted'
-                                  ? `Posted${d.published_date ? ` ${dateLabel(d.published_date)}` : ''}`
-                                  : `${d.status[0].toUpperCase()}${d.status.slice(1)}${d.due_date ? ` · due ${dateLabel(d.due_date)}` : ''}`}
+          <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
+            <table className="w-full border-collapse text-2xs">
+              <thead className="bg-zinc-50">
+                <tr>
+                  <th className={TH}>Creator</th>
+                  <th className={TH}>Account manager</th>
+                  <th className={TH}>Stage</th>
+                  <th className={`${TH} text-center`}>Posted</th>
+                  <th className={TH}>Deliverables</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((c) => {
+                  const total = c.deliverables.length;
+                  const posted = c.deliverables.filter((d) => d.status === 'posted').length;
+                  const current = c.deliverables.filter((d) => !d.carried);
+                  return (
+                    <tr key={c.engagement_id} className="transition-colors hover:bg-brand-soft/30">
+                      <td className={`${TD} text-sm font-medium text-ink`}>{c.full_name}</td>
+                      <td className={`${TD} text-ink-secondary`}>{c.manager_name ?? '—'}</td>
+                      <td className={TD}><Pill tone={stageTone(c.stage)}>{stageLabel(c.stage)}</Pill></td>
+                      <td className={`${TD} text-center`}>
+                        <span className={`inline-block min-w-[2.5rem] rounded-full px-2 py-0.5 font-semibold tabular-nums ${
+                          total > 0 && posted === total ? 'bg-teal-50 text-teal-700' : 'bg-zinc-100 text-ink-secondary'
+                        }`}>
+                          {posted}/{total}
+                        </span>
+                      </td>
+                      <td className={TD}>
+                        {current.length === 0 ? <span className="text-ink-tertiary">—</span> : (
+                          <div className="flex flex-wrap gap-1.5">
+                            {current.map((d, i) => (
+                              <span
+                                key={i}
+                                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ring-1 ${
+                                  d.status === 'posted'
+                                    ? 'bg-teal-50 text-teal-800 ring-teal-100'
+                                    : 'bg-white text-ink-secondary ring-line'
+                                }`}
+                              >
+                                <span className="font-medium">
+                                  {TYPE_LABELS[d.type] ?? d.type}{d.quantity > 1 ? ` ×${d.quantity}` : ''}
+                                </span>
+                                <span className="opacity-60">·</span>
+                                <span>
+                                  {d.status === 'posted'
+                                    ? `Posted${d.published_date ? ` ${dateLabel(d.published_date)}` : ''}`
+                                    : `${d.status[0].toUpperCase()}${d.status.slice(1)}${d.due_date ? ` · due ${dateLabel(d.due_date)}` : ''}`}
+                                </span>
+                                {d.content_link && (
+                                  <a href={d.content_link} target="_blank" rel="noreferrer" className="ml-0.5 font-medium text-brand hover:underline">
+                                    link
+                                  </a>
+                                )}
                               </span>
-                              {d.content_link && (
-                                <a href={d.content_link} target="_blank" rel="noreferrer" className="ml-1 text-brand hover:underline">
-                                  link
-                                </a>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
         {carried.length > 0 && (
-          <div className="mt-4">
-            <h3 className="mb-1.5 text-2xs font-semibold text-amber-800">
-              Balance from previous cycles ({carried.length})
+          <div className="mt-4 overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm">
+            <h3 className="flex items-center gap-2 border-b border-amber-100 bg-amber-50 px-4 py-2.5 text-2xs font-semibold text-amber-800">
+              Balance from previous cycles
+              <span className="rounded-full bg-white px-2 py-0.5 tabular-nums ring-1 ring-amber-200">{carried.length}</span>
             </h3>
             <table className="w-full border-collapse text-2xs">
               <thead>
-                <tr className="bg-amber-50 text-left text-ink-tertiary">
-                  <th className="border-b border-line px-2 py-1.5 font-medium">Creator</th>
-                  <th className="border-b border-line px-2 py-1.5 font-medium">Account manager</th>
-                  <th className="border-b border-line px-2 py-1.5 font-medium">Deliverable</th>
-                  <th className="border-b border-line px-2 py-1.5 font-medium">Was due</th>
-                  <th className="border-b border-line px-2 py-1.5 font-medium">Status</th>
+                <tr>
+                  <th className={TH}>Creator</th>
+                  <th className={TH}>Account manager</th>
+                  <th className={TH}>Deliverable</th>
+                  <th className={TH}>Was due</th>
+                  <th className={TH}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {carried.map((item, i) => (
-                  <tr key={i}>
-                    <td className="border-b border-line px-2 py-1.5 font-medium text-ink">{item.creator}</td>
-                    <td className="border-b border-line px-2 py-1.5">{item.manager ?? '—'}</td>
-                    <td className="border-b border-line px-2 py-1.5">
+                  <tr key={i} className="transition-colors hover:bg-amber-50/50">
+                    <td className={`${TD} font-medium text-ink`}>{item.creator}</td>
+                    <td className={`${TD} text-ink-secondary`}>{item.manager ?? '—'}</td>
+                    <td className={TD}>
                       {TYPE_LABELS[item.d.type] ?? item.d.type}{item.d.quantity > 1 ? ` ×${item.d.quantity}` : ''}
                     </td>
-                    <td className="border-b border-line px-2 py-1.5">{dateLabel(item.d.due_date)}</td>
-                    <td className="border-b border-line px-2 py-1.5 capitalize">{item.d.status}</td>
+                    <td className={TD}>{dateLabel(item.d.due_date)}</td>
+                    <td className={TD}><Pill tone="warning"><span className="capitalize">{item.d.status}</span></Pill></td>
                   </tr>
                 ))}
               </tbody>

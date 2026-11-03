@@ -51,7 +51,7 @@ function NavGroup({ item, mobile, onNavClick, user }) {
       {shown && (
         <div className="mt-0.5 space-y-0.5 pl-3">
           {children.map((c) => (
-            <NavLink key={c.to} to={c.to} onClick={onNavClick} className={({ isActive }) => navLinkClass(isActive, mobile)}>
+            <NavLink key={c.to} to={c.to} onClick={onNavClick} className={({ isActive }) => `${navLinkClass(isActive, mobile)} !text-xs`}>
               {c.label}
             </NavLink>
           ))}

@@ -112,7 +112,7 @@ export function AudienceCard({ contactId }) {
 }
 
 // Same grid as the accordion header, so every value sits under its own heading.
-const ROW_GRID = 'grid grid-cols-2 gap-x-4 gap-y-2 px-2 lg:grid-cols-[36px_minmax(150px,1.8fr)_repeat(11,minmax(0,1fr))]';
+const ROW_GRID = 'grid grid-cols-2 gap-x-4 gap-y-2 px-2 lg:grid-cols-[36px_minmax(150px,1.8fr)_repeat(3,minmax(0,1fr))_minmax(112px,1.2fr)_repeat(7,minmax(0,1fr))]';
 
 function DeliverableStatsTable({ deliverables, classification, followers, action }) {
   if (!deliverables.length) {
@@ -198,7 +198,7 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
         className="cursor-pointer px-2 py-3.5 transition-colors hover:bg-zinc-50/70"
         title="Open engagement"
       >
-        <div className="flex flex-wrap items-center gap-x-7 gap-y-3 text-left lg:grid lg:grid-cols-[36px_minmax(150px,1.8fr)_repeat(11,minmax(0,1fr))] lg:gap-x-4">
+        <div className="flex flex-wrap items-center gap-x-7 gap-y-3 text-left lg:grid lg:grid-cols-[36px_minmax(150px,1.8fr)_repeat(3,minmax(0,1fr))_minmax(112px,1.2fr)_repeat(7,minmax(0,1fr))] lg:gap-x-4">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}
@@ -215,7 +215,7 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
           <Col label="Date">{formatDate(row.last_contact_date)}</Col>
           <Col label="Manager">{row.owner_name ?? '—'}</Col>
           <Col label="Reason">{formatCollaborationReason(row.primary_collaboration_reason) ?? '—'}</Col>
-          <Col label="Deliverables"><Chip>{row.deliverables_completed}</Chip></Col>
+          <Col label="Deliverables" className="pr-2"><Chip>{row.deliverables_completed}</Chip></Col>
           {METRICS.map(([k, label]) => (
             <Col key={k} label={label} tint>{k === 'reach' ? reachText : formatCount(stats?.[k])}</Col>
           ))}

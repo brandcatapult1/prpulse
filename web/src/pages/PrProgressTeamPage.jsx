@@ -235,7 +235,9 @@ export function PrProgressTeamPage() {
                         ) : row[`${col.key}_deliv`] != null ? (
                           <div>
                             <div className="font-medium text-ink">{row[col.key]}</div>
-                            <div className="text-[10px] text-ink-tertiary">{row[`${col.key}_deliv`]} deliverables</div>
+                            {row[`${col.key}_deliv`] > 0 && (
+                              <div className="text-[10px] text-ink-tertiary">{row[`${col.key}_deliv`]} deliverables</div>
+                            )}
                           </div>
                         ) : row[col.key]}
                       </td>

@@ -562,7 +562,7 @@ export async function buildPrProgressTeamPdf({ rows, cycleLabel, range = '' }) {
     for (const col of TEAM_COLUMNS) {
       doc.rect(x, y, col.width, 22).stroke('#9ca3af');
       const dv = row[`${col.key}_deliv`];
-      const text = dv != null ? `${row[col.key]}  (${dv} deliverables)` : String(row[col.key] ?? '');
+      const text = dv > 0 ? `${row[col.key]}  (${dv} deliverables)` : String(row[col.key] ?? '');
       doc.fillColor('#111827').text(text, x + pad, y + 7, { width: col.width - pad * 2, align: col.align });
       x += col.width;
     }

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import ContactTagChips from '../tags/ContactTagChips.jsx';
 import { GlassSectionCard } from '../ui/Primitives.jsx';
 import { Pill, formatFee } from '../../lib/format.jsx';
 import { formatClassification, CLASSIFICATION_OPTIONS, classificationSelectLabel } from '../../lib/classifications.js';
@@ -477,27 +478,7 @@ function ContactReadOverview({ contact, extras, tagLabels }) {
               <div>
                 <span className="text-[10px] font-medium uppercase tracking-wider text-ink-tertiary">Tags</span>
                 <div className="mt-1 flex flex-wrap gap-1.5">
-                  {(contact.tags ?? []).map((t) => {
-                    const tag = typeof t === 'string' ? { name: t, type: 'influencer' } : t;
-                    const reason = tag.type === 'system' ? 'From Label' : tag.type === 'campaign' ? 'From campaign' : null;
-                    return reason ? (
-                      <span
-                        key={tag.id ?? tag.name}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-brand/30 bg-brand-soft/60 px-3 py-1.5 text-2xs font-medium text-brand"
-                        title={`System-managed · ${reason}`}
-                      >
-                        <span>{tag.name}</span>
-                        <span className="rounded bg-amber-50 px-1 py-0.5 text-[10px] font-medium text-amber-700">{reason}</span>
-                      </span>
-                    ) : (
-                      <span
-                        key={tag.id ?? tag.name}
-                        className="inline-flex items-center rounded-lg border border-brand bg-brand-soft px-3 py-1.5 text-2xs font-medium text-brand"
-                      >
-                        {tag.name}
-                      </span>
-                    );
-                  })}
+                  <ContactTagChips tags={contact.tags} />
                 </div>
               </div>
             )}

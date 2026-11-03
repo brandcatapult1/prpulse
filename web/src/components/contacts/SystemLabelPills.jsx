@@ -4,8 +4,10 @@ const ORDER = ['New', 'Recent', 'Frequent'];
 const TONE = { New: 'info', Recent: 'success', Frequent: 'brand' };
 
 /** New / Recent / Frequent — derived server-side, so they vanish when no longer true. */
-export function SystemLabelPills({ labels }) {
-  const shown = ORDER.filter((l) => labels?.includes(l));
+export function SystemLabelPills({ labels, topOnly = false }) {
+  const all = ORDER.filter((l) => labels?.includes(l));
+  // Priority when only one fits: Frequent, then Recent, then New.
+  const shown = topOnly ? all.slice(-1) : all;
   if (shown.length === 0) return null;
   return (
     <>

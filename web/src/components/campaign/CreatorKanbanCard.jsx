@@ -243,7 +243,7 @@ function CreatorCardHeader({ engagement }) {
             <span className="truncate text-sm font-medium leading-tight text-ink">
               {engagement.contact_name}
             </span>
-            <SystemLabelPills labels={engagement.contact_labels} />
+            <SystemLabelPills labels={engagement.contact_labels} topOnly />
           </div>
           <div className="mt-0.5">
             <CreatorHandle

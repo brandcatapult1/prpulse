@@ -144,7 +144,7 @@ function DeliverableStatsTable({ deliverables, classification, followers, action
           {METRICS.map(([k, label]) => {
             const est = k === 'reach' ? estimateReach(l, classification, followers) : null;
             return (
-              <div key={k} className="text-2xs font-semibold tabular-nums text-ink">
+              <div key={k} className="text-center text-2xs font-semibold tabular-nums text-ink">
                 <span className="mr-1 text-[10px] font-medium uppercase tracking-wider text-ink-tertiary lg:hidden">{label}</span>
                 {est != null ? `~${formatCount(est)}` : formatCount(l[k])}
               </div>
@@ -217,16 +217,16 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
             <span className="block truncate text-sm font-medium text-ink">{row.campaign_name}</span>
             <span className="block truncate text-2xs font-normal text-ink-tertiary">{row.brand_name}</span>
           </Col>
-          <Col label="Date">{formatDate(row.last_contact_date)}</Col>
-          <Col label="Manager">{row.owner_name ?? '—'}</Col>
-          <Col label="Reason">{formatCollaborationReason(row.primary_collaboration_reason) ?? '—'}</Col>
-          <Col label="Deliverables" className="pr-2"><Chip>{row.deliverables_completed}</Chip></Col>
+          <Col label="Date" className="text-center">{formatDate(row.last_contact_date)}</Col>
+          <Col label="Manager" className="text-center">{row.owner_name ?? '—'}</Col>
+          <Col label="Reason" className="text-center">{formatCollaborationReason(row.primary_collaboration_reason) ?? '—'}</Col>
+          <Col label="Deliverables" className="px-2 text-center"><Chip>{row.deliverables_completed}</Chip></Col>
           {METRICS.map(([k, label]) => (
-            <Col key={k} label={label} tint>{k === 'reach' ? reachText : formatCount(stats?.[k])}</Col>
+            <Col key={k} label={label} className="text-center">{k === 'reach' ? reachText : formatCount(stats?.[k])}</Col>
           ))}
-          <Col label="Fee">{formatFee(row.agreed_fee)}</Col>
-          <Col label="Rating">{row.avg_rating != null ? <Chip tone="warn">★ {row.avg_rating.toFixed(1)}</Chip> : '—'}</Col>
-          <Col label="WWA">{row.would_work_again == null ? '—' : <Chip tone={row.would_work_again ? 'good' : 'muted'}>{row.would_work_again ? 'Yes' : 'No'}</Chip>}</Col>
+          <Col label="Fee" className="text-center">{formatFee(row.agreed_fee)}</Col>
+          <Col label="Rating" className="text-center">{row.avg_rating != null ? <Chip tone="warn">★ {row.avg_rating.toFixed(1)}</Chip> : '—'}</Col>
+          <Col label="WWA" className="text-center">{row.would_work_again == null ? '—' : <Chip tone={row.would_work_again ? 'good' : 'muted'}>{row.would_work_again ? 'Yes' : 'No'}</Chip>}</Col>
         </div>
       </div>
       <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>

@@ -447,15 +447,14 @@ export async function buildPrProgressPdf({ rows, cycleLabel, range = '' }) {
 }
 
 export const TEAM_COLUMNS = [
-  { key: 'manager_name', label: 'Account manager', width: 190 },
+  { key: 'manager_name', label: 'Account manager', width: 230 },
   { key: 'campaigns', label: 'Campaigns', width: 80, align: 'center' },
-  { key: 'creators', label: 'Creators', width: 80, align: 'center' },
   { key: 'not_contacted', label: 'Not contacted', width: 85, align: 'center' },
   { key: 'in_conversation', label: 'In conversation', width: 90, align: 'center' },
   { key: 'scheduled', label: 'Scheduled', width: 80, align: 'center' },
-  { key: 'awaiting', label: 'Awaiting final deliverables', width: 105, align: 'center' },
+  { key: 'awaiting', label: 'Awaiting final deliverables', width: 125, align: 'center' },
   { key: 'completed', label: 'Completed', width: 80, align: 'center' },
-  { key: 'balance_prev', label: 'Balance from previous cycles', width: 105, align: 'center' },
+  { key: 'balance_prev', label: 'Balance from previous cycles', width: 125, align: 'center' },
 ];
 
 /**

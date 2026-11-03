@@ -169,7 +169,7 @@ function Chip({ children, tone = 'neutral' }) {
     warn: 'bg-amber-50 text-amber-700',
     muted: 'bg-zinc-50 text-ink-tertiary',
   };
-  return <span className={`inline-block rounded-full px-2 py-0.5 text-2xs font-semibold ${tones[tone]}`}>{children}</span>;
+  return <span className={`-my-0.5 inline-block rounded-full px-2 py-0.5 text-2xs font-semibold ${tones[tone]}`}>{children}</span>;
 }
 
 /** A header column: small label above, value below. */

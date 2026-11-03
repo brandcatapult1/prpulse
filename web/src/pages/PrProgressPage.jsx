@@ -27,7 +27,7 @@ const stageLabel = (s) => STAGE_LABELS[s] ?? (s?.startsWith('dropped') ? 'Droppe
 const dateLabel = (iso) =>
   iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—';
 
-/** Expanded row: every creator on the campaign with their deliverables. */
+/** Expanded row: the creators who completed on the campaign, with their deliverables. */
 function CreatorDeliverables({ campaignId, managerId, creator, before, prev, colSpan }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
@@ -35,7 +35,7 @@ function CreatorDeliverables({ campaignId, managerId, creator, before, prev, col
   useEffect(() => {
     let cancelled = false;
     prProgressApi.creators(campaignId, managerId, creator, before, prev)
-      .then((d) => { if (!cancelled) setRows(Array.isArray(d) ? d : []); })
+      .then((d) => { if (!cancelled) setRows(Array.isArray(d) ? d.filter((c) => c.stage === 'collaboration_complete') : []); })
       .catch((err) => { if (!cancelled) setError(err.message ?? 'Could not load creators'); });
     return () => { cancelled = true; };
   }, [campaignId, managerId, creator, before, prev]);
@@ -54,7 +54,7 @@ function CreatorDeliverables({ campaignId, managerId, creator, before, prev, col
         ) : !rows ? (
           <p className="text-2xs text-ink-secondary">Loading creators…</p>
         ) : rows.length === 0 ? (
-          <p className="text-2xs text-ink-secondary">No creators {managerId ? 'for this account manager ' : ''}in this campaign yet.</p>
+          <p className="text-2xs text-ink-secondary">No completed creators {managerId ? 'for this account manager ' : ''}in this campaign yet.</p>
         ) : (
           <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
             <table className="w-full border-collapse text-2xs">

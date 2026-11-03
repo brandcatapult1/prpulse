@@ -186,16 +186,13 @@ async function fetchConnectedMedia(token, wantedCodes) {
  * Average views and engagement rate from the account's newest media (newest first).
  * avg_views = views of the latest `n` reels/videos (real view count > 0) divided by `n`.
  * engagement_rate = mean (likes + comments) of the latest `n` photo posts/carousels (no view count) / followers,
- * as a percentage rounded to 2 decimals. When fewer than `n` photo posts exist, the latest `n` posts of any type are used.
- * Each is null when fewer than `n` such posts exist.
+ * as a percentage rounded to 2 decimals. Each is null when fewer than `n` such posts exist.
  */
 export function latestPostStats(media, followers, n = 5) {
   const all = media ?? [];
   const reels = all.filter((m) => m.views != null && m.views > 0).slice(0, n);
   const avgViews = reels.length === n ? reels.reduce((a, m) => a + m.views, 0) / n : null;
-  const photos = all.filter((m) => m.views == null).slice(0, n);
-  // Reel-only accounts rarely have n photo posts; fall back to their latest n posts of any type.
-  const posts = photos.length === n ? photos : all.slice(0, n);
+  const posts = all.filter((m) => m.views == null).slice(0, n);
   let rate = null;
   if (posts.length === n && followers > 0) {
     const inter = posts.reduce((a, m) => a + (m.likes ?? 0) + (m.comments ?? 0), 0) / n;

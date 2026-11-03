@@ -19,11 +19,12 @@ prProgressRouter.use(requireAuth, (req, res, next) => {
   }
 });
 
-/** 'current' → { number: null }; a positive integer → { number }; anything else → null. */
+/** 'current' / 'previous' → the running cycle or the one before it (number null); a number → that cycle. */
 function cycleParam(req) {
-  if (req.query.cycle === 'current') return { number: null };
+  if (req.query.cycle === 'current') return { number: null, back: 0 };
+  if (req.query.cycle === 'previous') return { number: null, back: 1 };
   const n = Number.parseInt(req.query.cycle, 10);
-  return Number.isInteger(n) && n >= 1 ? { number: n } : null;
+  return Number.isInteger(n) && n >= 1 ? { number: n, back: 0 } : null;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -79,8 +80,8 @@ prProgressRouter.get('/', async (req, res) => {
   try {
     const cycle = cycleParam(req);
     if (!cycle) return res.status(400).json({ error: 'Select a cycle' });
-    const rows = await loadPrProgressRows(pool, cycle.number, progressScope(req.user), campaignParam(req), managerParam(req), creatorParam(req));
-    res.json({ cycle: cycle.number ?? 'current', as_of: asOfLabel(), rows });
+    const rows = await loadPrProgressRows(pool, cycle.number, progressScope(req.user), campaignParam(req), managerParam(req), creatorParam(req), cycle.back);
+    res.json({ cycle: cycle.number ?? (cycle.back ? 'previous' : 'current'), as_of: asOfLabel(), rows });
   } catch (err) {
     res.status(503).json({ error: err.message ?? 'Could not load PR progress' });
   }
@@ -96,7 +97,7 @@ prProgressRouter.get('/team', teamGuard, async (req, res) => {
   try {
     const cycle = cycleParam(req);
     if (!cycle) return res.status(400).json({ error: 'Select a cycle' });
-    res.json({ cycle: cycle.number ?? 'current', as_of: asOfLabel(), rows: await loadPrProgressTeamRows(pool, cycle.number) });
+    res.json({ cycle: cycle.number ?? 'current', as_of: asOfLabel(), rows: await loadPrProgressTeamRows(pool, cycle.number, cycle.back) });
   } catch (err) {
     res.status(503).json({ error: err.message ?? 'Could not load team progress' });
   }
@@ -106,7 +107,7 @@ prProgressRouter.get('/team/pdf', teamGuard, async (req, res) => {
   try {
     const cycle = cycleParam(req);
     if (!cycle) return res.status(400).json({ error: 'Select a cycle' });
-    const rows = sortTeamRows(await loadPrProgressTeamRows(pool, cycle.number), req.query.sort, req.query.dir);
+    const rows = sortTeamRows(await loadPrProgressTeamRows(pool, cycle.number, cycle.back), req.query.sort, req.query.dir);
     const { cycles } = await loadPrProgressCycles(pool, null, null);
     const picked = cycles.find((c) => String(c.number) === String(req.query.cycle));
     const pdf = await buildPrProgressTeamPdf({ rows, cycleLabel: picked?.label ?? 'Current cycle', range: picked?.range ?? '' });
@@ -123,7 +124,7 @@ prProgressRouter.get('/pdf', async (req, res) => {
     const cycle = cycleParam(req);
     if (!cycle) return res.status(400).json({ error: 'Select a cycle' });
     const rows = sortPrProgressRows(
-      await loadPrProgressRows(pool, cycle.number, progressScope(req.user), campaignParam(req), managerParam(req), creatorParam(req)), req.query.sort, req.query.dir,
+      await loadPrProgressRows(pool, cycle.number, progressScope(req.user), campaignParam(req), managerParam(req), creatorParam(req), cycle.back), req.query.sort, req.query.dir,
     );
     // Campaigns that were expanded on screen get their creator-wise deliverables in the PDF too.
     const expanded = new Set(String(req.query.expanded ?? '').split(',').filter((id) => UUID_RE.test(id)).slice(0, 100));

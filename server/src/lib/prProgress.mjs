@@ -42,6 +42,26 @@ const ownCampaignSql = (n) => `($${n}::uuid IS NULL OR EXISTS (
   SELECT 1 FROM campaign_managers mine WHERE mine.campaign_id = cam.id AND mine.user_id = $${n}::uuid))`;
 const OWN_CAMPAIGN_SQL = ownCampaignSql(2);
 
+/**
+ * SQL for "the cycle of campaign `cam` to report on".
+ * A cycle number → that cycle. Otherwise the campaign's running cycle, or `back` cycles before it
+ * (back = 1 is the previous cycle; campaigns without such a cycle drop out).
+ * Arguments are the parameter indexes of: cycle number, today (date), back (int).
+ */
+const cyclePick = (num, today, back) => `
+  SELECT c.* FROM campaign_cycles c
+  WHERE c.campaign_id = cam.id AND (
+    ($${num}::int IS NOT NULL AND c.cycle_number = $${num}::int)
+    OR ($${num}::int IS NULL AND c.cycle_number = (
+      SELECT r.cycle_number FROM campaign_cycles r WHERE r.campaign_id = cam.id
+      ORDER BY (r.cycle_start <= $${today}::date AND $${today}::date < r.cycle_end) DESC,
+               (r.cycle_start <= $${today}::date) DESC,
+               CASE WHEN r.cycle_start <= $${today}::date THEN -r.cycle_number ELSE r.cycle_number END
+      LIMIT 1
+    ) - $${back}::int)
+  )
+  LIMIT 1`;
+
 /** Creator-wise deliverables for one campaign (the expanded row). */
 export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUserId = null, managerId = null, creator = null, before = null, prevStart = null) {
   const { rows } = await pool.query(
@@ -103,49 +123,30 @@ export async function loadPrProgressCampaigns(pool, onlyUserId = null) {
  */
 export async function loadPrProgressCycles(pool, onlyUserId = null, campaignId = null) {
   const today = todayIst();
-  if (campaignId) {
-    const { rows } = await pool.query(
-      `SELECT cc.cycle_number, cc.cycle_start::text AS start_date, (cc.cycle_end - 1)::text AS end_date,
-              (cc.cycle_start <= $3::date AND $3::date < cc.cycle_end) AS running,
-              cam.campaign_type, cam.term_months
-       FROM campaign_cycles cc JOIN campaigns cam ON cam.id = cc.campaign_id
-       WHERE cam.id = $1::uuid AND cam.status <> 'archived' AND ${OWN_CAMPAIGN_SQL}
-         AND cc.cycle_start <= $3::date
-       ORDER BY cc.cycle_number`,
-      [campaignId, onlyUserId, today],
-    );
-    const cycles = rows.map((r) => {
-      const of = r.campaign_type === 'monthly' && r.term_months ? ` of ${r.term_months}` : '';
-      return {
-        number: r.cycle_number,
-        label: `Cycle ${r.cycle_number}${of}`,
-        range: formatRange(r.start_date, r.end_date),
-      };
-    });
-    const running = rows.find((r) => r.running) ?? rows[rows.length - 1];
-    return { cycles, current: running ? running.cycle_number : null };
-  }
+  const options = [
+    { number: 'current', label: 'Current cycle', range: "each campaign's running cycle" },
+    { number: 'previous', label: 'Previous cycle', range: "the cycle before each campaign's running one" },
+  ];
+  if (!campaignId) return { cycles: options, current: 'current' };
 
-  // Several campaigns share a cycle number but not always its dates; show the dates most campaigns use.
+  // One campaign: show the real date ranges of its current and previous cycle.
   const { rows } = await pool.query(
     `SELECT cc.cycle_number, cc.cycle_start::text AS start_date, (cc.cycle_end - 1)::text AS end_date,
-            count(*)::int AS n
+            (cc.cycle_start <= $3::date AND $3::date < cc.cycle_end) AS running
      FROM campaign_cycles cc JOIN campaigns cam ON cam.id = cc.campaign_id
-     WHERE cam.status <> 'archived' AND ${OWN_CAMPAIGN_SQL} AND cc.cycle_start <= $1::date
-     GROUP BY cc.cycle_number, cc.cycle_start, cc.cycle_end
-     ORDER BY cc.cycle_number, count(*) DESC, cc.cycle_start`,
-    [today, onlyUserId],
+     WHERE cam.id = $1::uuid AND cam.status <> 'archived' AND ${OWN_CAMPAIGN_SQL}
+       AND cc.cycle_start <= $3::date
+     ORDER BY cc.cycle_number`,
+    [campaignId, onlyUserId, today],
   );
-  const byNumber = new Map();
-  for (const r of rows) if (!byNumber.has(r.cycle_number)) byNumber.set(r.cycle_number, r);
+  const runIdx = Math.max(0, rows.findIndex((r) => r.running) >= 0 ? rows.findIndex((r) => r.running) : rows.length - 1);
+  const cur = rows[runIdx];
+  const prev = runIdx > 0 ? rows[runIdx - 1] : null;
+  const rangeOf = (r) => (r ? formatRange(r.start_date, r.end_date) : '');
   return {
     cycles: [
-      { number: 'current', label: 'Current cycle', range: "each campaign's running cycle" },
-      ...[...byNumber.values()].map((r) => ({
-        number: r.cycle_number,
-        label: `Cycle ${r.cycle_number}`,
-        range: formatRange(r.start_date, r.end_date),
-      })),
+      { number: 'current', label: 'Current cycle', range: rangeOf(cur) },
+      ...(prev ? [{ number: 'previous', label: 'Previous cycle', range: rangeOf(prev) }] : []),
     ],
     current: 'current',
   };
@@ -155,7 +156,7 @@ export async function loadPrProgressCycles(pool, onlyUserId = null, campaignId =
  * cycleNumber = a number → that cycle of every campaign that has it.
  * cycleNumber = null → each campaign's own running cycle (the one that includes today).
  */
-export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, campaignId = null, managerId = null, creator = null) {
+export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, campaignId = null, managerId = null, creator = null, back = 0) {
   const { rows } = await pool.query(
     `SELECT cam.id, cam.campaign_name, cam.status,
             cc.target, cc.completed_collaborations, cc.remaining_collaborations,
@@ -202,14 +203,7 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
                  AND ($6::text IS NULL OR EXISTS (
                    SELECT 1 FROM contacts cn WHERE cn.id = e.contact_id AND cn.full_name ILIKE '%' || $6::text || '%')))::int AS awaiting
      FROM campaigns cam
-     JOIN LATERAL (
-       SELECT c.* FROM campaign_cycles c
-       WHERE c.campaign_id = cam.id AND ($1::int IS NULL OR c.cycle_number = $1::int)
-       ORDER BY (c.cycle_start <= $3::date AND $3::date < c.cycle_end) DESC,
-                (c.cycle_start <= $3::date) DESC,
-                CASE WHEN c.cycle_start <= $3::date THEN -c.cycle_number ELSE c.cycle_number END
-       LIMIT 1
-     ) cc ON true
+     JOIN LATERAL (${cyclePick(1, 3, 7)}) cc ON true
      WHERE cam.status <> 'archived' AND ${OWN_CAMPAIGN_SQL}
        AND ($4::uuid IS NULL OR cam.id = $4::uuid)
        AND ($5::uuid IS NULL OR EXISTS (
@@ -219,7 +213,7 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
          WHERE fe.campaign_id = cam.id AND fc.full_name ILIKE '%' || $6::text || '%'
            AND ($5::uuid IS NULL OR fe.assigned_manager = $5::uuid)))
      ORDER BY cam.campaign_name`,
-    [cycleNumber, onlyUserId, todayIst(), campaignId, managerId, creator],
+    [cycleNumber, onlyUserId, todayIst(), campaignId, managerId, creator, back],
   );
   return rows.map((r) => {
     const completed = r.completed_collaborations ?? 0;
@@ -471,20 +465,13 @@ export const TEAM_COLUMNS = [
  * cycleNumber = a number → that cycle of every campaign that has it; null → each campaign's running cycle.
  * "Completed" counts the manager's creators whose collaboration was completed inside that cycle.
  */
-export async function loadPrProgressTeamRows(pool, cycleNumber) {
+export async function loadPrProgressTeamRows(pool, cycleNumber, back = 0) {
   const { rows } = await pool.query(
     `WITH per AS (
        SELECT cam.id AS campaign_id, cm.user_id, cc.cycle_start, cc.cycle_end
        FROM campaigns cam
        JOIN campaign_managers cm ON cm.campaign_id = cam.id
-       JOIN LATERAL (
-         SELECT c.* FROM campaign_cycles c
-         WHERE c.campaign_id = cam.id AND ($1::int IS NULL OR c.cycle_number = $1::int)
-         ORDER BY (c.cycle_start <= $2::date AND $2::date < c.cycle_end) DESC,
-                  (c.cycle_start <= $2::date) DESC,
-                  CASE WHEN c.cycle_start <= $2::date THEN -c.cycle_number ELSE c.cycle_number END
-         LIMIT 1
-       ) cc ON true
+       JOIN LATERAL (${cyclePick(1, 2, 3)}) cc ON true
        WHERE cam.status <> 'archived'
      )
      SELECT u.id, u.full_name AS manager_name,
@@ -509,7 +496,7 @@ export async function loadPrProgressTeamRows(pool, cycleNumber) {
      LEFT JOIN engagements e ON e.campaign_id = per.campaign_id AND e.assigned_manager = u.id
      GROUP BY u.id, u.full_name
      ORDER BY u.full_name`,
-    [cycleNumber, todayIst()],
+    [cycleNumber, todayIst(), back],
   );
   return rows;
 }

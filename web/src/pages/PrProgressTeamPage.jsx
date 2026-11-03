@@ -38,7 +38,7 @@ export function PrProgressTeamPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [sort, setSort] = useState({ key: 'manager_name', dir: 'asc' });
+  const sort = { key: 'manager_name', dir: 'asc' }; // always listed A–Z by name
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
@@ -63,12 +63,9 @@ export function PrProgressTeamPage() {
     return () => { cancelled = true; };
   }, [cycle]);
 
-  const rows = useMemo(() => (data ? sortRows(data.rows, sort.key, sort.dir) : []), [data, sort]);
+  const rows = useMemo(() => (data ? sortRows(data.rows, sort.key, sort.dir) : []), [data]);
 
   if (!allowed) return <Navigate to="/" replace />;
-
-  const toggleSort = (key) =>
-    setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }));
 
   async function exportPdf() {
     if (!cycle || exporting) return;
@@ -127,30 +124,17 @@ export function PrProgressTeamPage() {
           <table className="w-full min-w-[820px] border-collapse text-sm">
             <thead>
               <tr className="bg-zinc-100">
-                {COLUMNS.map((col) => {
-                  const active = sort.key === col.key;
-                  return (
-                    <th
-                      key={col.key}
-                      scope="col"
-                      aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                      className="border border-line p-0"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => toggleSort(col.key)}
-                        className={`flex w-full items-center gap-1 px-3 py-2 text-2xs font-semibold text-ink hover:bg-zinc-200 ${
-                          col.align === 'left' ? 'justify-start text-left' : 'justify-center text-center'
-                        }`}
-                      >
-                        {col.label}
-                        <span className={active ? 'text-brand' : 'text-ink-tertiary'} aria-hidden>
-                          {active ? (sort.dir === 'asc' ? '▲' : '▼') : '↕'}
-                        </span>
-                      </button>
-                    </th>
-                  );
-                })}
+                {COLUMNS.map((col) => (
+                  <th
+                    key={col.key}
+                    scope="col"
+                    className={`border border-line px-3 py-2 text-2xs font-semibold text-ink ${
+                      col.align === 'left' ? 'text-left' : 'text-center'
+                    }`}
+                  >
+                    {col.label}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>

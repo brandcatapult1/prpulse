@@ -14,6 +14,7 @@ import {
   parseTermMonths,
 } from '../lib/campaignValidation.mjs';
 import { notify } from '../lib/notifications.mjs';
+import { todayIst } from '../lib/constants.mjs';
 import { buildNotContactedWorkbook } from '../lib/campaignExport.mjs';
 import { ensureCampaignCycles } from '../lib/campaignCycles.mjs';
 
@@ -186,9 +187,11 @@ campaignsRouter.get('/:id/export-not-contacted', requireAuth, async (req, res) =
   try {
     const out = await buildNotContactedWorkbook(pool, req.params.id);
     if (!out) return res.status(404).json({ error: 'Campaign not found' });
-    const safe = out.name.replace(/[^\w\- ]+/g, '').trim() || 'campaign';
+    const clean = (t) => String(t ?? '').replace(/[^\w\- ]+/g, '').trim();
+    const [y, m, d] = todayIst().split('-');
+    const file = [clean(out.brand), clean(out.name), `${d}-${m}-${y}`].filter(Boolean).join('-');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${safe} - not contacted.xlsx"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${file}.xlsx"`);
     res.send(Buffer.from(out.buffer));
   } catch (err) {
     res.status(err.status ?? 503).json({ error: err.message ?? 'Could not export' });

@@ -66,5 +66,5 @@ export async function buildNotContactedWorkbook(pool, campaignId) {
   });
   if (rows.length === 0) ws.getCell('A6').value = 'No creators in Not contacted';
 
-  return { buffer: await wb.xlsx.writeBuffer(), name: campaign.campaign_name };
+  return { buffer: await wb.xlsx.writeBuffer(), brand: campaign.brand_name, name: campaign.campaign_name };
 }

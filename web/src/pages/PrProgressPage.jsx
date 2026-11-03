@@ -43,7 +43,7 @@ function CreatorDeliverables({ campaignId, managerId, creator, before, prev, col
     c.deliverables.filter((d) => d.carried).map((d) => ({ creator: c.full_name, manager: c.manager_name, d })));
 
   const TH = 'px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-ink-tertiary';
-  const TD = 'border-t border-line/60 px-3 py-3 align-top';
+  const TD = 'border-t border-line/60 px-3 py-3 align-middle text-xs';
 
   return (
     <tr>
@@ -73,7 +73,7 @@ function CreatorDeliverables({ campaignId, managerId, creator, before, prev, col
                   const current = c.deliverables.filter((d) => !d.carried);
                   return (
                     <tr key={c.engagement_id} className="transition-colors hover:bg-brand-soft/30">
-                      <td className={`${TD} text-sm font-medium text-ink`}>{c.full_name}</td>
+                      <td className={`${TD} font-medium text-ink`}>{c.full_name}</td>
                       <td className={`${TD} text-ink-secondary`}>{c.manager_name ?? '—'}</td>
                       <td className={TD}><Pill tone={stageTone(c.stage)}>{stageLabel(c.stage)}</Pill></td>
                       <td className={`${TD} text-center`}>
@@ -89,7 +89,7 @@ function CreatorDeliverables({ campaignId, managerId, creator, before, prev, col
                             {current.map((d, i) => (
                               <span
                                 key={i}
-                                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 ring-1 ${
+                                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-2xs leading-4 ring-1 ${
                                   d.status === 'posted'
                                     ? 'bg-teal-50 text-teal-800 ring-teal-100'
                                     : 'bg-white text-ink-secondary ring-line'
@@ -390,7 +390,7 @@ export function PrProgressPage() {
                     {COLUMNS.map((col, i) => (
                       <td
                         key={col.key}
-                        className={`border-b border-line/60 px-4 py-3.5 ${col.align === 'left' ? 'text-left' : 'text-center tabular-nums'}`}
+                        className={`border-b border-line/60 px-4 py-3.5 align-middle ${col.align === 'left' ? 'text-left' : 'text-center tabular-nums'}`}
                       >
                         {i === 0 ? (
                           <div className="flex items-center gap-2.5">

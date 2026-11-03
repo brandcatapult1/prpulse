@@ -50,12 +50,12 @@ function ManagerCampaigns({ managerId, cycle, colSpan }) {
   if (!rows) return note('Loading campaigns…');
   if (rows.length === 0) return note('No campaigns for this cycle.');
 
-  const cell = 'border border-line bg-zinc-100/70 px-3 py-2.5 align-middle text-center text-xs tabular-nums';
+  const cell = 'border border-line bg-zinc-50/70 px-3 py-2.5 align-middle text-center text-xs tabular-nums';
   return rows.map((r) => (
     <tr key={r.id} className="transition-colors hover:bg-brand-soft/30">
-      <td className={`${cell} !text-left border-l-4 !border-l-brand/50`}>
-        <div className="pl-6">
-          <div className="text-2xs font-medium text-ink-secondary">{r.campaign_name}</div>
+      <td className={`${cell} !text-left`}>
+        <div className="pl-8">
+          <div className="font-medium text-ink">{r.campaign_name}</div>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-2xs text-ink-tertiary">
             <CellValue colKey="status" row={r} />
             <span>{r.remaining} left of {r.total}</span>
@@ -195,7 +195,7 @@ export function PrProgressTeamPage() {
               )}
               {!loading && rows.map((row) => (
                 <Fragment key={row.id}>
-                  <tr className={openIds.has(row.id) ? 'bg-brand-soft/60 font-semibold' : 'hover:bg-zinc-50'}>
+                  <tr className="hover:bg-zinc-50">
                     {COLUMNS.map((col, i) => (
                       <td
                         key={col.key}

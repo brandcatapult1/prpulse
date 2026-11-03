@@ -158,7 +158,7 @@ export function PrProgressTeamPage() {
                 <tr><td colSpan={COLUMNS.length} className="px-3 py-6 text-center text-2xs text-ink-secondary">Loading…</td></tr>
               )}
               {!loading && rows.length === 0 && (
-                <tr><td colSpan={COLUMNS.length} className="px-3 py-6 text-center text-2xs text-ink-secondary">No account managers have this cycle.</td></tr>
+                <tr><td colSpan={COLUMNS.length} className="px-3 py-6 text-center text-2xs text-ink-secondary">No team members found.</td></tr>
               )}
               {!loading && rows.map((row) => (
                 <tr key={row.id} className="hover:bg-zinc-50">

@@ -459,7 +459,7 @@ export const TEAM_COLUMNS = [
 ];
 
 /**
- * One row per account manager across their non-archived campaigns.
+ * One row per active team member (zeros included) across their non-archived campaigns.
  * cycleNumber = a number → that cycle of every campaign that has it; null → each campaign's running cycle.
  * "Completed" counts the manager's creators whose collaboration was completed inside that cycle.
  */
@@ -489,9 +489,10 @@ export async function loadPrProgressTeamRows(pool, cycleNumber, back = 0) {
                 AND e2.conversation_status::text NOT LIKE 'dropped%'
                 AND COALESCE(d.due_date, (e2.created_at AT TIME ZONE 'Asia/Kolkata')::date) < p2.cycle_start
             )::int AS balance_prev
-     FROM per
-     JOIN users u ON u.id = per.user_id
+     FROM users u
+     LEFT JOIN per ON per.user_id = u.id
      LEFT JOIN engagements e ON e.campaign_id = per.campaign_id AND e.assigned_manager = u.id
+     WHERE u.is_active AND u.role IN ('campaign_manager', 'senior_manager', 'admin')
      GROUP BY u.id, u.full_name
      ORDER BY u.full_name`,
     [cycleNumber, todayIst(), back],

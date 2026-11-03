@@ -66,6 +66,11 @@ export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUser
   const { rows } = await pool.query(
     `SELECT e.id AS engagement_id, ct.full_name, mgr.full_name AS manager_name,
             e.conversation_status::text AS stage,
+            COALESCE((
+              SELECT array_agg(t.name ORDER BY t.system_key)
+              FROM contact_tags ctl JOIN tags t ON t.id = ctl.tag_id AND t.type = 'system'
+              WHERE ctl.contact_id = ct.id
+            ), ARRAY[]::text[]) AS contact_labels,
             COALESCE(json_agg(json_build_object(
               'type', d.deliverable_type::text, 'quantity', d.quantity, 'status', d.status::text,
               'due_date', d.due_date, 'published_date', d.published_date, 'content_link', d.content_link,
@@ -81,7 +86,7 @@ export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUser
      WHERE e.campaign_id = $1::uuid AND ${OWN_CAMPAIGN_SQL}
        AND ($3::uuid IS NULL OR e.assigned_manager = $3::uuid)
        AND ($4::text IS NULL OR ct.full_name ILIKE '%' || $4::text || '%')
-     GROUP BY e.id, ct.full_name, mgr.full_name, e.conversation_status
+     GROUP BY e.id, ct.id, ct.full_name, mgr.full_name, e.conversation_status
      ORDER BY ct.full_name`,
     [campaignId, onlyUserId, managerId, creator, before],
   );

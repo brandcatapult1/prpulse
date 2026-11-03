@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import { SystemLabelPills } from '../components/contacts/SystemLabelPills.jsx';
 import AccordionChevron from '../components/ui/AccordionChevron.jsx';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -51,7 +52,12 @@ export function CreatorsTable({ rows, second = 'manager' }) {
           const current = c.deliverables.filter((d) => !d.carried);
           return (
             <tr key={c.engagement_id} className="transition-colors hover:bg-brand-soft/30">
-              <td className={`${TD} font-medium text-ink`}>{c.full_name}</td>
+              <td className={`${TD} font-medium text-ink`}>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span>{c.full_name}</span>
+                          <SystemLabelPills labels={c.contact_labels} />
+                        </div>
+                      </td>
               <td className={`${TD} text-ink-secondary`}>{second === 'campaign' ? c.campaign_name : (c.manager_name ?? '—')}</td>
               <td className={TD}><Pill tone={stageTone(c.stage)}>{stageLabel(c.stage)}</Pill></td>
               <td className={`${TD} text-center`}>

@@ -29,8 +29,8 @@ export async function buildNotContactedWorkbook(pool, campaignId) {
 
   ws.getRow(1).height = 82; // room for the logo (200 x 100 px)
   const logo = wb.addImage({ filename: LOGO, extension: 'png' });
-  // Fill the middle column (anchored to cells, so it stays centred in any spreadsheet app).
-  ws.addImage(logo, { tl: { col: 2.035, row: 0.05 }, br: { col: 2.965, row: 0.95 }, editAs: 'oneCell' });
+  // Fixed size (never stretched), starting at the left edge of the middle column, which is just wide enough for it.
+  ws.addImage(logo, { tl: { col: 2.035, row: 0.05 }, ext: { width: 200, height: 100 } });
 
   // Client and campaign, large on a light blue band.
   [['Client', campaign.brand_name ?? '—'], ['Campaign', campaign.campaign_name]].forEach(([label, value], i) => {

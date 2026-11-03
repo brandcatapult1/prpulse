@@ -453,11 +453,11 @@ export async function buildPrProgressPdf({ rows, cycleLabel, range = '' }) {
 }
 
 export const TEAM_COLUMNS = [
-  { key: 'manager_name', label: 'Account manager', width: 230 },
-  { key: 'in_conversation', label: 'In conversation', width: 110, align: 'center' },
-  { key: 'scheduled', label: 'Scheduled', width: 100, align: 'center' },
-  { key: 'awaiting', label: 'Awaiting final deliverables', width: 150, align: 'center' },
-  { key: 'completed', label: 'Completed', width: 100, align: 'center' },
+  { key: 'manager_name', label: 'Account manager', width: 200 },
+  { key: 'in_conversation', label: 'In conversation', width: 135, align: 'center' },
+  { key: 'scheduled', label: 'Scheduled', width: 115, align: 'center' },
+  { key: 'awaiting', label: 'Awaiting final deliverables', width: 170, align: 'center' },
+  { key: 'completed', label: 'Completed', width: 120, align: 'center' },
 ];
 
 /**
@@ -537,12 +537,13 @@ export async function buildPrProgressTeamPdf({ rows, cycleLabel, range = '' }) {
   const pad = 5;
 
   const drawHeader = (y) => {
-    doc.font('Helvetica-Bold').fontSize(7.5);
-    const h = 34;
+    doc.font('Helvetica-Bold').fontSize(15);
+    const h = 52;
     let x = left;
     for (const col of TEAM_COLUMNS) {
       doc.rect(x, y, col.width, h).fillAndStroke('#e5e7eb', '#111827');
-      doc.fillColor('#111827').text(col.label, x + pad, y + 5, { width: col.width - pad * 2, align: 'center' });
+      const textH = doc.heightOfString(col.label, { width: col.width - pad * 2, align: 'center' });
+      doc.fillColor('#111827').text(col.label, x + pad, y + (h - textH) / 2, { width: col.width - pad * 2, align: 'center' });
       x += col.width;
     }
     return y + h;

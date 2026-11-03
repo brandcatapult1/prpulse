@@ -311,7 +311,8 @@ export async function syncContactSocial(pool, contactId, { minIntervalMs = 0 } =
   const { rows: deliverables } = await pool.query(
     `SELECT d.id, d.content_link, d.unit_proofs
      FROM deliverables d JOIN engagements e ON e.id = d.engagement_id
-     WHERE e.contact_id = $1 AND d.status = 'posted'`,
+     WHERE e.contact_id = $1 AND d.status = 'posted'
+       AND d.deliverable_type::text <> 'story'`, // stories are never looked up on Instagram
     [contactId],
   );
 

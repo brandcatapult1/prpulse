@@ -424,7 +424,7 @@ export function EngagementRecordPage() {
 
   const metricsFor = (deliverableId) => {
     const hit = creatorStats?.deliverables?.find((x) => x.deliverable_id === deliverableId);
-    if (!hit) return null;
+    if (!hit || hit.deliverable_type === 'story') return null;
     const followers = creatorStats.social?.find((x) => x.platform === 'instagram')?.followers ?? null;
     return { links: hit.links, classification: creatorStats.classification, followers };
   };

@@ -50,8 +50,9 @@ function ManagerCampaigns({ managerId, cycle, colSpan }) {
   if (!rows) return note('Loading campaigns…');
   if (rows.length === 0) return note('No campaigns for this cycle.');
 
-  const cell = 'border border-line bg-zinc-50/70 px-3 py-2.5 align-middle text-center text-xs tabular-nums';
-  return rows.map((r) => (
+  const cell = 'border border-line bg-white px-3 py-2.5 align-middle text-center text-xs tabular-nums';
+  const spacer = (k) => <tr key={k}><td colSpan={colSpan} className="border-x border-line bg-zinc-100/80 p-0"><div className="h-3" /></td></tr>;
+  return [spacer('top'), ...rows.map((r) => (
     <tr key={r.id} className="transition-colors hover:bg-brand-soft/30">
       <td className={`${cell} !text-left`}>
         <div className="pl-8">
@@ -67,7 +68,7 @@ function ManagerCampaigns({ managerId, cycle, colSpan }) {
         <td key={k} className={cell}><CellValue colKey={k} row={r} /></td>
       ))}
     </tr>
-  ));
+  )), spacer('bottom')];
 }
 
 /** Account manager-wise progress for a cycle (admins and senior managers). */

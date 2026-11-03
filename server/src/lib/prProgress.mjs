@@ -537,8 +537,8 @@ export async function buildPrProgressTeamPdf({ rows, cycleLabel, range = '' }) {
   const pad = 5;
 
   const drawHeader = (y) => {
-    doc.font('Helvetica-Bold').fontSize(9);
-    const h = 34;
+    doc.font('Helvetica-Bold').fontSize(11);
+    const h = 36;
     let x = left;
     for (const col of TEAM_COLUMNS) {
       doc.rect(x, y, col.width, h).fillAndStroke('#e5e7eb', '#111827');

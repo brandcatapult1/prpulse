@@ -60,7 +60,13 @@ const ENGAGEMENT_CONTACT_COLS = `
   c.email AS contact_email,
   c.instagram_url AS contact_instagram_url,
   c.youtube_url AS contact_youtube_url,
-  c.city AS contact_city`;
+  c.city AS contact_city,
+  COALESCE((
+    SELECT array_agg(t.name ORDER BY t.system_key)
+    FROM contact_tags ctl
+    JOIN tags t ON t.id = ctl.tag_id AND t.type = 'system'
+    WHERE ctl.contact_id = c.id
+  ), ARRAY[]::text[]) AS contact_labels`;
 
 const ENGAGEMENT_PATCH_FIELDS = [
   'conversation_status',

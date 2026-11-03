@@ -1,4 +1,5 @@
 import { formatDate } from '../../lib/format.jsx';
+import { SystemLabelPills } from '../contacts/SystemLabelPills.jsx';
 import {
   formatVisitTimeVenue,
   resolveEngagementOutletName,
@@ -242,6 +243,7 @@ function CreatorCardHeader({ engagement }) {
             <span className="truncate text-sm font-medium leading-tight text-ink">
               {engagement.contact_name}
             </span>
+            <SystemLabelPills labels={engagement.contact_labels} />
           </div>
           <div className="mt-0.5">
             <CreatorHandle

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { SystemLabelPills } from '../components/contacts/SystemLabelPills.jsx';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { DataTable } from '../components/ui/DataKit.jsx';
 import { EmptyState, Toast } from '../components/ui/Primitives.jsx';
@@ -240,7 +241,10 @@ export function CampaignViewPage() {
       key: 'contact_name',
       label: 'Creator',
       render: (r) => (
-        <span className="font-medium text-brand">{r.contact_name}</span>
+        <span className="inline-flex flex-wrap items-center gap-1.5">
+          <span className="font-medium text-brand">{r.contact_name}</span>
+          <SystemLabelPills labels={r.contact_labels} />
+        </span>
       ),
     },
     { key: 'owner_name', label: 'Owner' },

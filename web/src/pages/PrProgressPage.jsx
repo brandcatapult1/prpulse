@@ -161,7 +161,7 @@ function CreatorDeliverables({ campaignId, managerId, creator, before, prev, col
 const STATUS_TONE = { Ongoing: 'success', Completed: 'info', Paused: 'warning', Draft: 'muted' };
 
 /** One table cell: zeros are quiet, key numbers get a soft pill. */
-function CellValue({ colKey, row }) {
+export function CellValue({ colKey, row }) {
   const v = row[colKey];
   if (colKey === 'status') return <Pill tone={STATUS_TONE[v] ?? 'default'}>{v}</Pill>;
   if (colKey === 'managers') return <span className="text-ink-secondary">{v || '—'}</span>;
@@ -178,7 +178,7 @@ function CellValue({ colKey, row }) {
   return <span className="font-medium text-ink">{v}</span>;
 }
 
-const COLUMNS = [
+export const COLUMNS = [
   { key: 'campaign_name', label: 'Campaign', align: 'left' },
   { key: 'managers', label: 'Account manager', align: 'left' },
   { key: 'total', label: 'Target collaboration' },

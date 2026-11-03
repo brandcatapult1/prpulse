@@ -227,7 +227,7 @@ export function ContactProfilePage() {
         <p className="mt-3 text-2xs text-ink-tertiary">
           Total: {extras.total_collaborations ?? contact.total_collaborations ?? '—'} collabs
           {extras.last_collaboration_date && ` · Last: ${formatDate(extras.last_collaboration_date)}`}
-          {extras.avg_rating != null && ` · ★${extras.avg_rating.toFixed(1)}`}
+          {extras.avg_rating != null && ` · ★ ${extras.avg_rating.toFixed(1)}`}
           {extras.would_work_again_pct != null && ` · Would work again ${extras.would_work_again_pct}%`}
         </p>
       </GlassTile>

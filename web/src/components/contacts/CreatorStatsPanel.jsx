@@ -221,7 +221,7 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
             <Col key={k} label={label} tint>{k === 'reach' ? reachText : formatCount(stats?.[k])}</Col>
           ))}
           <Col label="Fee">{formatFee(row.agreed_fee)}</Col>
-          <Col label="Rating">{row.avg_rating != null ? <Chip tone="warn">★{row.avg_rating.toFixed(1)}</Chip> : '—'}</Col>
+          <Col label="Rating">{row.avg_rating != null ? <Chip tone="warn">★ {row.avg_rating.toFixed(1)}</Chip> : '—'}</Col>
           <Col label="WWA">{row.would_work_again == null ? '—' : <Chip tone={row.would_work_again ? 'good' : 'muted'}>{row.would_work_again ? 'Yes' : 'No'}</Chip>}</Col>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import AccordionChevron from '../ui/AccordionChevron.jsx';
 import RefreshIconButton from '../ui/RefreshIconButton.jsx';
 import { contactsApi } from '../../lib/api.js';
 import { EmptyState, Toast } from '../ui/Primitives.jsx';
@@ -206,7 +207,7 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
             aria-label={open ? 'Hide deliverables' : 'Show deliverables'}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-tertiary hover:bg-zinc-100 hover:text-ink"
           >
-            <span className={`transition-transform duration-300 ${open ? 'rotate-90' : ''}`} aria-hidden>▸</span>
+            <AccordionChevron open={open} />
           </button>
           <Col className="w-44 lg:w-auto">
             <span className="block truncate text-sm font-medium text-ink">{row.campaign_name}</span>

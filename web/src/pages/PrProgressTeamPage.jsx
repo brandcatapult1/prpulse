@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import AccordionChevron from '../components/ui/AccordionChevron.jsx';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
@@ -211,7 +212,7 @@ export function PrProgressTeamPage() {
                               aria-label={openIds.has(row.id) ? 'Hide campaigns' : 'Show campaigns'}
                               className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-ink-tertiary hover:bg-zinc-100 hover:text-ink"
                             >
-                              <span className={`transition-transform ${openIds.has(row.id) ? 'rotate-90' : ''}`} aria-hidden>▸</span>
+                              <AccordionChevron open={openIds.has(row.id)} />
                             </button>
                             <span>{row[col.key]}</span>
                           </div>

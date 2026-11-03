@@ -127,13 +127,13 @@ function DeliverableStatsTable({ deliverables, classification, followers, action
   return (
     <div>
       {rows.map(({ d, l, key }, idx) => (
-        <div key={key} className={`${ROW_GRID} items-center border-b border-line/60 py-2.5 last:border-0`}>
+        <div key={key} className={`${ROW_GRID} items-center border-b border-line/50 py-3 transition-colors last:border-0 hover:bg-white`}>
           <div className="col-span-2 min-w-0 lg:col-span-5 lg:col-start-2">
-            <div className="text-2xs font-medium text-ink">{TYPE_LABEL[d.deliverable_type] ?? formatStatus(d.deliverable_type)}</div>
-            <div className="truncate text-2xs text-ink-tertiary">
+            <div className="flex items-center gap-2">
+              <Chip>{TYPE_LABEL[d.deliverable_type] ?? formatStatus(d.deliverable_type)}</Chip>
               {l.content_url
-                ? <a href={l.content_url} target="_blank" rel="noreferrer" className="text-brand hover:underline">{l.content_url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 40)}</a>
-                : 'No link (screenshot proof)'}
+                ? <a href={l.content_url} target="_blank" rel="noreferrer" title={l.content_url} className="truncate text-2xs text-brand hover:underline">{l.content_url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 34)}{l.content_url.replace(/^https?:\/\/(www\.)?/, '').length > 34 ? '…' : ''}</a>
+                : <span className="text-2xs italic text-ink-tertiary">No link · screenshot proof</span>}
             </div>
           </div>
           {METRICS.map(([k, label]) => {
@@ -162,11 +162,21 @@ function Field({ label, children }) {
   );
 }
 
+function Chip({ children, tone = 'neutral' }) {
+  const tones = {
+    neutral: 'bg-zinc-100 text-ink',
+    good: 'bg-emerald-50 text-emerald-700',
+    warn: 'bg-amber-50 text-amber-700',
+    muted: 'bg-zinc-50 text-ink-tertiary',
+  };
+  return <span className={`inline-block rounded-full px-2 py-0.5 text-2xs font-semibold ${tones[tone]}`}>{children}</span>;
+}
+
 /** A header column: small label above, value below. */
-function Col({ label, children, className = '' }) {
+function Col({ label, children, className = '', tint = false }) {
   return (
-    <div className={`shrink-0 ${className}`}>
-      {label && <div className="text-[10px] font-medium uppercase tracking-wider text-ink-tertiary">{label}</div>}
+    <div className={`shrink-0 ${tint ? 'rounded-lg bg-brand/5 px-2.5 py-1.5' : ''} ${className}`}>
+      {label && <div className="text-[10px] font-medium uppercase tracking-wider text-ink-tertiary/80">{label}</div>}
       <div className={`${label ? 'mt-0.5' : ''} text-2xs font-semibold tabular-nums text-ink`}>{children}</div>
     </div>
   );
@@ -185,7 +195,7 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
         tabIndex={0}
         onClick={() => onOpenEngagement(row.id)}
         onKeyDown={(e) => { if (e.key === 'Enter') onOpenEngagement(row.id); }}
-        className="cursor-pointer px-2 py-3 hover:bg-zinc-50"
+        className="cursor-pointer px-2 py-3.5 transition-colors hover:bg-zinc-50/70"
         title="Open engagement"
       >
         <div className="flex flex-wrap items-center gap-x-7 gap-y-3 text-left lg:grid lg:grid-cols-[36px_minmax(150px,1.8fr)_repeat(11,minmax(0,1fr))] lg:gap-x-4">
@@ -205,17 +215,17 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
           <Col label="Date">{formatDate(row.last_contact_date)}</Col>
           <Col label="Manager">{row.owner_name ?? '—'}</Col>
           <Col label="Reason">{formatCollaborationReason(row.primary_collaboration_reason) ?? '—'}</Col>
-          <Col label="Deliverables">{row.deliverables_completed}</Col>
+          <Col label="Deliverables"><Chip>{row.deliverables_completed}</Chip></Col>
           {METRICS.map(([k, label]) => (
-            <Col key={k} label={label}>{k === 'reach' ? reachText : formatCount(stats?.[k])}</Col>
+            <Col key={k} label={label} tint>{k === 'reach' ? reachText : formatCount(stats?.[k])}</Col>
           ))}
           <Col label="Fee">{formatFee(row.agreed_fee)}</Col>
-          <Col label="Rating">{row.avg_rating != null ? `★${row.avg_rating.toFixed(1)}` : '—'}</Col>
-          <Col label="WWA">{row.would_work_again == null ? '—' : row.would_work_again ? 'Yes' : 'No'}</Col>
+          <Col label="Rating">{row.avg_rating != null ? <Chip tone="warn">★{row.avg_rating.toFixed(1)}</Chip> : '—'}</Col>
+          <Col label="WWA">{row.would_work_again == null ? '—' : <Chip tone={row.would_work_again ? 'good' : 'muted'}>{row.would_work_again ? 'Yes' : 'No'}</Chip>}</Col>
         </div>
       </div>
       {open && (
-        <div className="border-t border-line">
+        <div className="border-t border-line bg-zinc-50/50">
           <DeliverableStatsTable
             deliverables={deliverables}
             classification={classification}

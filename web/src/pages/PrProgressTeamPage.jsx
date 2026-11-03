@@ -27,7 +27,7 @@ function sortRows(rows, key, dir) {
   });
 }
 
-/** Opened row: the manager's creators who have not completed yet, across their campaigns. */
+/** Opened row: the manager's creators awaiting final deliverables, across their campaigns. */
 function ManagerCreators({ managerId, cycle, colSpan }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
@@ -40,7 +40,7 @@ function ManagerCreators({ managerId, cycle, colSpan }) {
       .then((d) => Promise.all((d.rows ?? []).map((camp) =>
         prProgressApi.creators(camp.id, managerId, '', camp.cycle_start, camp.prev_start)
           .then((list) => (Array.isArray(list) ? list : [])
-            .filter((c) => c.stage !== 'collaboration_complete')
+            .filter((c) => c.stage === 'awaiting_final_deliverables')
             .map((c) => ({ ...c, campaign_name: camp.campaign_name }))))))
       .then((lists) => { if (!cancelled) setRows(lists.flat()); })
       .catch((err) => { if (!cancelled) setError(err.message ?? 'Could not load creators'); });
@@ -55,7 +55,7 @@ function ManagerCreators({ managerId, cycle, colSpan }) {
         ) : !rows ? (
           <p className="text-2xs text-ink-secondary">Loading creators…</p>
         ) : rows.length === 0 ? (
-          <p className="text-2xs text-ink-secondary">No pending creators for this account manager.</p>
+          <p className="text-2xs text-ink-secondary">No creators awaiting deliverables for this account manager.</p>
         ) : (
           <CreatorsTable rows={rows} second="campaign" />
         )}

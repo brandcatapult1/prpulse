@@ -2,7 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ExcelJS from 'exceljs';
 
-const LOGO = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../assets/brand-catapult-logo.png');
+const LOGO = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../assets/export-banner.png');
 
 /** Excel sheet of the creators still in "Not contacted" for a campaign. */
 export async function buildNotContactedWorkbook(pool, campaignId) {
@@ -27,10 +27,10 @@ export async function buildNotContactedWorkbook(pool, campaignId) {
   ws.columns = [46, 20, 30, 24, 42].map((width) => ({ width }));
   const FONT = 15; // body and header text; 4 larger than Excel's default 11
 
-  ws.getRow(1).height = 82; // room for the logo (200 x 100 px)
-  const logo = wb.addImage({ filename: LOGO, extension: 'png' });
-  // Fixed size (never stretched), starting at the left edge of the middle column, which is just wide enough for it.
-  ws.addImage(logo, { tl: { col: 2.035, row: 0.05 }, ext: { width: 200, height: 100 } });
+  ws.getRow(1).height = 82; // room for the banner (109 px)
+  const banner = wb.addImage({ filename: LOGO, extension: 'png' });
+  // White banner as wide as the table with the logo already centred inside it (see assets/export-banner.png).
+  ws.addImage(banner, { tl: { col: 0, row: 0 }, ext: { width: 1159, height: 109 } });
 
   // Client and campaign, large on a light blue band.
   [['Client', campaign.brand_name ?? '—'], ['Campaign', campaign.campaign_name]].forEach(([label, value], i) => {

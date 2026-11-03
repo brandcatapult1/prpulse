@@ -342,6 +342,44 @@ contactsRouter.delete('/:id/blacklist', requireAuth, requireSeniorOrAdmin, async
   }
 });
 
+/**
+ * Admin only: hand a creator's engagements (with their deliverables) to another creator, then optionally
+ * delete the emptied creator. A campaign the target already has an engagement in is skipped and reported;
+ * the source is only deleted when nothing was skipped.
+ */
+contactsRouter.post('/:id/move-engagements', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const targetId = req.body?.target_contact_id;
+    if (!targetId || targetId === req.params.id) {
+      return res.status(400).json({ error: 'target_contact_id must be a different creator' });
+    }
+    const result = await withUserTransaction(req.user.id, async (client) => {
+      const { rows: found } = await client.query('SELECT id FROM contacts WHERE id = ANY($1::uuid[])', [[req.params.id, targetId]]);
+      if (found.length !== 2) throw Object.assign(new Error('Creator not found'), { status: 404 });
+      const { rows: moved } = await client.query(
+        `UPDATE engagements e SET contact_id = $2
+         WHERE e.contact_id = $1
+           AND NOT EXISTS (SELECT 1 FROM engagements t WHERE t.contact_id = $2 AND t.campaign_id = e.campaign_id)
+         RETURNING e.id`,
+        [req.params.id, targetId],
+      );
+      const { rows: skipped } = await client.query(
+        `SELECT e.id, c.campaign_name FROM engagements e JOIN campaigns c ON c.id = e.campaign_id WHERE e.contact_id = $1`,
+        [req.params.id],
+      );
+      let deleted = false;
+      if (req.body?.delete_source && skipped.length === 0) {
+        await client.query('DELETE FROM contacts WHERE id = $1', [req.params.id]);
+        deleted = true;
+      }
+      return { moved: moved.length, skipped, deleted };
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(err.status ?? 500).json({ error: err.message });
+  }
+});
+
 /** Hard delete — Admin only (PRD). Fails when engagements still reference the contact. */
 contactsRouter.delete('/:id', requireAuth, requireAdmin, async (req, res) => {
   try {

@@ -25,6 +25,7 @@ import {
   logVisitReminder,
 } from '../../lib/persistence.js';
 import { setDeliverablesCache, getDeliverablesForEngagement } from '../../lib/deliverablesCache.js';
+import { SystemLabelPills } from '../contacts/SystemLabelPills.jsx';
 import { getCachedContact } from '../../lib/contactsCache.js';
 
 /** Single-person dashboard workspace — optionally scoped to a direct report. */
@@ -554,7 +555,10 @@ function DashboardRowIdentity({ row, subtitle }) {
     <>
       <Avatar initials={row.initials} />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-ink">{row.fullName}</div>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-sm font-medium text-ink">{row.fullName}</span>
+          <SystemLabelPills labels={row.labels} />
+        </div>
         <div className="truncate text-2xs text-ink-tertiary">{subtitle}</div>
       </div>
     </>

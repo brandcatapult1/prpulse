@@ -44,6 +44,12 @@ export async function loadDashboardWorkspace(pool, scopeUserId, requesterId, req
   const [engagementsRes, campaignsRes] = await Promise.all([
     pool.query(
       `SELECT e.*, c.full_name AS contact_name, u.full_name AS owner_name,
+              COALESCE((
+                SELECT array_agg(t.name ORDER BY t.system_key)
+                FROM contact_tags ctl
+                JOIN tags t ON t.id = ctl.tag_id AND t.type = 'system'
+                WHERE ctl.contact_id = c.id
+              ), ARRAY[]::text[]) AS contact_labels,
               cam.campaign_name, cam.status AS campaign_status, ${ENGAGEMENT_OUTLET_SELECT}
        FROM engagements e
        JOIN contacts c ON c.id = e.contact_id

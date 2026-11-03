@@ -110,22 +110,22 @@ export function PrProgressTeamPage() {
       return next;
     });
 
-  async function exportPdf() {
+  async function exportFile(kind) {
     if (!cycle || exporting) return;
-    setExporting(true);
+    setExporting(kind);
     try {
-      const { blob, contentDisposition } = await prProgressApi.teamPdf(cycle, sort.key, sort.dir);
+      const { blob, contentDisposition } = await (kind === 'xlsx' ? prProgressApi.teamXlsx : prProgressApi.teamPdf)(cycle, sort.key, sort.dir);
       const match = /filename="?([^";]+)"?/i.exec(contentDisposition);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = match?.[1] ?? 'pr-progress-team.pdf';
+      a.download = match?.[1] ?? `pr-progress-team.${kind}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
-      setError(err.message ?? 'Could not export PDF');
+      setError(err.message ?? 'Could not export');
     } finally {
       setExporting(false);
     }
@@ -137,9 +137,14 @@ export function PrProgressTeamPage() {
         title={MODULES.prProgressTeam.pageTitle}
         subtitle={MODULES.prProgressTeam.subtitle}
         actions={
-          <button type="button" className="btn-primary" disabled={!cycle || loading || exporting} onClick={exportPdf}>
-            {exporting ? 'Exporting…' : 'Export PDF'}
-          </button>
+          <div className="flex gap-2">
+            <button type="button" className="btn-secondary" disabled={!cycle || loading || Boolean(exporting)} onClick={() => exportFile('xlsx')}>
+              {exporting === 'xlsx' ? 'Exporting…' : 'Export Excel'}
+            </button>
+            <button type="button" className="btn-primary" disabled={!cycle || loading || Boolean(exporting)} onClick={() => exportFile('pdf')}>
+              {exporting === 'pdf' ? 'Exporting…' : 'Export PDF'}
+            </button>
+          </div>
         }
       />
 

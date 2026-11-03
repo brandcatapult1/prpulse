@@ -280,6 +280,10 @@ export const prProgressApi = {
   team: (cycle) => api(`/pr-progress/team?cycle=${encodeURIComponent(cycle)}`),
   teamPdf: (cycle, sort, dir) =>
     download(`/pr-progress/team/pdf?cycle=${encodeURIComponent(cycle)}&sort=${encodeURIComponent(sort)}&dir=${dir}`),
+  teamXlsx: (cycle, sort, dir) =>
+    download(`/pr-progress/team/xlsx?cycle=${encodeURIComponent(cycle)}&sort=${encodeURIComponent(sort)}&dir=${dir}`),
+  xlsx: (cycle, sort, dir, campaign, manager, creator) =>
+    download(`/pr-progress/xlsx?cycle=${encodeURIComponent(cycle)}&sort=${encodeURIComponent(sort)}&dir=${dir}${campaign ? `&campaign=${encodeURIComponent(campaign)}` : ''}${manager ? `&manager=${encodeURIComponent(manager)}` : ''}${creator ? `&creator=${encodeURIComponent(creator)}` : ''}`),
   cycles: (campaign) => api(`/pr-progress/cycles${campaign ? `?campaign=${encodeURIComponent(campaign)}` : ''}`),
   report: (cycle, campaign, manager, creator) =>
     api(`/pr-progress?cycle=${encodeURIComponent(cycle)}${campaign ? `&campaign=${encodeURIComponent(campaign)}` : ''}${manager ? `&manager=${encodeURIComponent(manager)}` : ''}${creator ? `&creator=${encodeURIComponent(creator)}` : ''}`),

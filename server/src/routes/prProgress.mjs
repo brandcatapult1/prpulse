@@ -5,6 +5,7 @@ import { assertStaffUser } from '../lib/permissions.mjs';
 import {
   asOfLabel, buildPrProgressPdf, buildPrProgressTeamPdf, loadPrProgressTeamRows, sortTeamRows, loadCampaignCreatorDeliverables, loadPrProgressCampaigns, loadPrProgressManagers, loadPrProgressCycles, loadPrProgressRows, progressScope, sortPrProgressRows,
 } from '../lib/prProgress.mjs';
+import { buildPrProgressExcel, buildPrProgressTeamExcel } from '../lib/prProgressExcel.mjs';
 
 export const prProgressRouter = Router();
 prProgressRouter.use(requireAuth, (req, res, next) => {
@@ -147,5 +148,39 @@ prProgressRouter.get('/pdf', async (req, res) => {
     res.send(pdf);
   } catch (err) {
     res.status(503).json({ error: err.message ?? 'Could not export PDF' });
+  }
+});
+
+prProgressRouter.get('/team/xlsx', teamGuard, async (req, res) => {
+  try {
+    const cycle = cycleParam(req);
+    if (!cycle) return res.status(400).json({ error: 'Select a cycle' });
+    const rows = sortTeamRows(await loadPrProgressTeamRows(pool, cycle.number, cycle.back), req.query.sort, req.query.dir);
+    const { cycles } = await loadPrProgressCycles(pool, null, null);
+    const picked = cycles.find((c) => String(c.number) === String(req.query.cycle));
+    const buf = await buildPrProgressTeamExcel({ rows, cycleLabel: picked?.label ?? 'Current cycle', range: picked?.range ?? '' });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="pr-progress-team-cycle-${req.query.cycle}.xlsx"`);
+    res.send(Buffer.from(buf));
+  } catch (err) {
+    res.status(503).json({ error: err.message ?? 'Could not export Excel' });
+  }
+});
+
+prProgressRouter.get('/xlsx', async (req, res) => {
+  try {
+    const cycle = cycleParam(req);
+    if (!cycle) return res.status(400).json({ error: 'Select a cycle' });
+    const rows = sortPrProgressRows(
+      await loadPrProgressRows(pool, cycle.number, progressScope(req.user), campaignParam(req), managerParam(req), creatorParam(req), cycle.back), req.query.sort, req.query.dir,
+    );
+    const { cycles } = await loadPrProgressCycles(pool, progressScope(req.user), campaignParam(req));
+    const picked = cycles.find((c) => String(c.number) === String(req.query.cycle));
+    const buf = await buildPrProgressExcel({ rows, cycleLabel: picked?.label ?? 'Current cycle', range: picked?.range ?? '' });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="pr-progress-cycle-${req.query.cycle}.xlsx"`);
+    res.send(Buffer.from(buf));
+  } catch (err) {
+    res.status(503).json({ error: err.message ?? 'Could not export Excel' });
   }
 });

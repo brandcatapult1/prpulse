@@ -170,6 +170,7 @@ export const campaignsApi = {
   create: (body) => api('/campaigns', { method: 'POST', body: JSON.stringify(body) }),
   get: (id) => api(`/campaigns/${id}`),
   update: (id, body) => api(`/campaigns/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  exportNotContacted: (id) => download(`/campaigns/${id}/export-not-contacted`),
   populate: (id, body) =>
     api(`/campaigns/${id}/populate`, { method: 'POST', body: JSON.stringify(body) }),
 };

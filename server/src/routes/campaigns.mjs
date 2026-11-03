@@ -14,6 +14,7 @@ import {
   parseTermMonths,
 } from '../lib/campaignValidation.mjs';
 import { notify } from '../lib/notifications.mjs';
+import { buildNotContactedWorkbook } from '../lib/campaignExport.mjs';
 import { ensureCampaignCycles } from '../lib/campaignCycles.mjs';
 
 export const campaignsRouter = Router();
@@ -178,6 +179,19 @@ campaignsRouter.post('/', requireAuth, requireStaffRole, async (req, res) => {
     res.status(201).json(row);
   } catch (err) {
     res.status(err.status ?? 503).json({ error: err.message ?? 'Could not create campaign' });
+  }
+});
+
+campaignsRouter.get('/:id/export-not-contacted', requireAuth, async (req, res) => {
+  try {
+    const out = await buildNotContactedWorkbook(pool, req.params.id);
+    if (!out) return res.status(404).json({ error: 'Campaign not found' });
+    const safe = out.name.replace(/[^\w\- ]+/g, '').trim() || 'campaign';
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${safe} - not contacted.xlsx"`);
+    res.send(Buffer.from(out.buffer));
+  } catch (err) {
+    res.status(err.status ?? 503).json({ error: err.message ?? 'Could not export' });
   }
 });
 

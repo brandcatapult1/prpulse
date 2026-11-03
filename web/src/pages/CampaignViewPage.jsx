@@ -65,6 +65,7 @@ export function CampaignViewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [activeFilters, setActiveFilters] = useState(CAMPAIGN_EMPTY_FILTERS);
   const [viewMode, setViewMode] = useState('board');
   const [quickEditId, setQuickEditId] = useState(null);
@@ -270,6 +271,26 @@ export function CampaignViewPage() {
     );
   }
 
+  async function exportNotContacted() {
+    setExporting(true);
+    try {
+      const { blob, contentDisposition } = await campaignsApi.exportNotContacted(id);
+      const match = /filename="?([^";]+)"?/i.exec(contentDisposition);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = match?.[1] ?? 'not-contacted.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setToast({ message: err.message ?? 'Could not export', onUndo: null });
+    } finally {
+      setExporting(false);
+    }
+  }
+
   if (error || !campaign) {
     return (
       <div className="mx-auto max-w-6xl">
@@ -287,6 +308,9 @@ export function CampaignViewPage() {
         subtitle={`${MODULES.campaignView.pageTitle} · ${campaign.brand_name}`}
         actions={
           <>
+            <button type="button" className="btn-secondary" onClick={exportNotContacted} disabled={exporting}>
+              {exporting ? 'Exporting…' : 'Export Not contacted'}
+            </button>
             <button type="button" className="btn-secondary" onClick={() => setEditOpen(true)}>Edit</button>
             <button type="button" className="btn-primary" onClick={() => setAddOpen(true)}>Add Creators</button>
           </>

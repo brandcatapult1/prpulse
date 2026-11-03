@@ -206,7 +206,7 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
             aria-label={open ? 'Hide deliverables' : 'Show deliverables'}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-ink-tertiary hover:bg-zinc-100 hover:text-ink"
           >
-            <span className={`transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden>▸</span>
+            <span className={`transition-transform duration-300 ${open ? 'rotate-90' : ''}`} aria-hidden>▸</span>
           </button>
           <Col className="w-44 lg:w-auto">
             <span className="block truncate text-sm font-medium text-ink">{row.campaign_name}</span>
@@ -224,18 +224,18 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
           <Col label="WWA">{row.would_work_again == null ? '—' : <Chip tone={row.would_work_again ? 'good' : 'muted'}>{row.would_work_again ? 'Yes' : 'No'}</Chip>}</Col>
         </div>
       </div>
-      {open && (
-        <div className="border-t border-line bg-zinc-50/50">
-          <DeliverableStatsTable
-            deliverables={deliverables}
-            classification={classification}
-            followers={followers}
-            action={(
-              <RefreshIconButton busy={refreshing} onClick={onRefresh} />
-            )}
-          />
+      <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+        <div className="overflow-hidden" aria-hidden={!open}>
+          <div className="border-t border-line bg-zinc-50/50">
+            <DeliverableStatsTable
+              deliverables={deliverables}
+              classification={classification}
+              followers={followers}
+              action={<RefreshIconButton busy={refreshing} onClick={onRefresh} />}
+            />
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

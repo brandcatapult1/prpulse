@@ -35,7 +35,18 @@ function NavGroup({ item, mobile, onNavClick, user }) {
         className={`flex w-full items-center justify-between ${navLinkClass(false, mobile)} ${active ? 'font-medium text-ink' : ''}`}
       >
         <span>{item.label}</span>
-        <span className={`text-2xs transition-transform ${shown ? 'rotate-90' : ''}`} aria-hidden>▸</span>
+        <svg
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`h-4 w-4 shrink-0 text-ink-secondary transition-transform ${shown ? 'rotate-180' : ''}`}
+          aria-hidden
+        >
+          <path d="M5 8l5 5 5-5" />
+        </svg>
       </button>
       {shown && (
         <div className="mt-0.5 space-y-0.5 pl-3">

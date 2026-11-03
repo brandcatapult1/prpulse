@@ -475,12 +475,19 @@ export async function loadPrProgressTeamRows(pool, cycleNumber, back = 0) {
             count(DISTINCT per.campaign_id)::int AS campaigns,
             count(e.id) FILTER (WHERE e.conversation_status::text NOT LIKE 'dropped%')::int AS creators,
             count(e.id) FILTER (WHERE e.conversation_status = 'not_contacted')::int AS not_contacted,
+            COALESCE(sum(dl.qty) FILTER (WHERE e.conversation_status = 'not_contacted'), 0)::int AS not_contacted_deliv,
             count(e.id) FILTER (WHERE e.conversation_status = 'in_conversation')::int AS in_conversation,
+            COALESCE(sum(dl.qty) FILTER (WHERE e.conversation_status = 'in_conversation'), 0)::int AS in_conversation_deliv,
             count(e.id) FILTER (WHERE e.conversation_status = 'scheduled')::int AS scheduled,
+            COALESCE(sum(dl.qty) FILTER (WHERE e.conversation_status = 'scheduled'), 0)::int AS scheduled_deliv,
             count(e.id) FILTER (WHERE e.conversation_status = 'awaiting_final_deliverables')::int AS awaiting,
+            COALESCE(sum(dl.qty) FILTER (WHERE e.conversation_status = 'awaiting_final_deliverables'), 0)::int AS awaiting_deliv,
             count(e.id) FILTER (WHERE fn_engagement_counted(e.id) AND e.completed_at IS NOT NULL
               AND (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date >= per.cycle_start
               AND (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date < per.cycle_end)::int AS completed,
+            COALESCE(sum(dl.qty) FILTER (WHERE fn_engagement_counted(e.id) AND e.completed_at IS NOT NULL
+              AND (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date >= per.cycle_start
+              AND (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date < per.cycle_end), 0)::int AS completed_deliv,
             (SELECT count(*) FROM deliverables d
                JOIN engagements e2 ON e2.id = d.engagement_id
                JOIN per p2 ON p2.campaign_id = e2.campaign_id AND p2.user_id = u.id
@@ -491,6 +498,9 @@ export async function loadPrProgressTeamRows(pool, cycleNumber, back = 0) {
      FROM users u
      LEFT JOIN per ON per.user_id = u.id
      LEFT JOIN engagements e ON e.campaign_id = per.campaign_id AND e.assigned_manager = u.id
+     LEFT JOIN LATERAL (
+       SELECT COALESCE(sum(d.quantity), 0) AS qty FROM deliverables d WHERE d.engagement_id = e.id
+     ) dl ON true
      WHERE u.is_active AND u.role IN ('campaign_manager', 'senior_manager', 'admin')
      GROUP BY u.id, u.full_name
      ORDER BY u.full_name`,
@@ -551,7 +561,9 @@ export async function buildPrProgressTeamPdf({ rows, cycleLabel, range = '' }) {
     let x = left;
     for (const col of TEAM_COLUMNS) {
       doc.rect(x, y, col.width, 22).stroke('#9ca3af');
-      doc.fillColor('#111827').text(String(row[col.key] ?? ''), x + pad, y + 7, { width: col.width - pad * 2, align: col.align });
+      const dv = row[`${col.key}_deliv`];
+      const text = dv != null ? `${row[col.key]}  (${dv} deliverables)` : String(row[col.key] ?? '');
+      doc.fillColor('#111827').text(text, x + pad, y + 7, { width: col.width - pad * 2, align: col.align });
       x += col.width;
     }
     y += 22;

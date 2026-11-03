@@ -132,7 +132,6 @@ const COLUMNS = [
   { key: 'campaign_name', label: 'Campaign', align: 'left' },
   { key: 'managers', label: 'Account manager', align: 'left' },
   { key: 'total', label: 'Target collaboration' },
-  { key: 'creators', label: 'Creator name', align: 'left' },
   { key: 'in_conversation', label: 'In Conversation' },
   { key: 'scheduled', label: 'Scheduled' },
   { key: 'awaiting', label: 'Awaiting Deliverables' },
@@ -164,8 +163,7 @@ export function PrProgressPage() {
   const [campaignId, setCampaignId] = useState('');
   const [managers, setManagers] = useState([]);
   const [managerId, setManagerId] = useState('');
-  const [creatorInput, setCreatorInput] = useState('');
-  const [creator, setCreator] = useState('');
+  const creator = ''; // the creator-name filter was removed from this page
   const [cycle, setCycle] = useState('');
   const [currentCycle, setCurrentCycle] = useState('');
   const [data, setData] = useState(null);
@@ -179,11 +177,6 @@ export function PrProgressPage() {
     if (!allowed) return;
     prProgressApi.campaigns().then((rows) => setCampaigns(Array.isArray(rows) ? rows : [])).catch(() => {});
   }, [allowed]);
-
-  useEffect(() => {
-    const t = setTimeout(() => setCreator(creatorInput.trim()), 350);
-    return () => clearTimeout(t);
-  }, [creatorInput]);
 
   useEffect(() => {
     if (!canFilterManagers) return;
@@ -294,16 +287,6 @@ export function PrProgressPage() {
         </label>
         )}
         <label className="block">
-          <span className="mb-1.5 block text-2xs font-medium text-ink-secondary">Creator name</span>
-          <input
-            className="input-field w-56"
-            type="search"
-            value={creatorInput}
-            onChange={(e) => setCreatorInput(e.target.value)}
-            placeholder="Search creator"
-          />
-        </label>
-        <label className="block">
           <span className="mb-1.5 block text-2xs font-medium text-ink-secondary">Cycle</span>
           <select className="input-field w-80" value={cycle} onChange={(e) => setCycle(e.target.value)}>
             {cycles.length === 0 && <option value="">No cycles</option>}
@@ -366,8 +349,7 @@ export function PrProgressPage() {
               )}
               {!loading && rows.map((row) => (
                 <Fragment key={row.id}>
-                  <tr className={row.manager_count > 1 ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-zinc-50'}
-                    title={row.manager_count > 1 ? `${row.manager_count} account managers on this campaign` : undefined}>
+                  <tr className="hover:bg-zinc-50">
                     {COLUMNS.map((col, i) => (
                       <td
                         key={col.key}

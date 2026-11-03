@@ -9,17 +9,16 @@ const STATUS_LABELS = {
 };
 
 export const PR_PROGRESS_COLUMNS = [
-  { key: 'campaign_name', label: 'Campaign', width: 105, align: 'left' },
-  { key: 'managers', label: 'Account manager', width: 85, align: 'left' },
+  { key: 'campaign_name', label: 'Campaign', width: 135, align: 'left' },
+  { key: 'managers', label: 'Account manager', width: 115, align: 'left' },
   { key: 'total', label: 'Target collaboration', width: 60, align: 'center' },
-  { key: 'creators', label: 'Creator name', width: 90, align: 'left' },
   { key: 'in_conversation', label: 'In Conversation', width: 56, align: 'center' },
   { key: 'scheduled', label: 'Scheduled', width: 52, align: 'center' },
   { key: 'awaiting', label: 'Awaiting Deliverables', width: 64, align: 'center' },
   { key: 'completed', label: 'Completed', width: 56, align: 'center' },
-  { key: 'balance_prev', label: 'Balance from last month', width: 62, align: 'center' },
-  { key: 'status', label: 'Status', width: 52, align: 'center' },
-  { key: 'remaining', label: 'Remaining to complete', width: 58, align: 'center' },
+  { key: 'balance_prev', label: 'Balance from last month', width: 72, align: 'center' },
+  { key: 'status', label: 'Status', width: 62, align: 'center' },
+  { key: 'remaining', label: 'Remaining to complete', width: 68, align: 'center' },
 ];
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -341,8 +340,7 @@ export async function buildPrProgressPdf({ rows, cycleLabel, range = '' }) {
     if (y + h > bottom) newPage();
     let x = left;
     PR_PROGRESS_COLUMNS.forEach((col, i) => {
-      if (row.manager_count > 1) doc.rect(x, y, col.width, h).fillAndStroke('#fef3c7', '#9ca3af');
-      else doc.rect(x, y, col.width, h).stroke('#9ca3af');
+      doc.rect(x, y, col.width, h).stroke('#9ca3af');
       doc.fillColor('#111827').text(cells[i], x + pad, y + (h - heights[i]) / 2, {
         width: col.width - pad * 2,
         align: col.align,

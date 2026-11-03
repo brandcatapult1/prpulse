@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import RefreshIconButton from '../ui/RefreshIconButton.jsx';
 import { contactsApi } from '../../lib/api.js';
 import { EmptyState, Toast } from '../ui/Primitives.jsx';
 import { formatFee } from '../../lib/format.jsx';
@@ -79,10 +80,8 @@ export function AudienceCard({ contactId }) {
       <div className="panel p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-medium text-ink">Audience</h3>
-          <button type="button" className="btn-secondary" disabled={syncing || !configured} onClick={sync}
-            title={configured ? '' : 'Set META_ACCESS_TOKEN / META_IG_USER_ID on the server to enable sync'}>
-            {syncing ? 'Syncing…' : 'Refresh from Instagram'}
-          </button>
+          <RefreshIconButton busy={syncing} disabled={!configured} onClick={sync}
+            title={configured ? 'Refresh metrics' : 'Set META_ACCESS_TOKEN / META_IG_USER_ID on the server to enable sync'} />
         </div>
         <div className="mt-3 grid gap-4">
           {PLATFORMS.map(([key, name, followLabel]) => {
@@ -222,9 +221,7 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
             classification={classification}
             followers={followers}
             action={(
-              <button type="button" className="btn-secondary" disabled={refreshing} onClick={onRefresh}>
-                {refreshing ? 'Refreshing…' : 'Refresh metrics'}
-              </button>
+              <RefreshIconButton busy={refreshing} onClick={onRefresh} />
             )}
           />
         </div>

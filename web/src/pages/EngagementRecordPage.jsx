@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import RefreshIconButton from '../components/ui/RefreshIconButton.jsx';
 import { Link, useParams } from 'react-router-dom';
 import {
   Card,
@@ -1306,9 +1307,7 @@ export function EngagementRecordPage() {
                   />
                 ))}
                 {creatorStats?.deliverables?.some((x) => x.engagement_id === id) && (
-                  <button type="button" className="btn-secondary" disabled={refreshingMetrics} onClick={refreshMetrics}>
-                    {refreshingMetrics ? 'Refreshing…' : 'Refresh metrics'}
-                  </button>
+                  <RefreshIconButton busy={refreshingMetrics} onClick={refreshMetrics} />
                 )}
               </div>
             )}

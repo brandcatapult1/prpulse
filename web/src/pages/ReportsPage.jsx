@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import RefreshIconButton from '../components/ui/RefreshIconButton.jsx';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Card } from '../components/ui/Primitives.jsx';
@@ -324,9 +325,7 @@ export function ReportsPage() {
                     ? `Last updated ${new Date(report.metrics_synced_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}`
                     : 'Not refreshed yet'}
                 </span>
-                <button type="button" className="btn-secondary" disabled={refreshing} onClick={handleRefreshMetrics}>
-                  {refreshing ? 'Refreshing…' : 'Refresh metrics'}
-                </button>
+                <RefreshIconButton busy={refreshing} onClick={handleRefreshMetrics} />
               </div>
             }
           >

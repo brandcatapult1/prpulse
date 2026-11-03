@@ -362,15 +362,9 @@ export function PrProgressPage() {
                               onClick={() => toggleOpen(row.id)}
                               aria-expanded={openIds.has(row.id)}
                               aria-label={openIds.has(row.id) ? 'Hide creators' : 'Show creators'}
-                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand text-white hover:bg-brand/90"
+                              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-ink-tertiary hover:bg-zinc-100 hover:text-ink"
                             >
-                              <svg
-                                className={`h-3.5 w-3.5 transition-transform ${openIds.has(row.id) ? 'rotate-90' : ''}`}
-                                viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden
-                              >
-                                <path d="M9 5l7 7-7 7" />
-                              </svg>
+                              <span className={`transition-transform ${openIds.has(row.id) ? 'rotate-90' : ''}`} aria-hidden>▸</span>
                             </button>
                             <span>{row[col.key]}</span>
                           </div>

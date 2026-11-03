@@ -379,16 +379,6 @@ function DeliverableMetrics({ stats }) {
         const hasAny = ['likes', 'comments', 'views', 'reach', 'saves', 'shares'].some((k) => Number(l[k]) > 0);
         return (
           <div key={l.content_url ?? i} className="mt-1">
-            {l.content_url && (
-              <a
-                href={/^https?:\/\//i.test(l.content_url) ? l.content_url : `https://${l.content_url}`}
-                target="_blank"
-                rel="noreferrer"
-                className="block truncate text-2xs text-brand hover:underline"
-              >
-                {l.content_url}
-              </a>
-            )}
             {hasAny ? (
               <MetricsLine metrics={l} classification={stats.classification} followers={stats.followers} />
             ) : (

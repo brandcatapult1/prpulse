@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { MODULES } from '../lib/modules.js';
 import { prProgressApi } from '../lib/api.js';
-import { COLUMNS as CAMPAIGN_COLUMNS, CellValue } from './PrProgressPage.jsx';
+import { CellValue } from './PrProgressPage.jsx';
 
 const COLUMNS = [
   { key: 'manager_name', label: 'Account manager', align: 'left' },
@@ -29,12 +29,7 @@ function sortRows(rows, key, dir) {
   });
 }
 
-// The campaign table, minus the account manager (it is the row being opened).
-const MANAGER_CAMPAIGN_COLUMNS = CAMPAIGN_COLUMNS
-  .filter((c) => c.key !== 'managers')
-  .flatMap((c) => (c.key === 'in_conversation' ? [{ key: 'not_contacted', label: 'Not Contacted' }, c] : [c]));
-
-/** Opened row: the campaigns this account manager works on, with their numbers for the cycle. */
+/** Opened row: the manager's campaigns as rows of the same table, so every number sits under its own column. */
 function ManagerCampaigns({ managerId, cycle, colSpan }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
@@ -48,46 +43,31 @@ function ManagerCampaigns({ managerId, cycle, colSpan }) {
     return () => { cancelled = true; };
   }, [managerId, cycle]);
 
-  const TH = 'px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-ink-tertiary';
-  return (
-    <tr>
-      <td colSpan={colSpan} className="border-b border-line bg-zinc-50/70 px-4 py-4 sm:px-8">
-        {error ? (
-          <p className="text-2xs text-red-700">{error}</p>
-        ) : !rows ? (
-          <p className="text-2xs text-ink-secondary">Loading campaigns…</p>
-        ) : rows.length === 0 ? (
-          <p className="text-2xs text-ink-secondary">No campaigns for this cycle.</p>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border border-line bg-white shadow-sm">
-            <table className="w-full min-w-[760px] border-collapse text-xs">
-              <thead className="bg-zinc-50">
-                <tr>
-                  {MANAGER_CAMPAIGN_COLUMNS.map((c) => (
-                    <th key={c.key} className={`${TH} ${c.align === 'left' ? 'text-left' : 'text-center'}`}>{c.label}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id} className="transition-colors hover:bg-brand-soft/30">
-                    {MANAGER_CAMPAIGN_COLUMNS.map((c, i) => (
-                      <td
-                        key={c.key}
-                        className={`border-t border-line/60 px-3 py-3 align-middle ${c.align === 'left' ? 'text-left' : 'text-center tabular-nums'} ${i === 0 ? 'font-medium text-ink' : ''}`}
-                      >
-                        {i === 0 ? r[c.key] : <CellValue colKey={c.key} row={r} />}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </td>
-    </tr>
+  const note = (text, tone = 'text-ink-secondary') => (
+    <tr><td colSpan={colSpan} className={`border border-line bg-zinc-50/70 px-12 py-3 text-2xs ${tone}`}>{text}</td></tr>
   );
+  if (error) return note(error, 'text-red-700');
+  if (!rows) return note('Loading campaigns…');
+  if (rows.length === 0) return note('No campaigns for this cycle.');
+
+  const cell = 'border border-line bg-zinc-50/70 px-3 py-2.5 align-middle text-center text-xs tabular-nums';
+  return rows.map((r) => (
+    <tr key={r.id} className="transition-colors hover:bg-brand-soft/30">
+      <td className={`${cell} !text-left`}>
+        <div className="pl-8">
+          <div className="font-medium text-ink">{r.campaign_name}</div>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-2xs text-ink-tertiary">
+            <CellValue colKey="status" row={r} />
+            <span>{r.remaining} left of {r.total}</span>
+          </div>
+        </div>
+      </td>
+      <td className={cell}><CellValue colKey="total" row={r} /></td>
+      {['not_contacted', 'in_conversation', 'scheduled', 'awaiting', 'completed', 'balance_prev'].map((k) => (
+        <td key={k} className={cell}><CellValue colKey={k} row={r} /></td>
+      ))}
+    </tr>
+  ));
 }
 
 /** Account manager-wise progress for a cycle (admins and senior managers). */

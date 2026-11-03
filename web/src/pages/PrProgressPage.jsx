@@ -27,6 +27,80 @@ const stageLabel = (s) => STAGE_LABELS[s] ?? (s?.startsWith('dropped') ? 'Droppe
 const dateLabel = (iso) =>
   iso ? new Date(`${String(iso).slice(0, 10)}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—';
 
+const TH = 'px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-ink-tertiary';
+const TD = 'border-t border-line/60 px-3 py-3 align-middle text-xs';
+
+/** Creators with stage, posted count and deliverables. `second` picks the column after the creator name. */
+export function CreatorsTable({ rows, second = 'manager' }) {
+  return (
+  <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
+    <table className="w-full border-collapse text-2xs">
+      <thead className="bg-zinc-50">
+        <tr>
+          <th className={TH}>Creator</th>
+          <th className={TH}>{second === 'campaign' ? 'Campaign' : 'Account manager'}</th>
+          <th className={TH}>Stage</th>
+          <th className={`${TH} text-center`}>Posted</th>
+          <th className={TH}>Deliverables</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((c) => {
+          const total = c.deliverables.length;
+          const posted = c.deliverables.filter((d) => d.status === 'posted').length;
+          const current = c.deliverables.filter((d) => !d.carried);
+          return (
+            <tr key={c.engagement_id} className="transition-colors hover:bg-brand-soft/30">
+              <td className={`${TD} font-medium text-ink`}>{c.full_name}</td>
+              <td className={`${TD} text-ink-secondary`}>{second === 'campaign' ? c.campaign_name : (c.manager_name ?? '—')}</td>
+              <td className={TD}><Pill tone={stageTone(c.stage)}>{stageLabel(c.stage)}</Pill></td>
+              <td className={`${TD} text-center`}>
+                <span className={`inline-block min-w-[2.5rem] rounded-full px-2 py-0.5 font-semibold tabular-nums ${
+                  total > 0 && posted === total ? 'bg-teal-50 text-teal-700' : 'bg-zinc-100 text-ink-secondary'
+                }`}>
+                  {posted}/{total}
+                </span>
+              </td>
+              <td className={TD}>
+                {current.length === 0 ? <span className="text-ink-tertiary">—</span> : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {current.map((d, i) => (
+                      <span
+                        key={i}
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-2xs leading-4 ring-1 ${
+                          d.status === 'posted'
+                            ? 'bg-teal-50 text-teal-800 ring-teal-100'
+                            : 'bg-white text-ink-secondary ring-line'
+                        }`}
+                      >
+                        <span className="font-medium">
+                          {TYPE_LABELS[d.type] ?? d.type}{d.quantity > 1 ? ` ×${d.quantity}` : ''}
+                        </span>
+                        <span className="opacity-60">·</span>
+                        <span>
+                          {d.status === 'posted'
+                            ? `Posted${d.published_date ? ` ${dateLabel(d.published_date)}` : ''}`
+                            : `${d.status[0].toUpperCase()}${d.status.slice(1)}${d.due_date ? ` · due ${dateLabel(d.due_date)}` : ''}`}
+                        </span>
+                        {d.content_link && (
+                          <a href={d.content_link} target="_blank" rel="noreferrer" className="ml-0.5 font-medium text-brand hover:underline">
+                            link
+                          </a>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+  );
+}
+
 /** Expanded row: the creators who completed on the campaign, with their deliverables. */
 function CreatorDeliverables({ campaignId, managerId, creator, before, prev, colSpan }) {
   const [rows, setRows] = useState(null);
@@ -43,9 +117,6 @@ function CreatorDeliverables({ campaignId, managerId, creator, before, prev, col
   const carried = (rows ?? []).flatMap((c) =>
     c.deliverables.filter((d) => d.carried).map((d) => ({ creator: c.full_name, manager: c.manager_name, d })));
 
-  const TH = 'px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-ink-tertiary';
-  const TD = 'border-t border-line/60 px-3 py-3 align-middle text-xs';
-
   return (
     <tr>
       <td colSpan={colSpan} className="border-b border-line bg-zinc-50/70 px-4 py-4 sm:px-8">
@@ -56,71 +127,7 @@ function CreatorDeliverables({ campaignId, managerId, creator, before, prev, col
         ) : rows.length === 0 ? (
           <p className="text-2xs text-ink-secondary">No completed creators {managerId ? 'for this account manager ' : ''}in this campaign yet.</p>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-line bg-white shadow-sm">
-            <table className="w-full border-collapse text-2xs">
-              <thead className="bg-zinc-50">
-                <tr>
-                  <th className={TH}>Creator</th>
-                  <th className={TH}>Account manager</th>
-                  <th className={TH}>Stage</th>
-                  <th className={`${TH} text-center`}>Posted</th>
-                  <th className={TH}>Deliverables</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((c) => {
-                  const total = c.deliverables.length;
-                  const posted = c.deliverables.filter((d) => d.status === 'posted').length;
-                  const current = c.deliverables.filter((d) => !d.carried);
-                  return (
-                    <tr key={c.engagement_id} className="transition-colors hover:bg-brand-soft/30">
-                      <td className={`${TD} font-medium text-ink`}>{c.full_name}</td>
-                      <td className={`${TD} text-ink-secondary`}>{c.manager_name ?? '—'}</td>
-                      <td className={TD}><Pill tone={stageTone(c.stage)}>{stageLabel(c.stage)}</Pill></td>
-                      <td className={`${TD} text-center`}>
-                        <span className={`inline-block min-w-[2.5rem] rounded-full px-2 py-0.5 font-semibold tabular-nums ${
-                          total > 0 && posted === total ? 'bg-teal-50 text-teal-700' : 'bg-zinc-100 text-ink-secondary'
-                        }`}>
-                          {posted}/{total}
-                        </span>
-                      </td>
-                      <td className={TD}>
-                        {current.length === 0 ? <span className="text-ink-tertiary">—</span> : (
-                          <div className="flex flex-wrap gap-1.5">
-                            {current.map((d, i) => (
-                              <span
-                                key={i}
-                                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-2xs leading-4 ring-1 ${
-                                  d.status === 'posted'
-                                    ? 'bg-teal-50 text-teal-800 ring-teal-100'
-                                    : 'bg-white text-ink-secondary ring-line'
-                                }`}
-                              >
-                                <span className="font-medium">
-                                  {TYPE_LABELS[d.type] ?? d.type}{d.quantity > 1 ? ` ×${d.quantity}` : ''}
-                                </span>
-                                <span className="opacity-60">·</span>
-                                <span>
-                                  {d.status === 'posted'
-                                    ? `Posted${d.published_date ? ` ${dateLabel(d.published_date)}` : ''}`
-                                    : `${d.status[0].toUpperCase()}${d.status.slice(1)}${d.due_date ? ` · due ${dateLabel(d.due_date)}` : ''}`}
-                                </span>
-                                {d.content_link && (
-                                  <a href={d.content_link} target="_blank" rel="noreferrer" className="ml-0.5 font-medium text-brand hover:underline">
-                                    link
-                                  </a>
-                                )}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <CreatorsTable rows={rows} />
         )}
         {carried.length > 0 && (
           <div className="mt-4 overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm">

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { RequireAuth } from './components/layout/RequireAuth.jsx';
 import { AppShell } from './components/layout/AppShell.jsx';
@@ -12,6 +12,7 @@ import { CampaignViewPage } from './pages/CampaignViewPage.jsx';
 import { EngagementRecordPage, PlaceholderPage } from './pages/EngagementRecordPage.jsx';
 import { ReportsPage } from './pages/ReportsPage.jsx';
 import { PrProgressPage } from './pages/PrProgressPage.jsx';
+import { PrProgressTeamPage } from './pages/PrProgressTeamPage.jsx';
 import { RegistrationsPage } from './pages/RegistrationsPage.jsx';
 import { BrandsPage } from './pages/BrandsPage.jsx';
 import { BulkImportPage } from './pages/BulkImportPage.jsx';
@@ -38,8 +39,11 @@ export default function App() {
             <Route path="engagements/:id" element={<EngagementRecordPage />} />
             <Route path="brands" element={<BrandsPage />} />
             <Route path="registrations" element={<RegistrationsPage />} />
-            <Route path="reports" element={<ReportsPage />} />
-            <Route path="pr-progress" element={<PrProgressPage />} />
+            <Route path="reports" element={<Navigate to="/reports/client" replace />} />
+            <Route path="reports/client" element={<ReportsPage />} />
+            <Route path="reports/campaign" element={<PrProgressPage />} />
+            <Route path="reports/team" element={<PrProgressTeamPage />} />
+            <Route path="pr-progress" element={<Navigate to="/reports/campaign" replace />} />
             <Route path="import" element={<BulkImportPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="settings/:sectionKey" element={<SettingsPage />} />

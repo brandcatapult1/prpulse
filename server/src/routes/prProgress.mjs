@@ -3,7 +3,7 @@ import { pool } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
 import { assertStaffUser } from '../lib/permissions.mjs';
 import {
-  asOfLabel, buildPrProgressPdf, loadCampaignCreatorDeliverables, loadPrProgressCampaigns, loadPrProgressManagers, loadPrProgressCycles, loadPrProgressRows, progressScope, sortPrProgressRows,
+  asOfLabel, buildPrProgressPdf, buildPrProgressTeamPdf, loadPrProgressTeamRows, sortTeamRows, loadCampaignCreatorDeliverables, loadPrProgressCampaigns, loadPrProgressManagers, loadPrProgressCycles, loadPrProgressRows, progressScope, sortPrProgressRows,
 } from '../lib/prProgress.mjs';
 
 export const prProgressRouter = Router();
@@ -80,6 +80,38 @@ prProgressRouter.get('/', async (req, res) => {
     res.json({ cycle: cycle.number ?? 'current', as_of: asOfLabel(), rows });
   } catch (err) {
     res.status(503).json({ error: err.message ?? 'Could not load PR progress' });
+  }
+});
+
+/** Team view: one row per account manager (admins and senior managers only). */
+function teamGuard(req, res, next) {
+  if (progressScope(req.user) !== null) return res.status(403).json({ error: 'Only admins and senior managers can view the team report' });
+  next();
+}
+
+prProgressRouter.get('/team', teamGuard, async (req, res) => {
+  try {
+    const cycle = cycleParam(req);
+    if (!cycle) return res.status(400).json({ error: 'Select a cycle' });
+    res.json({ cycle: cycle.number ?? 'current', as_of: asOfLabel(), rows: await loadPrProgressTeamRows(pool, cycle.number) });
+  } catch (err) {
+    res.status(503).json({ error: err.message ?? 'Could not load team progress' });
+  }
+});
+
+prProgressRouter.get('/team/pdf', teamGuard, async (req, res) => {
+  try {
+    const cycle = cycleParam(req);
+    if (!cycle) return res.status(400).json({ error: 'Select a cycle' });
+    const rows = sortTeamRows(await loadPrProgressTeamRows(pool, cycle.number), req.query.sort, req.query.dir);
+    const { cycles } = await loadPrProgressCycles(pool, null, null);
+    const picked = cycles.find((c) => String(c.number) === String(req.query.cycle));
+    const pdf = await buildPrProgressTeamPdf({ rows, cycleLabel: picked?.label ?? 'Current cycle', range: picked?.range ?? '' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="pr-progress-team-cycle-${req.query.cycle}.pdf"`);
+    res.send(pdf);
+  } catch (err) {
+    res.status(503).json({ error: err.message ?? 'Could not export PDF' });
   }
 });
 

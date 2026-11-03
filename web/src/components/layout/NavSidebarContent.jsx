@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { roleLabel } from '../../lib/format.jsx';
 import { NAV_ITEMS } from '../../lib/modules.js';
 import { canAccessSettings } from '../../lib/settingsRegistry.js';
@@ -16,6 +17,37 @@ function navLinkClass(isActive, mobile) {
       ? 'bg-brand-soft font-medium text-brand'
       : 'text-ink-secondary hover:bg-canvas hover:text-ink'
   }`;
+}
+
+/** Parent menu with sub-pages; open while one of its pages is showing. */
+function NavGroup({ item, mobile, onNavClick, user }) {
+  const { pathname } = useLocation();
+  const active = pathname === item.to || pathname.startsWith(`${item.to}/`);
+  const [open, setOpen] = useState(active);
+  const shown = open;
+  const children = item.children.filter((c) => c.to !== '/reports/team' || user?.role !== 'campaign_manager');
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={shown}
+        className={`flex w-full items-center justify-between ${navLinkClass(false, mobile)} ${active ? 'font-medium text-ink' : ''}`}
+      >
+        <span>{item.label}</span>
+        <span className={`text-2xs transition-transform ${shown ? 'rotate-90' : ''}`} aria-hidden>▸</span>
+      </button>
+      {shown && (
+        <div className="mt-0.5 space-y-0.5 pl-3">
+          {children.map((c) => (
+            <NavLink key={c.to} to={c.to} onClick={onNavClick} className={({ isActive }) => navLinkClass(isActive, mobile)}>
+              {c.label}
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function NavSidebarContent({
@@ -36,7 +68,9 @@ export function NavSidebarContent({
     <>
       <SidebarBrand logoUrl={logoUrl} loading={loading} variant={mobile ? 'drawer' : 'sidebar'} />
       <nav className={`flex-1 space-y-0.5 ${mobile ? 'px-3' : 'px-2'}`}>
-        {items.map((item) => (
+        {items.map((item) => (item.children ? (
+          <NavGroup key={item.to} item={item} mobile={mobile} onNavClick={onNavClick} user={user} />
+        ) : (
           <NavLink
             key={item.to}
             to={item.to}
@@ -46,7 +80,7 @@ export function NavSidebarContent({
           >
             {item.label}
           </NavLink>
-        ))}
+        )))}
       </nav>
       <div className={`border-t border-line ${mobile ? 'p-4' : 'p-3'}`}>
         {devMode && (

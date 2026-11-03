@@ -59,16 +59,22 @@ export const MODULES = {
   },
   reporting: {
     prd: 8,
-    navLabel: 'Reports',
-    pageTitle: 'Reporting',
+    navLabel: 'PR Progress - Client',
+    pageTitle: 'PR Progress - Client',
     subtitle: 'Build a client-ready monthly report',
-    path: '/reports',
+    path: '/reports/client',
   },
   prProgress: {
-    navLabel: 'PR Progress',
-    pageTitle: 'PR Progress',
+    navLabel: 'PR Progress - Campaign',
+    pageTitle: 'PR Progress - Campaign',
     subtitle: 'Campaign-wise outreach progress for a cycle',
-    path: '/pr-progress',
+    path: '/reports/campaign',
+  },
+  prProgressTeam: {
+    navLabel: 'PR Progress - Team',
+    pageTitle: 'PR Progress - Team',
+    subtitle: 'Account manager-wise outreach progress for a cycle',
+    path: '/reports/team',
   },
   feedback: {
     prd: 9,
@@ -88,10 +94,16 @@ export const NAV_ITEMS = [
   MODULES.campaigns,
   MODULES.brands,
   MODULES.registration,
-  MODULES.reporting,
-  // PR Progress (/pr-progress) is hidden from the menu for now; the page itself still works.
+  {
+    // "Reports" is a parent menu; its pages are the PR Progress views.
+    to: '/reports',
+    label: 'Reports',
+    children: [MODULES.reporting, MODULES.prProgress, MODULES.prProgressTeam],
+  },
   MODULES.settings,
-].map((m) => ({ to: m.path, label: m.navLabel, end: m.path === '/' }));
+].map((m) => (m.children
+  ? { to: m.to, label: m.label, children: m.children.map((c) => ({ to: c.path, label: c.navLabel })) }
+  : { to: m.path, label: m.navLabel, end: m.path === '/' }));
 
 export const CONTACT_PROFILE_TABS = [
   'Overview',

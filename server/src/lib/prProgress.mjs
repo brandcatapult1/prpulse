@@ -453,3 +453,127 @@ export async function buildPrProgressPdf({ rows, cycleLabel, range = '' }) {
   doc.end();
   return done;
 }
+
+export const TEAM_COLUMNS = [
+  { key: 'manager_name', label: 'Account manager', width: 190 },
+  { key: 'campaigns', label: 'Campaigns', width: 80, align: 'center' },
+  { key: 'creators', label: 'Creators', width: 80, align: 'center' },
+  { key: 'not_contacted', label: 'Not contacted', width: 85, align: 'center' },
+  { key: 'in_conversation', label: 'In conversation', width: 90, align: 'center' },
+  { key: 'scheduled', label: 'Scheduled', width: 80, align: 'center' },
+  { key: 'awaiting', label: 'Awaiting final deliverables', width: 105, align: 'center' },
+  { key: 'completed', label: 'Completed', width: 80, align: 'center' },
+  { key: 'balance_prev', label: 'Balance from previous cycles', width: 105, align: 'center' },
+];
+
+/**
+ * One row per account manager across their non-archived campaigns.
+ * cycleNumber = a number → that cycle of every campaign that has it; null → each campaign's running cycle.
+ * "Completed" counts the manager's creators whose collaboration was completed inside that cycle.
+ */
+export async function loadPrProgressTeamRows(pool, cycleNumber) {
+  const { rows } = await pool.query(
+    `WITH per AS (
+       SELECT cam.id AS campaign_id, cm.user_id, cc.cycle_start, cc.cycle_end
+       FROM campaigns cam
+       JOIN campaign_managers cm ON cm.campaign_id = cam.id
+       JOIN LATERAL (
+         SELECT c.* FROM campaign_cycles c
+         WHERE c.campaign_id = cam.id AND ($1::int IS NULL OR c.cycle_number = $1::int)
+         ORDER BY (c.cycle_start <= $2::date AND $2::date < c.cycle_end) DESC,
+                  (c.cycle_start <= $2::date) DESC,
+                  CASE WHEN c.cycle_start <= $2::date THEN -c.cycle_number ELSE c.cycle_number END
+         LIMIT 1
+       ) cc ON true
+       WHERE cam.status <> 'archived'
+     )
+     SELECT u.id, u.full_name AS manager_name,
+            count(DISTINCT per.campaign_id)::int AS campaigns,
+            count(e.id) FILTER (WHERE e.conversation_status::text NOT LIKE 'dropped%')::int AS creators,
+            count(e.id) FILTER (WHERE e.conversation_status = 'not_contacted')::int AS not_contacted,
+            count(e.id) FILTER (WHERE e.conversation_status = 'in_conversation')::int AS in_conversation,
+            count(e.id) FILTER (WHERE e.conversation_status = 'scheduled')::int AS scheduled,
+            count(e.id) FILTER (WHERE e.conversation_status = 'awaiting_final_deliverables')::int AS awaiting,
+            count(e.id) FILTER (WHERE fn_engagement_counted(e.id) AND e.completed_at IS NOT NULL
+              AND (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date >= per.cycle_start
+              AND (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date < per.cycle_end)::int AS completed,
+            (SELECT count(*) FROM deliverables d
+               JOIN engagements e2 ON e2.id = d.engagement_id
+               JOIN per p2 ON p2.campaign_id = e2.campaign_id AND p2.user_id = u.id
+              WHERE e2.assigned_manager = u.id AND d.status <> 'posted'
+                AND e2.conversation_status::text NOT LIKE 'dropped%'
+                AND COALESCE(d.due_date, (e2.created_at AT TIME ZONE 'Asia/Kolkata')::date) < p2.cycle_start
+            )::int AS balance_prev
+     FROM per
+     JOIN users u ON u.id = per.user_id
+     LEFT JOIN engagements e ON e.campaign_id = per.campaign_id AND e.assigned_manager = u.id
+     GROUP BY u.id, u.full_name
+     ORDER BY u.full_name`,
+    [cycleNumber, todayIst()],
+  );
+  return rows;
+}
+
+export function sortTeamRows(rows, key, dir) {
+  if (!TEAM_COLUMNS.some((c) => c.key === key)) return rows;
+  const sign = dir === 'desc' ? -1 : 1;
+  return [...rows].sort((a, b) => {
+    const x = a[key];
+    const y = b[key];
+    const cmp = typeof x === 'number' && typeof y === 'number'
+      ? x - y
+      : String(x ?? '').localeCompare(String(y ?? ''), undefined, { sensitivity: 'base' });
+    return cmp * sign || a.manager_name.localeCompare(b.manager_name);
+  });
+}
+
+export async function buildPrProgressTeamPdf({ rows, cycleLabel, range = '' }) {
+  const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margins: { top: 36, right: 36, bottom: 36, left: 36 } });
+  const chunks = [];
+  doc.on('data', (c) => chunks.push(c));
+  const done = new Promise((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
+
+  const tableWidth = TEAM_COLUMNS.reduce((s, c) => s + c.width, 0);
+  const left = (doc.page.width - tableWidth) / 2;
+  const bottom = doc.page.height - doc.page.margins.bottom;
+  const pad = 5;
+
+  const drawHeader = (y) => {
+    doc.font('Helvetica-Bold').fontSize(7.5);
+    const h = 34;
+    let x = left;
+    for (const col of TEAM_COLUMNS) {
+      doc.rect(x, y, col.width, h).fillAndStroke('#e5e7eb', '#111827');
+      doc.fillColor('#111827').text(col.label, x + pad, y + 5, { width: col.width - pad * 2, align: 'center' });
+      x += col.width;
+    }
+    return y + h;
+  };
+
+  doc.font('Helvetica-Bold').fontSize(15).fillColor('#111827')
+    .text(`PR Progress - Team - As of ${asOfLabel()}`, left, 36, { width: tableWidth, align: 'center' });
+  doc.font('Helvetica').fontSize(9).fillColor('#6b7280')
+    .text(`${cycleLabel}${range ? ` (${range})` : ''}`, left, 58, { width: tableWidth, align: 'center' });
+
+  let y = drawHeader(78);
+  doc.font('Helvetica').fontSize(9);
+  for (const row of rows) {
+    if (y + 22 > bottom) {
+      doc.addPage();
+      y = drawHeader(doc.page.margins.top);
+      doc.font('Helvetica').fontSize(9);
+    }
+    let x = left;
+    for (const col of TEAM_COLUMNS) {
+      doc.rect(x, y, col.width, 22).stroke('#9ca3af');
+      doc.fillColor('#111827').text(String(row[col.key] ?? ''), x + pad, y + 7, { width: col.width - pad * 2, align: col.align });
+      x += col.width;
+    }
+    y += 22;
+  }
+  if (rows.length === 0) {
+    doc.fillColor('#6b7280').text('No account managers have this cycle.', left, y + 12, { width: tableWidth, align: 'center' });
+  }
+  doc.end();
+  return done;
+}

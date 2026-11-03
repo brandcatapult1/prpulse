@@ -277,6 +277,9 @@ export const prProgressApi = {
     if (creator) q.set('creator', creator);
     return api(`/pr-progress/campaigns/${campaignId}/creators${q.size ? `?${q}` : ''}`);
   },
+  team: (cycle) => api(`/pr-progress/team?cycle=${encodeURIComponent(cycle)}`),
+  teamPdf: (cycle, sort, dir) =>
+    download(`/pr-progress/team/pdf?cycle=${encodeURIComponent(cycle)}&sort=${encodeURIComponent(sort)}&dir=${dir}`),
   cycles: (campaign) => api(`/pr-progress/cycles${campaign ? `?campaign=${encodeURIComponent(campaign)}` : ''}`),
   report: (cycle, campaign, manager, creator) =>
     api(`/pr-progress?cycle=${encodeURIComponent(cycle)}${campaign ? `&campaign=${encodeURIComponent(campaign)}` : ''}${manager ? `&manager=${encodeURIComponent(manager)}` : ''}${creator ? `&creator=${encodeURIComponent(creator)}` : ''}`),

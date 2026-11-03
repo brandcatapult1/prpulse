@@ -40,9 +40,9 @@ export async function buildNotContactedWorkbook(pool, campaignId) {
   const ws = wb.addWorksheet('Not contacted', { views: [{ showGridLines: false }] });
   ws.columns = [{ width: 30 }, { width: 14 }, { width: 18 }, { width: 16 }, { width: 48 }];
 
-  ws.getRow(1).height = 60;
+  ws.getRow(1).height = 115; // room for the square logo
   const logo = wb.addImage({ filename: LOGO, extension: 'png' });
-  ws.addImage(logo, { tl: { col: 0, row: 0 }, ext: { width: 160, height: 56 } });
+  ws.addImage(logo, { tl: { col: 0, row: 0 }, ext: { width: 150, height: 150 } });
 
   ws.getCell('A2').value = campaign.campaign_name;
   ws.getCell('A2').font = { bold: true, size: 16 };

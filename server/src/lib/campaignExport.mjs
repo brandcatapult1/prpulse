@@ -23,11 +23,19 @@ export async function buildNotContactedWorkbook(pool, campaignId) {
 
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Not contacted', { views: [{ showGridLines: false }] });
-  ws.columns = [{ width: 30 }, { width: 14 }, { width: 18 }, { width: 16 }, { width: 48 }];
+  const WIDTHS = [34, 18, 24, 22, 54];
+  ws.columns = WIDTHS.map((width) => ({ width }));
+  const FONT = 15; // body and header text; 4 larger than Excel's default 11
+  const px = (w) => w * 7 + 5;
+  const totalPx = WIDTHS.reduce((sum, w) => sum + px(w), 0);
 
-  ws.getRow(1).height = 115; // room for the square logo
+  ws.getRow(1).height = 82; // room for the logo (200 x 100 px)
   const logo = wb.addImage({ filename: LOGO, extension: 'png' });
-  ws.addImage(logo, { tl: { col: 0, row: 0 }, ext: { width: 150, height: 150 } });
+  // Centre the logo over the table: find the column and the fraction into it where it starts.
+  let offset = (totalPx - 200) / 2;
+  let col = 0;
+  while (col < WIDTHS.length - 1 && offset >= px(WIDTHS[col])) { offset -= px(WIDTHS[col]); col += 1; }
+  ws.addImage(logo, { tl: { col: col + offset / px(WIDTHS[col]), row: 0 }, ext: { width: 200, height: 100 } });
 
   // Client and campaign, large on a light blue band.
   [['Client', campaign.brand_name ?? '—'], ['Campaign', campaign.campaign_name]].forEach(([label, value], i) => {
@@ -37,18 +45,18 @@ export async function buildNotContactedWorkbook(pool, campaignId) {
     cell.value = `${label} : ${value}`;
     cell.font = { bold: true, size: 20, color: { argb: 'FF1E3A5F' } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
-    cell.alignment = { vertical: 'middle', indent: 1 };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
     ws.getRow(r).height = 34;
   });
 
   const head = ws.getRow(5);
   head.values = ['Name', 'Followers', 'Engagement rate', 'Average views', 'Profile link'];
-  head.font = { bold: true, color: { argb: 'FF1E3A5F' } };
+  head.font = { bold: true, size: FONT, color: { argb: 'FF1E3A5F' } };
   head.eachCell((cell) => {
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
-    cell.alignment = { vertical: 'middle' };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
   });
-  head.height = 22;
+  head.height = 30;
 
   rows.forEach((r, i) => {
     const row = ws.getRow(6 + i);
@@ -59,12 +67,25 @@ export async function buildNotContactedWorkbook(pool, campaignId) {
     row.getCell(5).value = r.instagram_url
       ? { text: r.instagram_url, hyperlink: r.instagram_url }
       : '—';
-    if (r.instagram_url) row.getCell(5).font = { color: { argb: 'FF2563EB' }, underline: true };
     row.getCell(2).numFmt = '#,##0';
     row.getCell(4).numFmt = '#,##0';
-    [2, 3, 4].forEach((n) => { row.getCell(n).alignment = { horizontal: 'right' }; });
+    row.height = 26;
+    [1, 2, 3, 4, 5].forEach((n) => {
+      const cell = row.getCell(n);
+      cell.font = n === 5 && r.instagram_url
+        ? { size: FONT, color: { argb: 'FF2563EB' }, underline: true }
+        : { size: FONT };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    });
   });
-  if (rows.length === 0) ws.getCell('A6').value = 'No creators in Not contacted';
+  if (rows.length === 0) {
+    ws.mergeCells(6, 1, 6, 5);
+    const empty = ws.getCell(6, 1);
+    empty.value = 'No creators in Not contacted';
+    empty.font = { size: FONT, color: { argb: 'FF6B7280' } };
+    empty.alignment = { vertical: 'middle', horizontal: 'center' };
+    ws.getRow(6).height = 26;
+  }
 
   return { buffer: await wb.xlsx.writeBuffer(), brand: campaign.brand_name, name: campaign.campaign_name };
 }

@@ -1,28 +1,14 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ExcelJS from 'exceljs';
-import { pickCurrentCycle, mapCycleRow } from './campaignCycles.mjs';
-import { formatRange } from './prProgress.mjs';
 
 const LOGO = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../assets/brand-catapult-logo.png');
-
-/** "Cycle 2 of 6 · 28 Oct – 27 Nov" for the running cycle of a campaign. */
-async function cycleLabel(pool, campaignId) {
-  const { rows } = await pool.query(
-    'SELECT * FROM campaign_cycles WHERE campaign_id = $1 ORDER BY cycle_number', [campaignId],
-  );
-  const cycles = rows.map(mapCycleRow);
-  const cur = pickCurrentCycle(cycles);
-  if (!cur) return '—';
-  const end = new Date(`${cur.cycle_end}T00:00:00Z`);
-  end.setUTCDate(end.getUTCDate() - 1);
-  return `${cur.cycle_number} of ${cycles.length} · ${formatRange(cur.cycle_start, end.toISOString().slice(0, 10))}`;
-}
 
 /** Excel sheet of the creators still in "Not contacted" for a campaign. */
 export async function buildNotContactedWorkbook(pool, campaignId) {
   const { rows: [campaign] } = await pool.query(
-    'SELECT campaign_name FROM campaigns WHERE id = $1', [campaignId],
+    `SELECT cam.campaign_name, b.brand_name FROM campaigns cam
+     LEFT JOIN brands b ON b.id = cam.brand_id WHERE cam.id = $1`, [campaignId],
   );
   if (!campaign) return null;
   const { rows } = await pool.query(
@@ -34,7 +20,6 @@ export async function buildNotContactedWorkbook(pool, campaignId) {
      ORDER BY c.full_name`,
     [campaignId],
   );
-  const label = await cycleLabel(pool, campaignId);
 
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Not contacted', { views: [{ showGridLines: false }] });
@@ -44,10 +29,17 @@ export async function buildNotContactedWorkbook(pool, campaignId) {
   const logo = wb.addImage({ filename: LOGO, extension: 'png' });
   ws.addImage(logo, { tl: { col: 0, row: 0 }, ext: { width: 150, height: 150 } });
 
-  ws.getCell('A2').value = campaign.campaign_name;
-  ws.getCell('A2').font = { bold: true, size: 16 };
-  ws.getCell('A3').value = `Cycle : ${label}`;
-  ws.getCell('A3').font = { size: 11, color: { argb: 'FF52525B' } };
+  // Client and campaign, large on a light blue band.
+  [['Client', campaign.brand_name ?? '—'], ['Campaign', campaign.campaign_name]].forEach(([label, value], i) => {
+    const r = 2 + i;
+    ws.mergeCells(r, 1, r, 5);
+    const cell = ws.getCell(r, 1);
+    cell.value = `${label} : ${value}`;
+    cell.font = { bold: true, size: 20, color: { argb: 'FF1E3A5F' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
+    cell.alignment = { vertical: 'middle', indent: 1 };
+    ws.getRow(r).height = 34;
+  });
 
   const head = ws.getRow(5);
   head.values = ['Name', 'Followers', 'Engagement rate', 'Average views', 'Profile link'];

@@ -112,42 +112,45 @@ export function AudienceCard({ contactId }) {
   );
 }
 
-function DeliverableStatsTable({ deliverables, classification, followers }) {
+// Same grid as the accordion header, so every value sits under its own heading.
+const ROW_GRID = 'grid grid-cols-2 gap-x-4 gap-y-2 px-2 lg:grid-cols-[36px_minmax(150px,1.8fr)_repeat(11,minmax(0,1fr))]';
+
+function DeliverableStatsTable({ deliverables, classification, followers, action }) {
   if (!deliverables.length) {
-    return <p className="px-4 py-3 text-2xs text-ink-tertiary">No completed deliverables yet — metrics appear once they are marked posted.</p>;
+    return (
+      <div className="flex items-center justify-between gap-3 px-4 py-3">
+        <p className="text-2xs text-ink-tertiary">No completed deliverables yet — metrics appear once they are marked posted.</p>
+        {action}
+      </div>
+    );
   }
+  const rows = deliverables.flatMap((d) => (d.links.length ? d.links : [{ content_url: null }]).map((l, i) => ({ d, l, key: `${d.deliverable_id}-${i}` })));
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-2xs">
-        <thead>
-          <tr className="border-b border-line text-left text-ink-tertiary">
-            <th className="px-3 py-2">Deliverable</th>
-            {METRICS.map(([k, label]) => <th key={k} className="px-2 py-2">{label}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {deliverables.flatMap((d) => (d.links.length ? d.links : [{ content_url: null }]).map((l, i) => (
-            <tr key={`${d.deliverable_id}-${i}`} className="border-b border-line/60 last:border-0">
-              <td className="px-3 py-2">
-                <div className="font-medium text-ink">{TYPE_LABEL[d.deliverable_type] ?? formatStatus(d.deliverable_type)}</div>
-                <div className="text-ink-tertiary">
-                  {l.content_url
-                    ? <a href={l.content_url} target="_blank" rel="noreferrer" className="text-brand hover:underline">{l.content_url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 40)}</a>
-                    : 'No link (screenshot proof)'}
-                </div>
-              </td>
-              {METRICS.map(([k]) => {
-                const est = k === 'reach' ? estimateReach(l, classification, followers) : null;
-                return (
-                  <td key={k} className="px-2 py-2">
-                    {est != null ? `~${formatCount(est)}` : formatCount(l[k])}
-                  </td>
-                );
-              })}
-            </tr>
-          )))}
-        </tbody>
-      </table>
+    <div>
+      {rows.map(({ d, l, key }, idx) => (
+        <div key={key} className={`${ROW_GRID} items-center border-b border-line/60 py-2.5 last:border-0`}>
+          <div className="col-span-2 min-w-0 lg:col-span-5 lg:col-start-2">
+            <div className="text-2xs font-medium text-ink">{TYPE_LABEL[d.deliverable_type] ?? formatStatus(d.deliverable_type)}</div>
+            <div className="truncate text-2xs text-ink-tertiary">
+              {l.content_url
+                ? <a href={l.content_url} target="_blank" rel="noreferrer" className="text-brand hover:underline">{l.content_url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 40)}</a>
+                : 'No link (screenshot proof)'}
+            </div>
+          </div>
+          {METRICS.map(([k, label]) => {
+            const est = k === 'reach' ? estimateReach(l, classification, followers) : null;
+            return (
+              <div key={k} className="text-2xs font-semibold tabular-nums text-ink">
+                <span className="mr-1 text-[10px] font-medium uppercase tracking-wider text-ink-tertiary lg:hidden">{label}</span>
+                {est != null ? `~${formatCount(est)}` : formatCount(l[k])}
+              </div>
+            );
+          })}
+          <div className="col-span-2 flex justify-end lg:col-span-3">
+            {idx === 0 && action}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -214,14 +217,16 @@ function CollaborationAccordion({ row, stats, deliverables, reach, classificatio
       </div>
       {open && (
         <div className="border-t border-line">
-          <div className="flex justify-end px-4 pt-3">
-            <button type="button" className="btn-secondary" disabled={refreshing} onClick={onRefresh}>
-              {refreshing ? 'Refreshing…' : 'Refresh metrics'}
-            </button>
-          </div>
-          <div>
-            <DeliverableStatsTable deliverables={deliverables} classification={classification} followers={followers} />
-          </div>
+          <DeliverableStatsTable
+            deliverables={deliverables}
+            classification={classification}
+            followers={followers}
+            action={(
+              <button type="button" className="btn-secondary" disabled={refreshing} onClick={onRefresh}>
+                {refreshing ? 'Refreshing…' : 'Refresh metrics'}
+              </button>
+            )}
+          />
         </div>
       )}
     </div>

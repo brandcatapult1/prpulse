@@ -165,12 +165,12 @@ function Field({ label, children }) {
 
 function Chip({ children, tone = 'neutral' }) {
   const tones = {
-    neutral: 'bg-zinc-100 text-ink',
-    good: 'bg-emerald-50 text-emerald-700',
-    warn: 'bg-amber-50 text-amber-700',
-    muted: 'bg-zinc-50 text-ink-tertiary',
+    neutral: 'text-ink',
+    good: 'text-emerald-700',
+    warn: 'text-amber-700',
+    muted: 'text-ink-tertiary',
   };
-  return <span className={`-my-0.5 inline-block rounded-full px-2 py-0.5 text-2xs font-semibold ${tones[tone]}`}>{children}</span>;
+  return <span className={`text-2xs font-semibold ${tones[tone]}`}>{children}</span>;
 }
 
 /** A header column: small label above, value below. */

@@ -1,7 +1,7 @@
 import { Pill } from '../../lib/format.jsx';
 
 const ORDER = ['New', 'Recent', 'Frequent'];
-const TONE = { New: 'info', Recent: 'success', Frequent: 'brand' };
+const TONE = { New: 'info', Recent: 'success', Frequent: 'frequent' };
 
 /** Pill tone for a label name, or null when it is not a system label — one source of truth for the colours. */
 export const systemLabelTone = (name) => TONE[name] ?? null;

@@ -5,6 +5,7 @@ const tones = {
   danger: 'bg-red-50 text-red-700',
   info: 'bg-brand-soft text-brand',
   brand: 'bg-brand text-white',
+  frequent: 'bg-[#c8e6f3] text-[#036da3]',
   muted: 'bg-canvas text-ink-tertiary',
 };
 

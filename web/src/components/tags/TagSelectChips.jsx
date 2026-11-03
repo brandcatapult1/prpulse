@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Pill } from '../../lib/format.jsx';
+import { systemLabelTone } from '../contacts/SystemLabelPills.jsx';
 
 /** Filter active lookup tags to the allowed type(s). Null/empty = both types. */
 export function filterTagsByType(tags, allowedTypes) {
@@ -143,7 +144,7 @@ export function TagReadPills({ tags }) {
   return (
     <div className="flex flex-wrap gap-1">
       {names.map((name) => (
-        <Pill key={name} tone="info">{name}</Pill>
+        <Pill key={name} tone={systemLabelTone(name) ?? 'info'}>{name}</Pill>
       ))}
     </div>
   );

@@ -76,6 +76,7 @@ import {
 } from '../lib/deliverableLogging.js';
 import { deliverableProofDemotionMessage, deliverableProofRequirementMessage } from '../lib/deliverableProofRules.js';
 import { formatCollaborationReason, COLLABORATION_REASONS } from '../lib/collaborationReasons.js';
+import { systemLabelTone } from '../components/contacts/SystemLabelPills.jsx';
 import { estimateAgreedFeeFromIndicativeRates } from '../lib/agreedFeeEstimate.js';
 import { addDeliverableToList, deliverableListUnitTotals, removeDeliverableFromList } from '../lib/deliverableList.js';
 import {
@@ -1403,14 +1404,7 @@ export function EngagementRecordPage() {
                   <span className="text-sm text-ink-secondary">—</span>
                 ) : (
                   contactRecord.tags.map((t) => (
-                    <span
-                      key={t.id ?? t.name}
-                      className={`rounded-md px-2 py-0.5 text-2xs font-medium ${
-                        t.type === 'system' ? 'bg-brand-soft text-brand' : 'bg-zinc-100 text-ink-secondary'
-                      }`}
-                    >
-                      {t.name}
-                    </span>
+                    <Pill key={t.id ?? t.name} tone={(t.type === 'system' && systemLabelTone(t.name)) || 'default'}>{t.name}</Pill>
                   ))
                 )}
               </dd>

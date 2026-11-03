@@ -187,6 +187,11 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
                 AND ($6::text IS NULL OR ct.full_name ILIKE '%' || $6::text || '%')
             ), '') AS creators,
             (SELECT count(*) FROM engagements e WHERE e.campaign_id = cam.id
+               AND e.conversation_status = 'not_contacted'
+                 AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid)
+                 AND ($6::text IS NULL OR EXISTS (
+                   SELECT 1 FROM contacts cn WHERE cn.id = e.contact_id AND cn.full_name ILIKE '%' || $6::text || '%')))::int AS not_contacted,
+            (SELECT count(*) FROM engagements e WHERE e.campaign_id = cam.id
                AND e.conversation_status = 'in_conversation'
                  AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid)
                  AND ($6::text IS NULL OR EXISTS (
@@ -225,6 +230,7 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
       balance_prev: r.balance_prev,
       total: r.target ?? 0,
       creators: r.creators,
+      not_contacted: r.not_contacted,
       in_conversation: r.in_conversation,
       scheduled: r.scheduled,
       awaiting: r.awaiting,

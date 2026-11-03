@@ -30,7 +30,9 @@ function sortRows(rows, key, dir) {
 }
 
 // The campaign table, minus the account manager (it is the row being opened).
-const MANAGER_CAMPAIGN_COLUMNS = CAMPAIGN_COLUMNS.filter((c) => c.key !== 'managers');
+const MANAGER_CAMPAIGN_COLUMNS = CAMPAIGN_COLUMNS
+  .filter((c) => c.key !== 'managers')
+  .flatMap((c) => (c.key === 'in_conversation' ? [{ key: 'not_contacted', label: 'Not Contacted' }, c] : [c]));
 
 /** Opened row: the campaigns this account manager works on, with their numbers for the cycle. */
 function ManagerCampaigns({ managerId, cycle, colSpan }) {

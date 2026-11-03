@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db.mjs';
 import { requireAuth } from '../middleware/auth.mjs';
+import { requireSeniorOrAdmin } from '../middleware/permissions.mjs';
 import {
   assertCanViewCampaignReport,
   assertCanViewCycleReport,
@@ -12,6 +13,8 @@ import { syncContactSocial, syncProviders } from '../lib/socialSync.mjs';
 import { buildCycleReportPdf, reportPdfFileName } from '../lib/reportPdf.mjs';
 
 export const reportsRouter = Router();
+// Reports are for admins and senior managers only.
+reportsRouter.use(requireAuth, requireSeniorOrAdmin);
 
 reportsRouter.get('/brands', requireAuth, async (req, res) => {
   try {

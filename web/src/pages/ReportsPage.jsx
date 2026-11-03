@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx';
 import { Card } from '../components/ui/Primitives.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { HealthBadge } from '../components/ui/HealthBadge.jsx';
@@ -17,6 +19,8 @@ import {
 } from '../lib/persistence.js';
 
 export function ReportsPage() {
+  const { user } = useAuth();
+  const allowed = user?.role === 'admin' || user?.role === 'senior_manager';
   const [brands, setBrands] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [cyclesPayload, setCyclesPayload] = useState(null);
@@ -189,6 +193,8 @@ export function ReportsPage() {
       </div>
     );
   }
+
+  if (!allowed) return <Navigate to="/" replace />;
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">

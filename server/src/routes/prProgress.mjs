@@ -10,6 +10,9 @@ export const prProgressRouter = Router();
 prProgressRouter.use(requireAuth, (req, res, next) => {
   try {
     assertStaffUser(req.user);
+    if (progressScope(req.user) !== null) {
+      return res.status(403).json({ error: 'Reports are for admins and senior managers only' });
+    }
     next();
   } catch (err) {
     res.status(err.status ?? 403).json({ error: err.message });

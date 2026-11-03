@@ -51,9 +51,9 @@ export async function buildNotContactedWorkbook(pool, campaignId) {
 
   const head = ws.getRow(5);
   head.values = ['Name', 'Followers', 'Engagement rate', 'Average views', 'Profile link'];
-  head.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  head.font = { bold: true, color: { argb: 'FF1E3A5F' } };
   head.eachCell((cell) => {
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } };
     cell.alignment = { vertical: 'middle' };
   });
   head.height = 22;

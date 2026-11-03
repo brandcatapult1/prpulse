@@ -175,7 +175,7 @@ function Chip({ children, tone = 'neutral' }) {
 /** A header column: small label above, value below. */
 function Col({ label, children, className = '', tint = false }) {
   return (
-    <div className={`shrink-0 ${tint ? '-mx-2.5 rounded-lg bg-brand/5 px-2.5 py-1.5' : ''} ${className}`}>
+    <div className={`shrink-0 ${className}`}>
       {label && <div className="text-[10px] font-medium uppercase tracking-wider text-ink-tertiary/80">{label}</div>}
       <div className={`${label ? 'mt-0.5' : ''} text-2xs font-semibold tabular-nums text-ink`}>{children}</div>
     </div>

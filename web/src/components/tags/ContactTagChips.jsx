@@ -8,9 +8,7 @@ export default function ContactTagChips({ tags }) {
         return reason ? (
           <span
             key={tag.id ?? tag.name}
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-2xs font-medium ${
-              tag.name === 'Frequent' ? 'border-[#036da3]/30 bg-[#c8e6f3] text-[#036da3]' : 'border-brand/30 bg-brand-soft/60 text-brand'
-            }`}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-brand/30 bg-brand-soft/60 px-3 py-1.5 text-2xs font-medium text-brand"
             title={`System-managed · ${reason}`}
           >
             <span>{tag.name}</span>

@@ -30,7 +30,12 @@ export async function buildNotContactedWorkbook(pool, campaignId) {
   ws.getRow(1).height = 83; // room for the banner (110 px)
   const banner = wb.addImage({ filename: LOGO, extension: 'jpeg' });
   // White banner as wide as the table with the logo already centred inside it (see assets/export-banner.jpg).
-  ws.addImage(banner, { tl: { col: 0, row: 0 }, ext: { width: 1160, height: 110 } });
+  // Pinned to cell corners (A1 to the end of E1), so it always spans the table, whatever the app's column widths.
+  ws.addImage(banner, {
+    tl: { nativeCol: 0, nativeColOff: 0, nativeRow: 0, nativeRowOff: 0 },
+    br: { nativeCol: 5, nativeColOff: 0, nativeRow: 1, nativeRowOff: 0 },
+    editAs: 'twoCell',
+  });
 
   // Client and campaign, large on a light blue band.
   [['Client', campaign.brand_name ?? '—'], ['Campaign', campaign.campaign_name]].forEach(([label, value], i) => {

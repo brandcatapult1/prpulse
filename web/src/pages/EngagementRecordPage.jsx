@@ -76,7 +76,7 @@ import {
 } from '../lib/deliverableLogging.js';
 import { deliverableProofDemotionMessage, deliverableProofRequirementMessage } from '../lib/deliverableProofRules.js';
 import { formatCollaborationReason, COLLABORATION_REASONS } from '../lib/collaborationReasons.js';
-import ContactTagChips from '../components/tags/ContactTagChips.jsx';
+import { SystemLabelPills } from '../components/contacts/SystemLabelPills.jsx';
 import { estimateAgreedFeeFromIndicativeRates } from '../lib/agreedFeeEstimate.js';
 import { addDeliverableToList, deliverableListUnitTotals, removeDeliverableFromList } from '../lib/deliverableList.js';
 import {
@@ -1403,7 +1403,12 @@ export function EngagementRecordPage() {
                 {(contactRecord?.tags ?? []).length === 0 ? (
                   <span className="text-sm text-ink-secondary">—</span>
                 ) : (
-                  <ContactTagChips tags={contactRecord.tags} />
+                  <>
+                    <SystemLabelPills labels={contactRecord.tags.filter((t) => t.type === 'system').map((t) => t.name)} />
+                    {contactRecord.tags.filter((t) => t.type !== 'system').map((t) => (
+                      <Pill key={t.id ?? t.name} tone="info">{t.name}</Pill>
+                    ))}
+                  </>
                 )}
               </dd>
             </div>

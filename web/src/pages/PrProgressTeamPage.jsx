@@ -234,13 +234,6 @@ export function PrProgressTeamPage() {
                             </button>
                             <span>{row[col.key]}</span>
                           </div>
-                        ) : row[`${col.key}_deliv`] != null ? (
-                          <div>
-                            <div className="font-medium text-ink">{row[col.key]}</div>
-                            {row[`${col.key}_deliv`] > 0 && (
-                              <div className="text-[10px] text-ink-tertiary">{row[`${col.key}_deliv`]} deliverables</div>
-                            )}
-                          </div>
                         ) : row[col.key]}
                       </td>
                     ))}

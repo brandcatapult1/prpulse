@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { PageHeader } from '../components/ui/PageHeader.jsx';
 import { MODULES } from '../lib/modules.js';
 import { prProgressApi } from '../lib/api.js';
+import { Pill } from '../lib/format.jsx';
 
 const STAGE_LABELS = {
   not_contacted: 'Not contacted',
@@ -36,7 +37,7 @@ function CreatorDeliverables({ campaignId, managerId, creator, before, prev, col
 
   return (
     <tr>
-      <td colSpan={colSpan} className="border border-line bg-zinc-50 p-3">
+      <td colSpan={colSpan} className="border-b border-line bg-zinc-50/70 px-6 py-4">
         {error ? (
           <p className="text-2xs text-red-700">{error}</p>
         ) : !rows ? (
@@ -126,6 +127,26 @@ function CreatorDeliverables({ campaignId, managerId, creator, before, prev, col
       </td>
     </tr>
   );
+}
+
+const STATUS_TONE = { Ongoing: 'success', Completed: 'info', Paused: 'warning', Draft: 'muted' };
+
+/** One table cell: zeros are quiet, key numbers get a soft pill. */
+function CellValue({ colKey, row }) {
+  const v = row[colKey];
+  if (colKey === 'status') return <Pill tone={STATUS_TONE[v] ?? 'default'}>{v}</Pill>;
+  if (colKey === 'managers') return <span className="text-ink-secondary">{v || '—'}</span>;
+  if (v === '' || v == null) return <span className="text-ink-tertiary">—</span>;
+  if (typeof v !== 'number') return v;
+  if (v === 0) return <span className="text-ink-tertiary">0</span>;
+  if (colKey === 'completed') {
+    return <span className="inline-block min-w-[2rem] rounded-full bg-teal-50 px-2 py-0.5 font-semibold text-teal-700">{v}</span>;
+  }
+  if (colKey === 'balance_prev') {
+    return <span className="inline-block min-w-[2rem] rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">{v}</span>;
+  }
+  if (colKey === 'remaining') return <span className="font-semibold text-ink">{v}</span>;
+  return <span className="font-medium text-ink">{v}</span>;
 }
 
 const COLUMNS = [
@@ -303,19 +324,22 @@ export function PrProgressPage() {
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-2xs text-red-800">{error}</div>
       )}
 
-      <div className="panel overflow-hidden p-0">
-        <div className="border-b border-line px-4 py-3 text-center text-base font-semibold text-ink">
-          PR Progress Report - As of {data?.as_of ?? '…'}
+      <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-gradient-to-r from-brand-soft/70 to-white px-5 py-4">
+          <h2 className="text-base font-semibold tracking-tight text-ink">PR Progress Report</h2>
+          <span className="rounded-full bg-white px-3 py-1 text-2xs font-medium text-ink-secondary ring-1 ring-line">
+            As of {data?.as_of ?? '…'}
+          </span>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] border-collapse text-sm">
+          <table className="w-full min-w-[900px] border-separate border-spacing-0 text-sm">
             <thead>
-              <tr className="bg-zinc-100">
+              <tr>
                 {COLUMNS.map((col) => (
                   <th
                     key={col.key}
                     scope="col"
-                    className={`border border-line px-3 py-2 text-2xs font-semibold text-ink ${
+                    className={`border-b border-line bg-zinc-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary ${
                       col.align === 'left' ? 'text-left' : 'text-center'
                     }`}
                   >
@@ -326,21 +350,21 @@ export function PrProgressPage() {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={COLUMNS.length} className="px-3 py-6 text-center text-2xs text-ink-secondary">Loading…</td></tr>
+                <tr><td colSpan={COLUMNS.length} className="px-4 py-10 text-center text-2xs text-ink-secondary">Loading…</td></tr>
               )}
               {!loading && rows.length === 0 && (
-                <tr><td colSpan={COLUMNS.length} className="px-3 py-6 text-center text-2xs text-ink-secondary">No campaigns have this cycle.</td></tr>
+                <tr><td colSpan={COLUMNS.length} className="px-4 py-10 text-center text-2xs text-ink-secondary">No campaigns have this cycle.</td></tr>
               )}
               {!loading && rows.map((row) => (
                 <Fragment key={row.id}>
-                  <tr className="hover:bg-zinc-50">
+                  <tr className="group transition-colors hover:bg-brand-soft/40">
                     {COLUMNS.map((col, i) => (
                       <td
                         key={col.key}
-                        className={`border border-line px-3 py-2 ${col.align === 'left' ? 'text-left' : 'text-center tabular-nums'}`}
+                        className={`border-b border-line/60 px-4 py-3.5 ${col.align === 'left' ? 'text-left' : 'text-center tabular-nums'}`}
                       >
                         {i === 0 ? (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2.5">
                             <button
                               type="button"
                               onClick={() => toggleOpen(row.id)}
@@ -350,10 +374,10 @@ export function PrProgressPage() {
                             >
                               <span className={`transition-transform ${openIds.has(row.id) ? 'rotate-90' : ''}`} aria-hidden>▸</span>
                             </button>
-                            <span>{row[col.key]}</span>
+                            <span className="font-medium text-ink">{row[col.key]}</span>
                           </div>
                         ) : (
-                          row[col.key] === '' || row[col.key] == null ? '—' : row[col.key]
+                          <CellValue colKey={col.key} row={row} />
                         )}
                       </td>
                     ))}

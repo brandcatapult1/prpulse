@@ -23,19 +23,14 @@ export async function buildNotContactedWorkbook(pool, campaignId) {
 
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Not contacted', { views: [{ showGridLines: false }] });
-  const WIDTHS = [34, 18, 24, 22, 54];
-  ws.columns = WIDTHS.map((width) => ({ width }));
+  // Symmetric around the middle column (46 + 20 = 24 + 42), so the logo in that column sits dead centre.
+  ws.columns = [46, 20, 30, 24, 42].map((width) => ({ width }));
   const FONT = 15; // body and header text; 4 larger than Excel's default 11
-  const px = (w) => w * 7 + 5;
-  const totalPx = WIDTHS.reduce((sum, w) => sum + px(w), 0);
 
   ws.getRow(1).height = 82; // room for the logo (200 x 100 px)
   const logo = wb.addImage({ filename: LOGO, extension: 'png' });
-  // Centre the logo over the table: find the column and the fraction into it where it starts.
-  let offset = (totalPx - 200) / 2;
-  let col = 0;
-  while (col < WIDTHS.length - 1 && offset >= px(WIDTHS[col])) { offset -= px(WIDTHS[col]); col += 1; }
-  ws.addImage(logo, { tl: { col: col + offset / px(WIDTHS[col]), row: 0 }, ext: { width: 200, height: 100 } });
+  // Fill the middle column (anchored to cells, so it stays centred in any spreadsheet app).
+  ws.addImage(logo, { tl: { col: 2.035, row: 0.05 }, br: { col: 2.965, row: 0.95 }, editAs: 'oneCell' });
 
   // Client and campaign, large on a light blue band.
   [['Client', campaign.brand_name ?? '—'], ['Campaign', campaign.campaign_name]].forEach(([label, value], i) => {

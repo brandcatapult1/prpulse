@@ -133,8 +133,12 @@ function DeliverableStatsTable({ deliverables, classification, followers, action
             <div className="flex items-center gap-2">
               <Chip>{TYPE_LABEL[d.deliverable_type] ?? formatStatus(d.deliverable_type)}</Chip>
               {l.content_url
-                ? <a href={l.content_url} target="_blank" rel="noreferrer" title={l.content_url} className="truncate text-2xs text-brand hover:underline">{l.content_url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 34)}{l.content_url.replace(/^https?:\/\/(www\.)?/, '').length > 34 ? '…' : ''}</a>
-                : <span className="text-2xs italic text-ink-tertiary">No link · screenshot proof</span>}
+                ? (
+                  <span className="text-2xs text-ink-tertiary">
+                    (<a href={l.content_url} target="_blank" rel="noreferrer" title={l.content_url} className="text-brand hover:underline">Link</a>)
+                  </span>
+                )
+                : <span className="text-2xs italic text-ink-tertiary">(screenshot proof)</span>}
             </div>
           </div>
           {METRICS.map(([k, label]) => {
@@ -147,7 +151,7 @@ function DeliverableStatsTable({ deliverables, classification, followers, action
             );
           })}
           <div className="col-span-2 flex justify-end lg:col-span-3">
-            {idx === 0 && action}
+            {idx === 0 && <div className="-my-2.5">{action}</div>}
           </div>
         </div>
       ))}

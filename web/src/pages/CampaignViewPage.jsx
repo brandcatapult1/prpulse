@@ -309,7 +309,7 @@ export function CampaignViewPage() {
         actions={
           <>
             <button type="button" className="btn-secondary" onClick={exportNotContacted} disabled={exporting}>
-              {exporting ? 'Exporting…' : 'Export Not contacted'}
+              {exporting ? 'Exporting…' : 'Export for Approval'}
             </button>
             <button type="button" className="btn-secondary" onClick={() => setEditOpen(true)}>Edit</button>
             <button type="button" className="btn-primary" onClick={() => setAddOpen(true)}>Add Creators</button>

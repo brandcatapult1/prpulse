@@ -31,6 +31,42 @@ contactsRouter.get('/', requireAuth, async (req, res) => {
   }
 });
 
+/** Admin only: what the server's Instagram credentials are and what Meta says about them (no secrets returned). */
+contactsRouter.get('/instagram-diagnostics', requireAuth, requireAdmin, async (req, res) => {
+  const token = process.env.META_ACCESS_TOKEN;
+  const igId = process.env.META_IG_USER_ID;
+  const version = process.env.META_GRAPH_VERSION || 'v23.0';
+  const base = `https://graph.facebook.com/${version}`;
+  const out = {
+    graph_version: version,
+    ig_user_id: igId ?? null,
+    token_set: Boolean(token),
+    token_length: token ? token.length : 0,
+    token_has_whitespace: token ? token !== token.trim() || /\s/.test(token) : false,
+  };
+  const call = async (url) => {
+    const r = await fetch(url);
+    return { status: r.status, body: await r.json().catch(() => ({})) };
+  };
+  try {
+    if (token) {
+      const dbg = await call(`${base}/debug_token?input_token=${encodeURIComponent(token)}&access_token=${encodeURIComponent(token)}`);
+      const d = dbg.body?.data;
+      out.debug_token = d
+        ? { type: d.type, app_id: d.app_id, user_id: d.user_id, is_valid: d.is_valid, expires_at: d.expires_at, scopes: d.scopes, granular_scopes: d.granular_scopes }
+        : dbg.body;
+      const handle = String(req.query.handle ?? 'instagram').replace(/[^A-Za-z0-9._]/g, '');
+      const disc = await call(`${base}/${igId}?fields=${encodeURIComponent(`business_discovery.username(${handle}){followers_count}`)}&access_token=${encodeURIComponent(token)}`);
+      const own = await call(`${base}/${igId}?fields=username&access_token=${encodeURIComponent(token)}`);
+      out.own_account = own.status === 200 ? { ok: true, username: own.body.username } : { ok: false, error: own.body?.error };
+      out.business_discovery = disc.status === 200 ? { ok: true, handle } : { ok: false, handle, error: disc.body?.error };
+    }
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ ...out, error: err.message });
+  }
+});
+
 contactsRouter.get('/:id/engagements', requireAuth, async (req, res) => {
   const { rows } = await pool.query(
     `SELECT e.*, cam.campaign_name, b.brand_name, u.full_name AS owner_name,

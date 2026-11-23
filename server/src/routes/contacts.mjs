@@ -57,6 +57,13 @@ contactsRouter.get('/instagram-diagnostics', requireAuth, requireAdmin, async (r
         : dbg.body;
       const handle = String(req.query.handle ?? 'instagram').replace(/[^A-Za-z0-9._]/g, '');
       const disc = await call(`${base}/${igId}?fields=${encodeURIComponent(`business_discovery.username(${handle}){followers_count}`)}&access_token=${encodeURIComponent(token)}`);
+      const tok = encodeURIComponent(token);
+      const me = await call(`${base}/me?fields=id,name&access_token=${tok}`);
+      out.me = me.status === 200 ? me.body : { error: me.body?.error };
+      const pages = await call(`${base}/me/accounts?fields=id,name,instagram_business_account{id,username}&access_token=${tok}`);
+      out.pages = pages.status === 200 ? pages.body.data : { error: pages.body?.error };
+      const igViaPage = await call(`${base}/${igId}?fields=id&access_token=${tok}`);
+      out.ig_node_id_only = igViaPage.status === 200 ? { ok: true } : { ok: false, code: igViaPage.body?.error?.code, subcode: igViaPage.body?.error?.error_subcode };
       const own = await call(`${base}/${igId}?fields=username&access_token=${encodeURIComponent(token)}`);
       out.own_account = own.status === 200 ? { ok: true, username: own.body.username } : { ok: false, error: own.body?.error };
       out.business_discovery = disc.status === 200 ? { ok: true, handle } : { ok: false, handle, error: disc.body?.error };

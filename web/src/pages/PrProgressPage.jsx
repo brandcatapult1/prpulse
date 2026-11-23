@@ -16,7 +16,7 @@ const STAGE_LABELS = {
   awaiting_final_deliverables: 'Awaiting deliverables',
   collaboration_complete: 'Completed',
 };
-const TYPE_LABELS = { reel: 'Reel', story: 'Story', static_carousel_post: 'Post / Carousel', other: 'Other' };
+const TYPE_LABELS = { reel: 'Reel', story: 'Story', static_carousel_post: 'Carousel', other: 'Post' };
 const stageTone = (s) => {
   if (s === 'collaboration_complete') return 'success';
   if (s === 'awaiting_final_deliverables') return 'warning';

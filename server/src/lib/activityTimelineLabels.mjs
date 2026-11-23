@@ -37,8 +37,8 @@ const STAGE_SLUG_LABELS = {
 const DELIVERABLE_TYPE_LABELS = {
   reel: 'Reel',
   story: 'Story',
-  static_carousel_post: 'Static / carousel post',
-  other: 'Other',
+  static_carousel_post: 'Carousel',
+  other: 'Post',
 };
 
 const LEGACY_ACTION_LABELS = {

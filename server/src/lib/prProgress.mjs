@@ -43,16 +43,18 @@ const OWN_CAMPAIGN_SQL = ownCampaignSql(2);
 
 /**
  * SQL for "the cycle of campaign `cam` to report on".
- * A cycle number → that cycle. Otherwise the campaign's running cycle, or `back` cycles before it
- * (back = 1 is the previous cycle; campaigns without such a cycle drop out).
- * Arguments are the parameter indexes of: cycle number, today (date), back (int).
+ * A cycle number → that cycle. Otherwise the campaign's RUNNING cycle (the one that contains today), or `back`
+ * cycles before it (back = 1 is the previous cycle). A campaign with no running cycle (finished or not started)
+ * drops out, unless `anyCycle` is true (one campaign picked by name: its latest started cycle is used then).
+ * Arguments are the parameter indexes of: cycle number, today (date), back (int); anyCycle is a SQL boolean.
  */
-const cyclePick = (num, today, back) => `
+const cyclePick = (num, today, back, anyCycle = 'false') => `
   SELECT c.* FROM campaign_cycles c
   WHERE c.campaign_id = cam.id AND (
     ($${num}::int IS NOT NULL AND c.cycle_number = $${num}::int)
     OR ($${num}::int IS NULL AND c.cycle_number = (
       SELECT r.cycle_number FROM campaign_cycles r WHERE r.campaign_id = cam.id
+        AND (${anyCycle} OR (r.cycle_start <= $${today}::date AND $${today}::date < r.cycle_end))
       ORDER BY (r.cycle_start <= $${today}::date AND $${today}::date < r.cycle_end) DESC,
                (r.cycle_start <= $${today}::date) DESC,
                CASE WHEN r.cycle_start <= $${today}::date THEN -r.cycle_number ELSE r.cycle_number END
@@ -212,7 +214,7 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
                  AND ($6::text IS NULL OR EXISTS (
                    SELECT 1 FROM contacts cn WHERE cn.id = e.contact_id AND cn.full_name ILIKE '%' || $6::text || '%')))::int AS awaiting
      FROM campaigns cam
-     JOIN LATERAL (${cyclePick(1, 3, 7)}) cc ON true
+     JOIN LATERAL (${cyclePick(1, 3, 7, '$4::uuid IS NOT NULL')}) cc ON true
      WHERE cam.status <> 'archived' AND ${OWN_CAMPAIGN_SQL}
        AND ($4::uuid IS NULL OR cam.id = $4::uuid)
        AND ($5::uuid IS NULL OR EXISTS (

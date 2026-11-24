@@ -17,7 +17,7 @@ import {
   publicConnection,
   whatsappUrl,
 } from '../lib/instagramConnect.mjs';
-import { fetchLatestInstagramMedia, syncContactSocial, syncProviders, RATE_LIMIT_RE } from '../lib/socialSync.mjs';
+import { fetchLatestInstagramMedia, syncContactSocial, syncProviders } from '../lib/socialSync.mjs';
 import { listContactsPaginated, listPopulationContactsPaginated } from '../lib/contactList.mjs';
 
 export const contactsRouter = Router();
@@ -105,12 +105,18 @@ contactsRouter.post('/refresh-empty-stats', requireAuth, requireAdmin, async (re
   (async () => {
     for (const { id } of rows) {
       try {
-        await syncContactSocial(pool, id);
-        bulkRefresh.ok += 1;
+        const r = await syncContactSocial(pool, id);
+        const msg = String(r?.instagram ?? '');
+        if (/^error|not_configured|skipped/.test(msg)) {
+          bulkRefresh.failed += 1;
+          bulkRefresh.last_error = msg;
+          if (/rate-limiting/i.test(msg)) { bulkRefresh.stopped = 'Instagram rate limit reached; run again in about an hour'; bulkRefresh.done += 1; break; }
+        } else {
+          bulkRefresh.ok += 1;
+        }
       } catch (err) {
         bulkRefresh.failed += 1;
         bulkRefresh.last_error = err.message;
-        if (RATE_LIMIT_RE.test(err.message ?? '')) { bulkRefresh.stopped = 'Instagram rate limit reached; run again in about an hour'; break; }
       }
       bulkRefresh.done += 1;
       await new Promise((r) => setTimeout(r, 1500));

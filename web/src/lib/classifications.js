@@ -17,7 +17,7 @@ export const CLASSIFICATION_OPTIONS = [
 export function formatClassification(value) {
   if (!value) return '—';
   const match = CLASSIFICATION_OPTIONS.find((o) => o.value === value);
-  return match?.label ?? value.replace(/_/g, ' ');
+  return match?.label ?? String(value).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 /** Dropdown option text — includes follower bands or type descriptors. */

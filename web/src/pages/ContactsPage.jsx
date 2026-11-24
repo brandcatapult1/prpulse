@@ -12,6 +12,7 @@ import { contactsApi, lookupApi } from '../lib/api.js';
 import { setContactsCache } from '../lib/contactsCache.js';
 import { canBulkImport } from '../lib/csvImport.js';
 import { CONTACT_PAGE_FILTER_DEFAULTS } from '../lib/contactFilters.js';
+import { formatClassification } from '../lib/classifications.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const PAGE_SIZE = 50;
@@ -186,7 +187,7 @@ export function ContactsPage() {
       ),
     },
     { key: 'primary_category_name', label: 'Category', render: (r) => r.primary_category_name ?? '—' },
-    { key: 'classification', label: 'Class', render: (r) => r.classification?.replace('_', ' ') ?? '—' },
+    { key: 'classification', label: 'Class', render: (r) => formatClassification(r.classification) },
     {
       key: 'status',
       label: 'Status',

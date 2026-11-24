@@ -17,7 +17,7 @@ import {
   publicConnection,
   whatsappUrl,
 } from '../lib/instagramConnect.mjs';
-import { fetchLatestInstagramMedia, syncContactSocial, syncProviders } from '../lib/socialSync.mjs';
+import { fetchLatestInstagramMedia, syncContactSocial, syncProviders, RATE_LIMIT_RE } from '../lib/socialSync.mjs';
 import { listContactsPaginated, listPopulationContactsPaginated } from '../lib/contactList.mjs';
 
 export const contactsRouter = Router();
@@ -72,6 +72,52 @@ contactsRouter.get('/instagram-diagnostics', requireAuth, requireAdmin, async (r
   } catch (err) {
     res.status(500).json({ ...out, error: err.message });
   }
+});
+
+/** Admin only: background refresh of creators whose Instagram stats are still empty (paced; stops on rate limit). */
+const bulkRefresh = { running: false, total: 0, done: 0, ok: 0, failed: 0, stopped: null, started_at: null, finished_at: null, last_error: null };
+
+contactsRouter.get('/refresh-empty-stats', requireAuth, requireAdmin, async (req, res) => {
+  const { rows: [c] } = await pool.query(
+    `SELECT count(*)::int AS n FROM contacts c
+     WHERE NULLIF(trim(c.instagram_url), '') IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM creator_social_stats s
+                       WHERE s.contact_id = c.id AND s.platform = 'instagram' AND s.followers IS NOT NULL)`,
+  );
+  res.json({ ...bulkRefresh, still_empty: c.n });
+});
+
+contactsRouter.post('/refresh-empty-stats', requireAuth, requireAdmin, async (req, res) => {
+  if (bulkRefresh.running) return res.status(409).json({ error: 'A refresh is already running', ...bulkRefresh });
+  if (!syncProviders().instagram) return res.status(400).json({ error: 'Instagram sync is not configured' });
+  const limit = Math.min(Math.max(Number.parseInt(req.body?.limit, 10) || 150, 1), 500);
+  const { rows } = await pool.query(
+    `SELECT c.id FROM contacts c
+     LEFT JOIN creator_social_stats s ON s.contact_id = c.id AND s.platform = 'instagram'
+     WHERE NULLIF(trim(c.instagram_url), '') IS NOT NULL
+       AND (s.id IS NULL OR (s.followers IS NULL AND s.source <> 'manual'))
+     ORDER BY (s.id IS NOT NULL), c.created_at
+     LIMIT $1`,
+    [limit],
+  );
+  Object.assign(bulkRefresh, { running: true, total: rows.length, done: 0, ok: 0, failed: 0, stopped: null, last_error: null, started_at: new Date().toISOString(), finished_at: null });
+  res.status(202).json({ started: true, total: rows.length });
+  (async () => {
+    for (const { id } of rows) {
+      try {
+        await syncContactSocial(pool, id);
+        bulkRefresh.ok += 1;
+      } catch (err) {
+        bulkRefresh.failed += 1;
+        bulkRefresh.last_error = err.message;
+        if (RATE_LIMIT_RE.test(err.message ?? '')) { bulkRefresh.stopped = 'Instagram rate limit reached; run again in about an hour'; break; }
+      }
+      bulkRefresh.done += 1;
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    bulkRefresh.running = false;
+    bulkRefresh.finished_at = new Date().toISOString();
+  })();
 });
 
 contactsRouter.get('/:id/engagements', requireAuth, async (req, res) => {

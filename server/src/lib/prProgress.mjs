@@ -64,10 +64,14 @@ const cyclePick = (num, today, back, anyCycle = 'false') => `
   LIMIT 1`;
 
 /** Creator-wise deliverables for one campaign (the expanded row). */
-export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUserId = null, managerId = null, creator = null, before = null, prevStart = null) {
+export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUserId = null, managerId = null, creator = null, before = null, prevStart = null, until = null) {
   const { rows } = await pool.query(
     `SELECT e.id AS engagement_id, ct.full_name, mgr.full_name AS manager_name,
             e.conversation_status::text AS stage,
+            CASE WHEN $5::date IS NULL OR $6::date IS NULL THEN NULL
+                 ELSE (fn_engagement_counted(e.id) AND e.completed_at IS NOT NULL
+                       AND (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date >= $5::date
+                       AND (e.completed_at AT TIME ZONE 'Asia/Kolkata')::date < $6::date) END AS completed_in_cycle,
             COALESCE((
               SELECT array_agg(t.name ORDER BY t.system_key)
               FROM contact_tags ctl JOIN tags t ON t.id = ctl.tag_id AND t.type = 'system'
@@ -88,9 +92,10 @@ export async function loadCampaignCreatorDeliverables(pool, campaignId, onlyUser
      WHERE e.campaign_id = $1::uuid AND ${OWN_CAMPAIGN_SQL}
        AND ($3::uuid IS NULL OR e.assigned_manager = $3::uuid)
        AND ($4::text IS NULL OR ct.full_name ILIKE '%' || $4::text || '%')
+       AND ($6::date IS NULL OR (e.created_at AT TIME ZONE 'Asia/Kolkata')::date < $6::date)
      GROUP BY e.id, ct.id, ct.full_name, mgr.full_name, e.conversation_status
      ORDER BY ct.full_name`,
-    [campaignId, onlyUserId, managerId, creator, before],
+    [campaignId, onlyUserId, managerId, creator, before, until],
   );
   return rows;
 }
@@ -167,6 +172,7 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
     `SELECT cam.id, cam.campaign_name, cam.status,
             cc.target, cc.completed_collaborations, cc.remaining_collaborations,
             cc.cycle_start::text AS cycle_start,
+            cc.cycle_end::text AS cycle_end,
             (SELECT count(*) FROM deliverables d JOIN engagements e ON e.id = d.engagement_id
               WHERE e.campaign_id = cam.id AND d.status <> 'posted'
                 AND e.conversation_status::text NOT LIKE 'dropped%'
@@ -195,21 +201,25 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
             ), '') AS creators,
             (SELECT count(*) FROM engagements e WHERE e.campaign_id = cam.id
                AND e.conversation_status = 'not_contacted'
+                 AND (e.created_at AT TIME ZONE 'Asia/Kolkata')::date < cc.cycle_end
                  AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid)
                  AND ($6::text IS NULL OR EXISTS (
                    SELECT 1 FROM contacts cn WHERE cn.id = e.contact_id AND cn.full_name ILIKE '%' || $6::text || '%')))::int AS not_contacted,
             (SELECT count(*) FROM engagements e WHERE e.campaign_id = cam.id
                AND e.conversation_status = 'in_conversation'
+                 AND (e.created_at AT TIME ZONE 'Asia/Kolkata')::date < cc.cycle_end
                  AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid)
                  AND ($6::text IS NULL OR EXISTS (
                    SELECT 1 FROM contacts cn WHERE cn.id = e.contact_id AND cn.full_name ILIKE '%' || $6::text || '%')))::int AS in_conversation,
             (SELECT count(*) FROM engagements e WHERE e.campaign_id = cam.id
                AND e.conversation_status = 'scheduled'
+                 AND (e.created_at AT TIME ZONE 'Asia/Kolkata')::date < cc.cycle_end
                  AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid)
                  AND ($6::text IS NULL OR EXISTS (
                    SELECT 1 FROM contacts cn WHERE cn.id = e.contact_id AND cn.full_name ILIKE '%' || $6::text || '%')))::int AS scheduled,
             (SELECT count(*) FROM engagements e WHERE e.campaign_id = cam.id
                AND e.conversation_status = 'awaiting_final_deliverables'
+                 AND (e.created_at AT TIME ZONE 'Asia/Kolkata')::date < cc.cycle_end
                  AND ($5::uuid IS NULL OR e.assigned_manager = $5::uuid)
                  AND ($6::text IS NULL OR EXISTS (
                    SELECT 1 FROM contacts cn WHERE cn.id = e.contact_id AND cn.full_name ILIKE '%' || $6::text || '%')))::int AS awaiting
@@ -234,6 +244,7 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
       managers: r.managers,
       manager_count: r.manager_count,
       cycle_start: r.cycle_start,
+      cycle_end: r.cycle_end,
       balance_prev: r.balance_prev,
       total: r.target ?? 0,
       creators: r.creators,
@@ -509,6 +520,7 @@ export async function loadPrProgressTeamRows(pool, cycleNumber, back = 0) {
      FROM users u
      LEFT JOIN per ON per.user_id = u.id
      LEFT JOIN engagements e ON e.campaign_id = per.campaign_id AND e.assigned_manager = u.id
+       AND (e.created_at AT TIME ZONE 'Asia/Kolkata')::date < per.cycle_end
      LEFT JOIN LATERAL (
        SELECT COALESCE(sum(d.quantity), 0) AS qty FROM deliverables d WHERE d.engagement_id = e.id
      ) dl ON true

@@ -37,6 +37,7 @@ const managerParam = (req) =>
 
 const prevParam = (req) => (/^\d{4}-\d{2}-\d{2}$/.test(req.query.prev ?? '') ? req.query.prev : null);
 const beforeParam = (req) => (/^\d{4}-\d{2}-\d{2}$/.test(req.query.before ?? '') ? req.query.before : null);
+const untilParam = (req) => (/^\d{4}-\d{2}-\d{2}$/.test(req.query.until ?? '') ? req.query.until : null);
 
 const creatorParam = (req) => {
   const q = String(req.query.creator ?? '').trim().slice(0, 80);
@@ -63,7 +64,7 @@ prProgressRouter.get('/campaigns', async (req, res) => {
 prProgressRouter.get('/campaigns/:id/creators', async (req, res) => {
   try {
     if (!UUID_RE.test(req.params.id)) return res.status(400).json({ error: 'Invalid campaign' });
-    res.json(await loadCampaignCreatorDeliverables(pool, req.params.id, progressScope(req.user), managerParam(req), creatorParam(req), beforeParam(req), prevParam(req)));
+    res.json(await loadCampaignCreatorDeliverables(pool, req.params.id, progressScope(req.user), managerParam(req), creatorParam(req), beforeParam(req), prevParam(req), untilParam(req)));
   } catch (err) {
     res.status(503).json({ error: err.message ?? 'Could not load creators' });
   }
@@ -132,7 +133,7 @@ prProgressRouter.get('/pdf', async (req, res) => {
     for (const row of rows) {
       if (expanded.has(row.id)) {
         row.details = await loadCampaignCreatorDeliverables(
-          pool, row.id, progressScope(req.user), managerParam(req), creatorParam(req), row.cycle_start, row.prev_start,
+          pool, row.id, progressScope(req.user), managerParam(req), creatorParam(req), row.cycle_start, row.prev_start, row.cycle_end,
         );
       }
     }

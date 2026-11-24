@@ -38,7 +38,7 @@ function ManagerCreators({ managerId, cycle, colSpan }) {
     setError(null);
     prProgressApi.report(cycle, '', managerId, '')
       .then((d) => Promise.all((d.rows ?? []).map((camp) =>
-        prProgressApi.creators(camp.id, managerId, '', camp.cycle_start, camp.prev_start)
+        prProgressApi.creators(camp.id, managerId, '', camp.cycle_start, camp.prev_start, camp.cycle_end)
           .then((list) => (Array.isArray(list) ? list : [])
             .filter((c) => c.stage === 'awaiting_final_deliverables')
             .map((c) => ({ ...c, campaign_name: camp.campaign_name }))))))

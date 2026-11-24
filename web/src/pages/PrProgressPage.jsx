@@ -108,17 +108,17 @@ export function CreatorsTable({ rows, second = 'manager' }) {
 }
 
 /** Expanded row: the creators who completed on the campaign, with their deliverables. */
-function CreatorDeliverables({ campaignId, managerId, creator, before, prev, colSpan }) {
+function CreatorDeliverables({ campaignId, managerId, creator, before, prev, until, colSpan }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
-    prProgressApi.creators(campaignId, managerId, creator, before, prev)
-      .then((d) => { if (!cancelled) setRows(Array.isArray(d) ? d.filter((c) => c.stage === 'collaboration_complete') : []); })
+    prProgressApi.creators(campaignId, managerId, creator, before, prev, until)
+      .then((d) => { if (!cancelled) setRows(Array.isArray(d) ? d.filter((c) => c.stage === 'collaboration_complete' && c.completed_in_cycle !== false) : []); })
       .catch((err) => { if (!cancelled) setError(err.message ?? 'Could not load creators'); });
     return () => { cancelled = true; };
-  }, [campaignId, managerId, creator, before, prev]);
+  }, [campaignId, managerId, creator, before, prev, until]);
 
   const carried = (rows ?? []).flatMap((c) =>
     c.deliverables.filter((d) => d.carried).map((d) => ({ creator: c.full_name, manager: c.manager_name, d })));
@@ -432,7 +432,7 @@ export function PrProgressPage() {
                       </td>
                     ))}
                   </tr>
-                  {openIds.has(row.id) && <CreatorDeliverables campaignId={row.id} managerId={managerId} creator={creator} before={row.cycle_start} prev={row.prev_start} colSpan={COLUMNS.length} />}
+                  {openIds.has(row.id) && <CreatorDeliverables campaignId={row.id} managerId={managerId} creator={creator} before={row.cycle_start} prev={row.prev_start} until={row.cycle_end} colSpan={COLUMNS.length} />}
                 </Fragment>
               ))}
             </tbody>

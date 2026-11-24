@@ -215,7 +215,7 @@ export async function loadPrProgressRows(pool, cycleNumber, onlyUserId = null, c
                    SELECT 1 FROM contacts cn WHERE cn.id = e.contact_id AND cn.full_name ILIKE '%' || $6::text || '%')))::int AS awaiting
      FROM campaigns cam
      JOIN LATERAL (${cyclePick(1, 3, 7, '$4::uuid IS NOT NULL')}) cc ON true
-     WHERE cam.status <> 'archived' AND ${OWN_CAMPAIGN_SQL}
+     WHERE (cam.status = 'active' OR $4::uuid IS NOT NULL) AND ${OWN_CAMPAIGN_SQL}
        AND ($4::uuid IS NULL OR cam.id = $4::uuid)
        AND ($5::uuid IS NULL OR EXISTS (
          SELECT 1 FROM campaign_managers pm WHERE pm.campaign_id = cam.id AND pm.user_id = $5::uuid))
@@ -480,7 +480,7 @@ export async function loadPrProgressTeamRows(pool, cycleNumber, back = 0) {
        FROM campaigns cam
        JOIN campaign_managers cm ON cm.campaign_id = cam.id
        JOIN LATERAL (${cyclePick(1, 2, 3)}) cc ON true
-       WHERE cam.status <> 'archived'
+       WHERE cam.status = 'active'
      )
      SELECT u.id, u.full_name AS manager_name,
             count(DISTINCT per.campaign_id)::int AS campaigns,

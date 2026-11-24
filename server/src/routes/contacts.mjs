@@ -17,7 +17,7 @@ import {
   publicConnection,
   whatsappUrl,
 } from '../lib/instagramConnect.mjs';
-import { fetchLatestInstagramMedia, syncContactSocial, syncProviders } from '../lib/socialSync.mjs';
+import { fetchLatestInstagramMedia, syncContactSocial, syncProviders, instagramHandle } from '../lib/socialSync.mjs';
 import { listContactsPaginated, listPopulationContactsPaginated } from '../lib/contactList.mjs';
 
 export const contactsRouter = Router();
@@ -77,29 +77,30 @@ contactsRouter.get('/instagram-diagnostics', requireAuth, requireAdmin, async (r
 /** Admin only: background refresh of creators whose Instagram stats are still empty (paced; stops on rate limit). */
 const bulkRefresh = { running: false, total: 0, done: 0, ok: 0, failed: 0, stopped: null, started_at: null, finished_at: null, last_error: null };
 
-contactsRouter.get('/refresh-empty-stats', requireAuth, requireAdmin, async (req, res) => {
-  const { rows: [c] } = await pool.query(
-    `SELECT count(*)::int AS n FROM contacts c
+const EMPTY_STATS_SQL = `SELECT c.id, c.full_name AS name, c.instagram_url FROM contacts c
+     LEFT JOIN creator_social_stats s ON s.contact_id = c.id AND s.platform = 'instagram'
      WHERE NULLIF(trim(c.instagram_url), '') IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM creator_social_stats s
-                       WHERE s.contact_id = c.id AND s.platform = 'instagram' AND s.followers IS NOT NULL)`,
-  );
-  res.json({ ...bulkRefresh, still_empty: c.n });
+       AND (s.id IS NULL OR (s.followers IS NULL AND s.source <> 'manual'))
+     ORDER BY (s.id IS NOT NULL), c.created_at`;
+
+contactsRouter.get('/refresh-empty-stats', requireAuth, requireAdmin, async (req, res) => {
+  const { rows } = await pool.query(EMPTY_STATS_SQL);
+  const bad = rows.filter((r) => !instagramHandle(r.instagram_url));
+  res.json({
+    ...bulkRefresh,
+    still_empty: rows.length,
+    readable: rows.length - bad.length,
+    unreadable_links: bad.length,
+    unreadable_samples: bad.slice(0, 10).map((r) => ({ name: r.name, link: String(r.instagram_url).slice(0, 120) })),
+  });
 });
 
 contactsRouter.post('/refresh-empty-stats', requireAuth, requireAdmin, async (req, res) => {
   if (bulkRefresh.running) return res.status(409).json({ error: 'A refresh is already running', ...bulkRefresh });
   if (!syncProviders().instagram) return res.status(400).json({ error: 'Instagram sync is not configured' });
   const limit = Math.min(Math.max(Number.parseInt(req.body?.limit, 10) || 150, 1), 500);
-  const { rows } = await pool.query(
-    `SELECT c.id FROM contacts c
-     LEFT JOIN creator_social_stats s ON s.contact_id = c.id AND s.platform = 'instagram'
-     WHERE NULLIF(trim(c.instagram_url), '') IS NOT NULL
-       AND (s.id IS NULL OR (s.followers IS NULL AND s.source <> 'manual'))
-     ORDER BY (s.id IS NOT NULL), c.created_at
-     LIMIT $1`,
-    [limit],
-  );
+  const { rows: all } = await pool.query(EMPTY_STATS_SQL);
+  const rows = all.filter((r) => instagramHandle(r.instagram_url)).slice(0, limit);
   Object.assign(bulkRefresh, { running: true, total: rows.length, done: 0, ok: 0, failed: 0, stopped: null, last_error: null, started_at: new Date().toISOString(), finished_at: null });
   res.status(202).json({ started: true, total: rows.length });
   (async () => {

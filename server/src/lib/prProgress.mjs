@@ -524,7 +524,8 @@ export async function loadPrProgressTeamRows(pool, cycleNumber, back = 0) {
      LEFT JOIN LATERAL (
        SELECT COALESCE(sum(d.quantity), 0) AS qty FROM deliverables d WHERE d.engagement_id = e.id
      ) dl ON true
-     WHERE u.is_active AND u.role IN ('campaign_manager', 'senior_manager', 'admin')
+     WHERE u.is_active AND u.role IN ('campaign_manager', 'senior_manager')
+       AND u.full_name NOT ILIKE 'bhumi%'
      GROUP BY u.id, u.full_name
      ORDER BY u.full_name`,
     [cycleNumber, todayIst(), back],

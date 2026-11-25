@@ -88,6 +88,29 @@ authRouter.get('/me', async (req, res) => {
   res.json(req.session.user);
 });
 
+/** Signed-in users only: helps find why a session ends early (no secrets returned). */
+authRouter.get('/session-debug', async (req, res) => {
+  if (!req.session?.user) return res.status(401).json({ error: 'Sign in required' });
+  let stored = null;
+  try {
+    const { rows } = await pool.query(
+      'SELECT expires_at, (SELECT count(*)::int FROM http_sessions WHERE expires_at > now()) AS live FROM http_sessions WHERE sid = $1',
+      [req.sessionID],
+    );
+    stored = rows[0] ?? null;
+  } catch (err) { stored = { error: err.message }; }
+  res.json({
+    pid: process.pid,
+    sid_prefix: req.sessionID.slice(0, 6),
+    node_env: process.env.NODE_ENV ?? null,
+    cookie_secure: Boolean(req.session.cookie.secure),
+    cookie_expires: req.session.cookie.expires,
+    secure_request: req.secure,
+    stored_in_database: Boolean(stored && !stored.error),
+    store: stored,
+  });
+});
+
 authRouter.get('/status', (_req, res) => {
   res.json({
     google_configured: isGoogleConfigured(),

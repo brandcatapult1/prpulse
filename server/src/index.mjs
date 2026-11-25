@@ -54,12 +54,13 @@ app.use(
     store: databaseConfigured ? new PgSessionStore(pool) : undefined,
     secret: process.env.SESSION_SECRET ?? 'dev-only-change-me',
     resave: false,
+    rolling: true, // every request pushes the expiry forward, so active users stay signed in
     saveUninitialized: false,
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
       sameSite: 'lax',
-      maxAge: 7 * 86400000,
+      maxAge: 7 * 86400000, // idle sessions end after 7 days
     },
   }),
 );

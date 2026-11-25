@@ -12,7 +12,7 @@ export const SETTINGS_SECTIONS = [
     key: 'tags',
     label: 'Tags',
     path: 'tags',
-    allowedRoles: ['admin', 'senior_manager'],
+    allowedRoles: ['admin'],
   },
   {
     key: 'locations',

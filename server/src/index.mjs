@@ -13,6 +13,7 @@ import {
   seedDemoFixtures,
 } from '../../scripts/seed-demo.mjs';
 import { pool } from './db.mjs';
+import { PgSessionStore } from './lib/pgSessionStore.mjs';
 import { ensureCriticalSchema } from './lib/ensureSchema.mjs';
 import { startBackgroundJobs } from './lib/backgroundJobs.mjs';
 import { healthRouter } from './routes/health.mjs';
@@ -50,6 +51,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(
   session({
+    store: databaseConfigured ? new PgSessionStore(pool) : undefined,
     secret: process.env.SESSION_SECRET ?? 'dev-only-change-me',
     resave: false,
     saveUninitialized: false,

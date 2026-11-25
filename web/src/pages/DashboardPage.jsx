@@ -68,7 +68,7 @@ export function DashboardPage() {
   const hasReportTabs = (directReports?.length ?? 0) > 0 || isAdminUser;
 
   const scopeUserId = useMemo(() => {
-    if (!hasReportTabs) return undefined;
+    if (!hasReportTabs) return user?.role === 'senior_manager' ? user.id : undefined;
     if (activeScopeId === 'self') return user?.id;
     return activeScopeId;
   }, [activeScopeId, hasReportTabs, user?.id]);

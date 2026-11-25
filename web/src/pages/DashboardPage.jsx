@@ -64,7 +64,8 @@ export function DashboardPage() {
     directReports === null
     && (user?.role === 'senior_manager' || user?.role === 'admin');
 
-  const hasReportTabs = (directReports?.length ?? 0) > 0;
+  const isAdminUser = user?.role === 'admin';
+  const hasReportTabs = (directReports?.length ?? 0) > 0 || isAdminUser;
 
   const scopeUserId = useMemo(() => {
     if (!hasReportTabs) return undefined;
@@ -99,11 +100,20 @@ export function DashboardPage() {
               />
             )}
 
-            <ManagerDashboardView
-              key={scopeUserId ?? 'legacy'}
-              scopeUserId={scopeUserId}
-              displayFirstName={displayFirstName}
-            />
+            {isAdminUser && activeScopeId === 'self' ? (
+              <div className="rounded-2xl border border-line bg-white/90 px-6 py-12 text-center">
+                <p className="text-sm font-medium text-ink">Nothing to show here</p>
+                <p className="mt-1 text-2xs text-ink-secondary">
+                  Admins have no personal campaign work. Pick a team member above to see their dashboard.
+                </p>
+              </div>
+            ) : (
+              <ManagerDashboardView
+                key={scopeUserId ?? 'legacy'}
+                scopeUserId={scopeUserId}
+                displayFirstName={displayFirstName}
+              />
+            )}
           </>
         )}
       </div>

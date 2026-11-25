@@ -22,24 +22,32 @@ function mapCampaignRow(row) {
  * @param {string} requesterId Current user — used for legacy CM scope when scopeUserId is omitted.
  * @param {string} requesterRole Used for legacy broad scope when scopeUserId is omitted.
  */
-export async function loadDashboardWorkspace(pool, scopeUserId, requesterId, requesterRole) {
+export async function loadDashboardWorkspace(pool, scopeUserId, requesterId, requesterRole, { team = false } = {}) {
   const personalScope = Boolean(scopeUserId);
   const broadLegacy = !personalScope && isBroadRole(requesterRole);
   const ownerId = scopeUserId ?? requesterId;
+  // Team scope: the senior manager plus everyone reporting to them.
+  let ownerIds = [ownerId];
+  if (team && personalScope) {
+    const { rows } = await pool.query(
+      'SELECT id FROM users WHERE id = $1 OR (reports_to = $1 AND is_active = true)', [ownerId],
+    );
+    ownerIds = rows.map((r) => r.id);
+  }
 
   const engagementScopeSql = personalScope || !broadLegacy
-    ? `cam.status <> 'archived' AND e.assigned_manager = $1`
+    ? `cam.status <> 'archived' AND e.assigned_manager = ANY($1::uuid[])`
     : `cam.status <> 'archived'`;
 
   const campaignScopeSql = personalScope || !broadLegacy
     ? `cam.status = 'active' AND EXISTS (
          SELECT 1 FROM campaign_managers cm
-         WHERE cm.campaign_id = cam.id AND cm.user_id = $1
+         WHERE cm.campaign_id = cam.id AND cm.user_id = ANY($1::uuid[])
        )`
     : `cam.status = 'active'`;
 
-  const engagementParams = personalScope || !broadLegacy ? [ownerId] : [];
-  const campaignParams = personalScope || !broadLegacy ? [ownerId] : [];
+  const engagementParams = personalScope || !broadLegacy ? [ownerIds] : [];
+  const campaignParams = personalScope || !broadLegacy ? [ownerIds] : [];
 
   const [engagementsRes, campaignsRes] = await Promise.all([
     pool.query(

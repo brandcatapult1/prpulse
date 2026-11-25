@@ -1,6 +1,16 @@
 import { isAdmin, isBroadRole } from './permissions.mjs';
 
-export async function listDirectReports(pool, managerId) {
+export async function listDirectReports(pool, managerId, role = null) {
+  // Admins see every active senior manager (each tab shows that manager's team).
+  if (role === 'admin') {
+    const { rows } = await pool.query(
+      `SELECT id, full_name, role, is_active FROM users
+       WHERE role = 'senior_manager' AND is_active = true AND id <> $1
+       ORDER BY full_name`,
+      [managerId],
+    );
+    return rows;
+  }
   const { rows } = await pool.query(
     `SELECT id, full_name, role, is_active
      FROM users

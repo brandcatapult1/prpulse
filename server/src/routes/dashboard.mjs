@@ -65,7 +65,7 @@ dashboardRouter.get('/direct-reports', requireAuth, async (req, res) => {
     return res.json([]);
   }
   try {
-    const rows = await listDirectReports(pool, req.user.id);
+    const rows = await listDirectReports(pool, req.user.id, req.user.role);
     res.json(rows);
   } catch (err) {
     console.warn('Direct reports list failed:', err.message ?? err);
@@ -79,11 +79,17 @@ dashboardRouter.get('/workspace', requireAuth, async (req, res) => {
 
   try {
     const allowedScopeId = await assertCanViewDashboardFor(pool, req.user, scopeUserId);
+    let team = false;
+    if (scopeUserId && req.user.role === 'admin' && allowedScopeId !== req.user.id) {
+      const { rows: [t] } = await pool.query('SELECT role FROM users WHERE id = $1', [allowedScopeId]);
+      team = t?.role === 'senior_manager';
+    }
     const payload = await loadDashboardWorkspace(
       pool,
       scopeUserId ? allowedScopeId : null,
       req.user.id,
       req.user.role,
+      { team },
     );
     res.json(payload);
   } catch (err) {

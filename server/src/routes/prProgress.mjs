@@ -10,7 +10,10 @@ import { buildPrProgressExcel, buildPrProgressTeamExcel } from '../lib/prProgres
 export const prProgressRouter = Router();
 prProgressRouter.use(requireAuth, (req, res, next) => {
   try {
-    assertStaffUser(req.user); // campaign managers are limited to their own campaigns by progressScope
+    assertStaffUser(req.user);
+    if (progressScope(req.user) !== null) {
+      return res.status(403).json({ error: 'Only admins and senior managers can view this report' });
+    }
     next();
   } catch (err) {
     res.status(err.status ?? 403).json({ error: err.message });

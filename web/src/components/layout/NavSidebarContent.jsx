@@ -26,7 +26,8 @@ function NavGroup({ item, mobile, onNavClick, user }) {
   const active = pathname === item.to || pathname.startsWith(`${item.to}/`);
   const [open, setOpen] = useState(active);
   const shown = open;
-  const children = item.children.filter((c) => c.to !== '/reports/team' || user?.role !== 'campaign_manager');
+  // Campaign managers get the client report only.
+  const children = item.children.filter((c) => user?.role !== 'campaign_manager' || c.to === '/reports/client');
   return (
     <div>
       <button

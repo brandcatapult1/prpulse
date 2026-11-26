@@ -219,7 +219,7 @@ function sortRows(rows, key, dir) {
 
 export function PrProgressPage() {
   const { user } = useAuth();
-  const allowed = ['admin', 'senior_manager', 'campaign_manager'].includes(user?.role);
+  const allowed = user?.role === 'admin' || user?.role === 'senior_manager';
   const canFilterManagers = user?.role === 'admin' || user?.role === 'senior_manager';
 
   const [cycles, setCycles] = useState([]);

@@ -73,6 +73,8 @@ export const authApi = {
   me: () => api('/auth/me'),
   status: () => api('/auth/status'),
   logout: () => api('/auth/logout', { method: 'POST' }),
+  devUsers: () => api('/auth/dev-users'),
+  devSwitch: (userId) => api('/auth/dev-switch', { method: 'POST', body: JSON.stringify({ user_id: userId }) }),
 };
 
 export const dashboardApi = {

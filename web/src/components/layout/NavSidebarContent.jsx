@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { roleLabel } from '../../lib/format.jsx';
 import { NAV_ITEMS } from '../../lib/modules.js';
 import { canAccessSettings } from '../../lib/settingsRegistry.js';
+import { DevUserSwitcher } from './DevUserSwitcher.jsx';
 import { SidebarBrand } from './SidebarBrand.jsx';
 
 const DESKTOP_LINK =
@@ -99,6 +100,7 @@ export function NavSidebarContent({
             Dev mode — no Google sign-in
           </div>
         )}
+        {devMode && <DevUserSwitcher user={user} />}
         <div className="rounded-md px-2 py-2">
           <div className="truncate text-sm font-medium text-ink">{user?.full_name}</div>
           <div className="text-2xs text-ink-tertiary">{roleLabel(user?.role)}</div>

@@ -111,6 +111,40 @@ authRouter.get('/session-debug', async (req, res) => {
   });
 });
 
+/**
+ * Dev mode only (no Google sign-in): switch the session to another user to test each role.
+ * Both routes answer 404 wherever Google sign-in is configured, as on production.
+ */
+function devOnly(_req, res, next) {
+  if (!isDevAuthEnabled()) return res.status(404).json({ error: 'Not found' });
+  next();
+}
+
+authRouter.get('/dev-users', devOnly, async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, full_name, role FROM users WHERE is_active ORDER BY full_name`,
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(503).json({ error: err.message ?? 'Could not load users' });
+  }
+});
+
+authRouter.post('/dev-switch', devOnly, async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, email, full_name, role FROM users WHERE id::text = $1 AND is_active`,
+      [String(req.body?.user_id ?? '')],
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'User not found' });
+    req.session.user = sessionUser(rows[0]);
+    res.json(req.session.user);
+  } catch (err) {
+    res.status(503).json({ error: err.message ?? 'Could not switch user' });
+  }
+});
+
 authRouter.get('/status', (_req, res) => {
   res.json({
     google_configured: isGoogleConfigured(),

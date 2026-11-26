@@ -1,25 +1,13 @@
-import { assertStaffUser, isAdmin } from './permissions.mjs';
+import { assertStaffUser, isAdmin, isBroadRole } from './permissions.mjs';
 
 /** Campaign ids the requester may view in Reports (server-enforced). */
 export async function listAccessibleCampaignIds(pool, user) {
   assertStaffUser(user);
 
-  if (isAdmin(user.role)) {
+  // Admins and senior managers see every campaign; campaign managers only the ones they are on.
+  if (isBroadRole(user.role)) {
     const { rows } = await pool.query(
       `SELECT id FROM campaigns WHERE status <> 'archived'`,
-    );
-    return rows.map((r) => r.id);
-  }
-
-  if (user.role === 'senior_manager') {
-    const { rows } = await pool.query(
-      `SELECT DISTINCT cam.id
-       FROM campaigns cam
-       JOIN campaign_managers cm ON cm.campaign_id = cam.id
-       LEFT JOIN users u ON u.id = cm.user_id
-       WHERE cam.status <> 'archived'
-         AND (cm.user_id = $1 OR u.reports_to = $1)`,
-      [user.id],
     );
     return rows.map((r) => r.id);
   }

@@ -21,7 +21,7 @@ import {
 
 export function ReportsPage() {
   const { user } = useAuth();
-  const allowed = user?.role === 'admin' || user?.role === 'senior_manager';
+  const allowed = ['admin', 'senior_manager', 'campaign_manager'].includes(user?.role);
   const [brands, setBrands] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [cyclesPayload, setCyclesPayload] = useState(null);

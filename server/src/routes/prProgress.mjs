@@ -10,10 +10,7 @@ import { buildPrProgressExcel, buildPrProgressTeamExcel } from '../lib/prProgres
 export const prProgressRouter = Router();
 prProgressRouter.use(requireAuth, (req, res, next) => {
   try {
-    assertStaffUser(req.user);
-    if (progressScope(req.user) !== null) {
-      return res.status(403).json({ error: 'Reports are for admins and senior managers only' });
-    }
+    assertStaffUser(req.user); // campaign managers are limited to their own campaigns by progressScope
     next();
   } catch (err) {
     res.status(err.status ?? 403).json({ error: err.message });
@@ -90,6 +87,9 @@ prProgressRouter.get('/', async (req, res) => {
 });
 
 /** Team view: one row per account manager (admins and senior managers only). */
+// A senior manager's team is themselves plus the people reporting to them; admins see everyone.
+const teamOf = (req) => (req.user.role === 'senior_manager' ? req.user.id : null);
+
 function teamGuard(req, res, next) {
   if (progressScope(req.user) !== null) return res.status(403).json({ error: 'Only admins and senior managers can view the team report' });
   next();
@@ -99,7 +99,7 @@ prProgressRouter.get('/team', teamGuard, async (req, res) => {
   try {
     const cycle = cycleParam(req);
     if (!cycle) return res.status(400).json({ error: 'Select a cycle' });
-    res.json({ cycle: cycle.number ?? 'current', as_of: asOfLabel(), rows: await loadPrProgressTeamRows(pool, cycle.number, cycle.back) });
+    res.json({ cycle: cycle.number ?? 'current', as_of: asOfLabel(), rows: await loadPrProgressTeamRows(pool, cycle.number, cycle.back, teamOf(req)) });
   } catch (err) {
     res.status(503).json({ error: err.message ?? 'Could not load team progress' });
   }
@@ -109,7 +109,7 @@ prProgressRouter.get('/team/pdf', teamGuard, async (req, res) => {
   try {
     const cycle = cycleParam(req);
     if (!cycle) return res.status(400).json({ error: 'Select a cycle' });
-    const rows = sortTeamRows(await loadPrProgressTeamRows(pool, cycle.number, cycle.back), req.query.sort, req.query.dir);
+    const rows = sortTeamRows(await loadPrProgressTeamRows(pool, cycle.number, cycle.back, teamOf(req)), req.query.sort, req.query.dir);
     const { cycles } = await loadPrProgressCycles(pool, null, null);
     const picked = cycles.find((c) => String(c.number) === String(req.query.cycle));
     const pdf = await buildPrProgressTeamPdf({ rows, cycleLabel: picked?.label ?? 'Current cycle', range: picked?.range ?? '' });
@@ -156,7 +156,7 @@ prProgressRouter.get('/team/xlsx', teamGuard, async (req, res) => {
   try {
     const cycle = cycleParam(req);
     if (!cycle) return res.status(400).json({ error: 'Select a cycle' });
-    const rows = sortTeamRows(await loadPrProgressTeamRows(pool, cycle.number, cycle.back), req.query.sort, req.query.dir);
+    const rows = sortTeamRows(await loadPrProgressTeamRows(pool, cycle.number, cycle.back, teamOf(req)), req.query.sort, req.query.dir);
     const { cycles } = await loadPrProgressCycles(pool, null, null);
     const picked = cycles.find((c) => String(c.number) === String(req.query.cycle));
     const buf = await buildPrProgressTeamExcel({ rows, cycleLabel: picked?.label ?? 'Current cycle', range: picked?.range ?? '' });

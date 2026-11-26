@@ -481,10 +481,11 @@ export const TEAM_COLUMNS = [
 
 /**
  * One row per active team member (zeros included) across their non-archived campaigns.
+ * teamOf = a senior manager's id → only that manager and the people reporting to them.
  * cycleNumber = a number → that cycle of every campaign that has it; null → each campaign's running cycle.
  * "Completed" counts the manager's creators whose collaboration was completed inside that cycle.
  */
-export async function loadPrProgressTeamRows(pool, cycleNumber, back = 0) {
+export async function loadPrProgressTeamRows(pool, cycleNumber, back = 0, teamOf = null) {
   const { rows } = await pool.query(
     `WITH per AS (
        SELECT cam.id AS campaign_id, cm.user_id, cc.cycle_start, cc.cycle_end
@@ -526,9 +527,10 @@ export async function loadPrProgressTeamRows(pool, cycleNumber, back = 0) {
      ) dl ON true
      WHERE u.is_active AND u.role IN ('campaign_manager', 'senior_manager')
        AND u.full_name NOT ILIKE 'bhumi%'
+       AND ($4::uuid IS NULL OR u.id = $4::uuid OR u.reports_to = $4::uuid)
      GROUP BY u.id, u.full_name
      ORDER BY u.full_name`,
-    [cycleNumber, todayIst(), back],
+    [cycleNumber, todayIst(), back, teamOf],
   );
   return rows;
 }

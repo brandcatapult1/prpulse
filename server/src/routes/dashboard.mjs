@@ -25,6 +25,7 @@ dashboardRouter.get('/', requireAuth, async (req, res) => {
        JOIN contacts c ON c.id = e.contact_id
        JOIN campaigns cam ON cam.id = e.campaign_id
        WHERE e.assigned_manager = $1
+         AND cam.status = 'active'
          AND e.next_follow_up_date IS NOT NULL
          AND e.next_follow_up_date <= $2
          AND e.conversation_status NOT IN ('collaboration_complete', 'dropped_profile_rejected', 'dropped_not_interested', 'dropped_terms_disagreement', 'dropped')
@@ -38,7 +39,7 @@ dashboardRouter.get('/', requireAuth, async (req, res) => {
        JOIN engagements e ON e.id = d.engagement_id
        JOIN contacts c ON c.id = e.contact_id
        JOIN campaigns cam ON cam.id = e.campaign_id
-       WHERE d.is_overdue = true AND e.assigned_manager = $1
+       WHERE d.is_overdue = true AND e.assigned_manager = $1 AND cam.status = 'active'
        LIMIT 20`,
       [userId],
     ),

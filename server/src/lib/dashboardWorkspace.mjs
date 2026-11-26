@@ -36,8 +36,8 @@ export async function loadDashboardWorkspace(pool, scopeUserId, requesterId, req
   }
 
   const engagementScopeSql = personalScope || !broadLegacy
-    ? `cam.status <> 'archived' AND e.assigned_manager = ANY($1::uuid[])`
-    : `cam.status <> 'archived'`;
+    ? `cam.status = 'active' AND e.assigned_manager = ANY($1::uuid[])`
+    : `cam.status = 'active'`;
 
   const campaignScopeSql = personalScope || !broadLegacy
     ? `cam.status = 'active' AND EXISTS (
